@@ -1,20 +1,20 @@
 <Project>
   <ItemGroup>
-    <Content Include="$(MSBuildThisFileDirectory)x86\**\*.*" Condition="'$(OS)' == 'Windows_NT' AND '$(Platform)' == 'x86'">
+    <None Include="$(MSBuildThisFileDirectory)x86\**\*.*" Condition="'$(OS)' == 'Windows_NT' AND '$(Platform)' == 'x86'">
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="$(MSBuildThisFileDirectory)x64\**\*.*" Condition="'$(OS)' == 'Windows_NT' AND '$(Platform)' == 'x64'">
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)x64\**\*.*" Condition="'$(OS)' == 'Windows_NT' AND '$(Platform)' == 'x64'">
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="$(MSBuildThisFileDirectory)libaarch64\**\*.*" Condition="'$(OS)' != 'Windows_NT' AND '$(Platform)' == 'arm64'" >
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)libaarch64\**\*.*" Condition="'$(OS)' != 'Windows_NT' AND '$(Platform)' == 'arm64'" >
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="$(MSBuildThisFileDirectory)lib64\**\*.*" Condition="'$(OS)' != 'Windows_NT' AND '$(Platform)' == 'x64'" >
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)lib64\**\*.*" Condition="'$(OS)' != 'Windows_NT' AND '$(Platform)' == 'x64'" >
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    </None>
   </ItemGroup>
 </Project>
