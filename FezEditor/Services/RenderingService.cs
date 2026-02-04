@@ -1,4 +1,5 @@
 ﻿using FezEditor.Structure;
+using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -6,6 +7,7 @@ using InstanceType = FezEditor.Services.IRenderingService.InstanceType;
 
 namespace FezEditor.Services;
 
+[UsedImplicitly]
 public partial class RenderingService : IRenderingService
 {
     private readonly GraphicsDevice _device;

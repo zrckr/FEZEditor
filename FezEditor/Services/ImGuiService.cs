@@ -1,6 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using FezEditor.Structure;
 using ImGuiNET;
+using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -11,6 +12,7 @@ namespace FezEditor.Services;
 /// <summary>
 /// Renders Dear ImGui user interfaces by integrating ImGui.NET with the FNA graphics pipeline.
 /// </summary>
+[UsedImplicitly]
 public partial class ImGuiService : IImGuiService
 {
     private static readonly ILogger Logger = Logging.Create<ImGuiService>();
