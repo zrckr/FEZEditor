@@ -125,7 +125,6 @@ public class WelcomeScreen : DrawableGameComponent
             {
                 var pakService = Game.CreateService<IResourceService, PakResourceService>();
                 pakService.Initialize(new FileInfo(result.Files[0]));
-                Game.CreateComponent<FileBrowser>();
                 Game.RemoveComponent(this);
             }
             catch (Exception ex)
@@ -143,7 +142,6 @@ public class WelcomeScreen : DrawableGameComponent
             {
                 var dirService = Game.CreateService<IResourceService, DirResourceService>();
                 dirService.Initialize(new DirectoryInfo(result.Files[0]));
-                Game.CreateComponent<FileBrowser>();
                 Game.RemoveComponent(this);
             }
             catch (Exception ex)

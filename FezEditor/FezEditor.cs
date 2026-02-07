@@ -50,10 +50,13 @@ public class FezEditor : Game
         _imGui = this.CreateService<IImGuiService, ImGuiService>();
         _rendering = this.CreateService<IRenderingService, RenderingService>();
         this.CreateService<IStateService, StateService>();
-
-        this.CreateComponent<MenuBar>();
-        this.CreateComponent<WelcomeScreen>();
         
+        this.CreateComponent<MenuBar>();
+        this.CreateComponent<FileBrowser>();
+        this.CreateComponent<StatusBar>();
+        this.CreateComponent<MainLayout>();
+        this.CreateComponent<WelcomeScreen>();
+
         base.Initialize();
     }
 

@@ -1,4 +1,5 @@
 ﻿using FezEditor.Services;
+using FezEditor.Tools;
 using ImGuiNET;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
@@ -24,7 +25,7 @@ public class FileBrowser : DrawableGameComponent
 
     private SortMode _sortMode = SortMode.NameAscending;
 
-    private readonly IResourceService _resourceService;
+    private IResourceService? _resourceService;
 
     private enum SortMode
     {
@@ -34,220 +35,235 @@ public class FileBrowser : DrawableGameComponent
         TypeDescending
     }
 
-    public FileBrowser(Game game, IResourceService resourceService) : base(game)
+    public FileBrowser(Game game) : base(game)
     {
-        _resourceService = resourceService;
-        _resourceService.Refreshed += UpdateNodeTree;
     }
 
-    public override void Initialize()
+    public void Draw()
     {
-        UpdateNodeTree();
-    }
-
-    public override void Draw(GameTime gameTime)
-    {
-        ImGuiX.SetNextWindowSize(new Vector2(240, 0), ImGuiCond.FirstUseEver);
-        if (ImGui.Begin("File Browser", ImGuiWindowFlags.NoCollapse))
+        if (_resourceService == null)
         {
-            ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4, 4));
+            _resourceService = Game.TryGetService<IResourceService>();
+            if (_resourceService != null)
             {
-                ImGui.BeginDisabled(_historyIndex <= 0);
-                if (ImGui.ArrowButton("GoBack", ImGuiDir.Left))
-                {
-                    _historyIndex--;
-                    _selected = _selectionHistory[_historyIndex];
-                    _path = _selected.Path;
-                }
-
-                ImGui.EndDisabled();
-
-                ImGui.SameLine();
-                ImGui.BeginDisabled(_historyIndex >= _selectionHistory.Count - 1);
-                if (ImGui.ArrowButton("GoForward", ImGuiDir.Right))
-                {
-                    _historyIndex++;
-                    _selected = _selectionHistory[_historyIndex];
-                    _path = _selected.Path;
-                }
-
-                ImGui.EndDisabled();
-
-                ImGui.SameLine();
-                ImGui.SetNextItemWidth(-1);
-                if (ImGui.InputText("##PathInput", ref _path, 512, ImGuiInputTextFlags.EnterReturnsTrue))
-                {
-                    // Try to find and select the node at this path
-                    var node = FindNodeByPath(_path);
-                    if (node != null)
-                    {
-                        _selected = node;
-
-                        // Add to selection history
-                        if (_historyIndex < _selectionHistory.Count - 1)
-                        {
-                            _selectionHistory.RemoveRange(_historyIndex + 1,
-                                _selectionHistory.Count - _historyIndex - 1);
-                        }
-
-                        if (_selectionHistory.Count == 0 || _selectionHistory[^1] != node)
-                        {
-                            _selectionHistory.Add(node);
-                            _historyIndex = _selectionHistory.Count - 1;
-                        }
-                    }
-                }
+                _resourceService.Refreshed += UpdateNodeTree;
+                UpdateNodeTree();
             }
-            ImGui.PopStyleVar();
-
-            ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 4));
-            {
-                ImGui.SetNextItemWidth(-30);
-                ImGui.InputTextWithHint("", "Filter Files", ref _filter, 255);
-                ImGui.SameLine();
-                if (ImGui.Button("?"))
-                {
-                    ImGui.OpenPopup("SortOptions");
-                }
-
-                if (ImGui.BeginPopup("SortOptions"))
-                {
-                    ImGui.SeparatorText("Sort by");
-
-                    if (ImGui.MenuItem("Name (A-Z)", null, _sortMode == SortMode.NameAscending))
-                    {
-                        _sortMode = SortMode.NameAscending;
-                        SortAllNodes();
-                    }
-
-                    if (ImGui.MenuItem("Name (Z-A)", null, _sortMode == SortMode.NameDescending))
-                    {
-                        _sortMode = SortMode.NameDescending;
-                        SortAllNodes();
-                    }
-
-                    ImGui.Separator();
-
-                    if (ImGui.MenuItem("Type (A-Z)", null, _sortMode == SortMode.TypeAscending))
-                    {
-                        _sortMode = SortMode.TypeAscending;
-                        SortAllNodes();
-                    }
-
-                    if (ImGui.MenuItem("Type (Z-A)", null, _sortMode == SortMode.TypeDescending))
-                    {
-                        _sortMode = SortMode.TypeDescending;
-                        SortAllNodes();
-                    }
-
-                    ImGui.EndPopup();
-                }
-            }
-            ImGui.PopStyleVar();
-
-            ImGui.Separator();
-
-            if (ImGui.BeginChild("FileTree") && _root != null)
-            {
-                // Reduce tree node padding for more compact display
-                ImGuiX.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(4, 2));
-                // Check if empty space was clicked to deselect
-                if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !ImGui.IsAnyItemHovered())
-                {
-                    _selected = null;
-                    _path = "";
-                }
-
-                _tree.Clear();
-                _tree.Push((_root, false));
-
-                while (_tree.Count > 0)
-                {
-                    var (node, shouldPop) = _tree.Pop();
-
-                    // Handle TreePop for previously opened nodes
-                    if (shouldPop)
-                    {
-                        ImGui.TreePop();
-                        continue;
-                    }
-
-                    // Skip if it doesn't match filter (fuzzy search)
-                    if (!string.IsNullOrEmpty(_filter) && !FuzzyMatch(node.Name, _filter))
-                    {
-                        continue;
-                    }
-
-                    var flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
-                    if (!node.IsDirectory)
-                    {
-                        flags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
-                    }
-
-                    if (_selected == node)
-                    {
-                        flags |= ImGuiTreeNodeFlags.Selected;
-                    }
-
-                    var nodeOpen = ImGui.TreeNodeEx($"{node.Path}##{node.Path}", flags, $"{node.Name}");
-                    if (ImGui.IsItemClicked())
-                    {
-                        _selected = node;
-                        _path = node.Path;
-
-                        // Add to selection history
-                        // Remove any forward history if we're not at the end
-                        if (_historyIndex < _selectionHistory.Count - 1)
-                        {
-                            _selectionHistory.RemoveRange(_historyIndex + 1,
-                                _selectionHistory.Count - _historyIndex - 1);
-                        }
-
-                        // Only add if it's different from the last selection
-                        if (_selectionHistory.Count == 0 || _selectionHistory[^1] != node)
-                        {
-                            _selectionHistory.Add(node);
-                            _historyIndex = _selectionHistory.Count - 1;
-                        }
-                    }
-
-                    // if (ImGui.BeginPopupContextItem())
-                    // {
-                    //     if (ImGui.MenuItem("Open"))
-                    //     {
-                    //         /* ... */
-                    //     }
-                    //
-                    //     if (ImGui.MenuItem("Delete"))
-                    //     {
-                    //         /* ... */
-                    //     }
-                    //
-                    //     ImGui.EndPopup();
-                    // }
-
-                    if (node.IsDirectory && nodeOpen)
-                    {
-                        _tree.Push((node, true));
-                        for (var i = node.Children.Count - 1; i >= 0; i--)
-                        {
-                            _tree.Push((node.Children[i], false));
-                        }
-                    }
-                }
-
-                ImGui.PopStyleVar(); // Pop ItemSpacing
-            }
-
-            ImGui.EndChild();
         }
 
-        ImGui.End();
+        if (_resourceService == null)
+        {
+            ImGui.TextDisabled("No resources loaded.");
+        }
+        else
+        {
+            DrawToolbar();
+            ImGui.Separator();
+            DrawFileTree();
+        }
+    }
+
+    private void DrawToolbar()
+    {
+        ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4, 4));
+        {
+            ImGui.BeginDisabled(_historyIndex <= 0);
+            if (ImGui.ArrowButton("GoBack", ImGuiDir.Left))
+            {
+                _historyIndex--;
+                _selected = _selectionHistory[_historyIndex];
+                _path = _selected.Path;
+            }
+
+            ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            ImGui.BeginDisabled(_historyIndex >= _selectionHistory.Count - 1);
+            if (ImGui.ArrowButton("GoForward", ImGuiDir.Right))
+            {
+                _historyIndex++;
+                _selected = _selectionHistory[_historyIndex];
+                _path = _selected.Path;
+            }
+
+            ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.InputText("##PathInput", ref _path, 512, ImGuiInputTextFlags.EnterReturnsTrue))
+            {
+                // Try to find and select the node at this path
+                var node = FindNodeByPath(_path);
+                if (node != null)
+                {
+                    _selected = node;
+
+                    // Add to selection history
+                    if (_historyIndex < _selectionHistory.Count - 1)
+                    {
+                        _selectionHistory.RemoveRange(_historyIndex + 1,
+                            _selectionHistory.Count - _historyIndex - 1);
+                    }
+
+                    if (_selectionHistory.Count == 0 || _selectionHistory[^1] != node)
+                    {
+                        _selectionHistory.Add(node);
+                        _historyIndex = _selectionHistory.Count - 1;
+                    }
+                }
+            }
+        }
+        ImGui.PopStyleVar();
+
+        ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 4));
+        {
+            ImGui.SetNextItemWidth(-30);
+            ImGui.InputTextWithHint("", "Filter Files", ref _filter, 255);
+            ImGui.SameLine();
+            if (ImGui.Button("^⌄"))
+            {
+                ImGui.OpenPopup("SortOptions");
+            }
+
+            if (ImGui.BeginPopup("SortOptions"))
+            {
+                ImGui.SeparatorText("Sort by");
+
+                if (ImGui.MenuItem("Name (A-Z)", null, _sortMode == SortMode.NameAscending))
+                {
+                    _sortMode = SortMode.NameAscending;
+                    SortAllNodes();
+                }
+
+                if (ImGui.MenuItem("Name (Z-A)", null, _sortMode == SortMode.NameDescending))
+                {
+                    _sortMode = SortMode.NameDescending;
+                    SortAllNodes();
+                }
+
+                ImGui.Separator();
+
+                if (ImGui.MenuItem("Type (A-Z)", null, _sortMode == SortMode.TypeAscending))
+                {
+                    _sortMode = SortMode.TypeAscending;
+                    SortAllNodes();
+                }
+
+                if (ImGui.MenuItem("Type (Z-A)", null, _sortMode == SortMode.TypeDescending))
+                {
+                    _sortMode = SortMode.TypeDescending;
+                    SortAllNodes();
+                }
+
+                ImGui.EndPopup();
+            }
+        }
+        ImGui.PopStyleVar();
+    }
+
+    private void DrawFileTree()
+    {
+        if (ImGui.BeginChild("FileTree") && _root != null)
+        {
+            // Reduce tree node padding for more compact display
+            ImGuiX.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(4, 2));
+            // Check if empty space was clicked to deselect
+            if (ImGui.IsWindowHovered() && ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !ImGui.IsAnyItemHovered())
+            {
+                _selected = null;
+                _path = "";
+            }
+
+            _tree.Clear();
+            _tree.Push((_root, false));
+
+            while (_tree.Count > 0)
+            {
+                var (node, shouldPop) = _tree.Pop();
+
+                // Handle TreePop for previously opened nodes
+                if (shouldPop)
+                {
+                    ImGui.TreePop();
+                    continue;
+                }
+
+                // Skip if it doesn't match filter (fuzzy search)
+                if (!string.IsNullOrEmpty(_filter) && !FuzzyMatch(node.Name, _filter))
+                {
+                    continue;
+                }
+
+                var nodeFlags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
+                if (!node.IsDirectory)
+                {
+                    nodeFlags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
+                }
+
+                if (_selected == node)
+                {
+                    nodeFlags |= ImGuiTreeNodeFlags.Selected;
+                }
+
+                var nodeOpen = ImGui.TreeNodeEx($"{node.Path}##{node.Path}", nodeFlags, $"{node.Name}");
+                if (ImGui.IsItemClicked())
+                {
+                    _selected = node;
+                    _path = node.Path;
+
+                    // Add to selection history
+                    // Remove any forward history if we're not at the end
+                    if (_historyIndex < _selectionHistory.Count - 1)
+                    {
+                        _selectionHistory.RemoveRange(_historyIndex + 1,
+                            _selectionHistory.Count - _historyIndex - 1);
+                    }
+
+                    // Only add if it's different from the last selection
+                    if (_selectionHistory.Count == 0 || _selectionHistory[^1] != node)
+                    {
+                        _selectionHistory.Add(node);
+                        _historyIndex = _selectionHistory.Count - 1;
+                    }
+                }
+
+                // if (ImGui.BeginPopupContextItem())
+                // {
+                //     if (ImGui.MenuItem("Open"))
+                //     {
+                //         /* ... */
+                //     }
+                //
+                //     if (ImGui.MenuItem("Delete"))
+                //     {
+                //         /* ... */
+                //     }
+                //
+                //     ImGui.EndPopup();
+                // }
+
+                if (node.IsDirectory && nodeOpen)
+                {
+                    _tree.Push((node, true));
+                    for (var i = node.Children.Count - 1; i >= 0; i--)
+                    {
+                        _tree.Push((node.Children[i], false));
+                    }
+                }
+            }
+
+            ImGui.PopStyleVar(); // Pop ItemSpacing
+        }
+
+        ImGui.EndChild();
     }
 
     protected override void Dispose(bool disposing)
     {
-        _resourceService.Refreshed -= UpdateNodeTree;
+        if (_resourceService != null)
+        {
+            _resourceService.Refreshed -= UpdateNodeTree;
+        }
         base.Dispose(disposing);
     }
 
@@ -259,6 +275,8 @@ public class FileBrowser : DrawableGameComponent
 
     private void BuildNodeTree()
     {
+        if (_resourceService == null) return;
+
         _root = new FileNode
         {
             Name = _resourceService.Root,
@@ -281,8 +299,8 @@ public class FileBrowser : DrawableGameComponent
             for (var i = 0; i < segments.Length - 1; i++)
             {
                 var parentPath = currentPath;
-                currentPath = string.IsNullOrEmpty(parentPath) 
-                    ? segments[i] 
+                currentPath = string.IsNullOrEmpty(parentPath)
+                    ? segments[i]
                     : $"{parentPath}/{segments[i]}";
 
                 if (!lookup.ContainsKey(currentPath))
@@ -295,17 +313,17 @@ public class FileBrowser : DrawableGameComponent
                         IsDirectory = true,
                         Depth = parentNode.Depth + 1
                     };
-                    
+
                     parentNode.Children.Add(dirNode);
                     lookup[currentPath] = dirNode;
                 }
             }
-            
+
             // Add the file node
             var fileName = segments[^1];
             var fileParentPath = string.Join('/', segments.Take(segments.Length - 1));
             var parentNodeForFile = lookup[fileParentPath];
-            
+
             var fileNode = new FileNode
             {
                 Name = fileName,
@@ -314,7 +332,7 @@ public class FileBrowser : DrawableGameComponent
                 Depth = parentNodeForFile.Depth + 1,
                 Extension = Path.GetExtension(fileName)
             };
-            
+
             parentNodeForFile.Children.Add(fileNode);
         }
     }
@@ -367,9 +385,11 @@ public class FileBrowser : DrawableGameComponent
 
     private void SortAllNodes()
     {
+        if (_root == null) return;
+
         var stack = new Stack<FileNode>();
-        stack.Push(_root!);
-        
+        stack.Push(_root);
+
         while (stack.Count > 0)
         {
             var node = stack.Pop();
