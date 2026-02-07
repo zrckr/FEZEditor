@@ -77,7 +77,7 @@ public class MenuBar : DrawableGameComponent
                     // TODO: add safeguard modal
                     _resourceService.CloseProvider();
                     _editorService.CloseAllEditors();
-                    _editorService.OpenEditor(new WelcomeComponent(Game, _editorService, _resourceService));
+                    _editorService.OpenEditor(new WelcomeComponent(Game));
                 }
                 
                 if (ImGui.MenuItem("Quit"))

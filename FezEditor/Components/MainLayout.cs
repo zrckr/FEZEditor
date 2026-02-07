@@ -68,20 +68,12 @@ public class MainLayout : DrawableGameComponent
                     {
                         foreach (var editor in _editorService.Editors)
                         {
-                            if (editor is WelcomeComponent)
-                            {
-                                if (ImGui.BeginTabItem(editor.Title))
-                                {
-                                    _editorService.MarkEditorActive(editor);
-                                    editor.Draw(gameTime);
-                                    ImGui.EndTabItem();
-                                }
-
-                                continue;
-                            }
-
                             var isOpen = true;
-                            if (ImGui.BeginTabItem(editor.Title, ref isOpen))
+                            var beginTabItem = editor is WelcomeComponent
+                                ? ImGui.BeginTabItem(editor.Title)
+                                : ImGui.BeginTabItem(editor.Title, ref isOpen);
+                            
+                            if (beginTabItem)
                             {
                                 _editorService.MarkEditorActive(editor);
                                 editor.Draw(gameTime);
@@ -99,7 +91,9 @@ public class MainLayout : DrawableGameComponent
                 }
                 else
                 {
-                    ImGuiX.TextCentered("Open an asset from File Browser on the left...");
+                    const string text = "Open an asset from File Browser on the left...";
+                    ImGuiX.SetTextCentered(text);
+                    ImGui.Text(text);
                 }
                 ImGui.EndChild();
             }

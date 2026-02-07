@@ -4,13 +4,14 @@ namespace FezEditor.Components;
 
 public abstract class EditorComponent
 {
-    public abstract string Title { get; }
+    public string Title { get; }
     
     protected Game Game { get; }
 
-    protected EditorComponent(Game game)
+    protected EditorComponent(Game game, string title)
     {
         Game = game;
+        Title = title;
     }
     
     public virtual void Initialize() { }

@@ -1,5 +1,8 @@
-﻿using FezEditor.Structure;
+﻿using FezEditor.Components;
+using FezEditor.Structure;
+using FezEditor.Tools;
 using JetBrains.Annotations;
+using Microsoft.Xna.Framework;
 
 namespace FezEditor.Services;
 
@@ -8,9 +11,14 @@ public class ResourceService : IResourceService
 {
     public IResourceProvider? Provider { get; private set; }
     
-    public event Action? ProviderOpened;
+    public event Action? ProviderChanged;
     
-    public event Action? ProviderClosed;
+    private readonly Game _game;
+
+    public ResourceService(Game game)
+    {
+        _game = game;
+    }
     
     public void OpenProvider(FileSystemInfo info)
     {
@@ -23,14 +31,19 @@ public class ResourceService : IResourceService
         
         CloseProvider();
         Provider = provider;
-        ProviderOpened?.Invoke();
+        ProviderChanged?.Invoke();
     }
 
     public void CloseProvider()
     {
-        ProviderClosed?.Invoke();
+        ProviderChanged?.Invoke();
         Provider?.Dispose();
         Provider = null;
+    }
+
+    public EditorComponent CreateEditorFor(string path)
+    {
+        return new TestComponent(_game, path);
     }
     
     public void Dispose()

@@ -12,8 +12,6 @@ public class WelcomeComponent : EditorComponent
     
     private const float ContentHeight = 230f;
 
-    public override string Title => "Welcome!";
-
     private Texture2D _logoTexture = null!;
     
     private ResourceExtractor? _resourceExtractor;
@@ -22,10 +20,10 @@ public class WelcomeComponent : EditorComponent
     
     private readonly IResourceService _resourceService;
 
-    public WelcomeComponent(Game game, IEditorService editorService, IResourceService resourceService) : base(game)
+    public WelcomeComponent(Game game) : base(game, "Welcome")
     {
-        _editorService = editorService;
-        _resourceService = resourceService;
+        _editorService = game.GetService<IEditorService>();
+        _resourceService = game.GetService<IResourceService>();
     }
 
     public override void Initialize()

@@ -463,12 +463,11 @@ public static class ImGuiX
         ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, NVector2.One / 2f);
     }
 
-    public static void TextCentered(string text)
+    public static void SetTextCentered(string text)
     {
         var textSize = ImGui.CalcTextSize(text);
         var windowSize = ImGui.GetWindowSize();
         ImGui.SetCursorPos((windowSize - textSize) * 0.5f);
-        ImGui.Text(text);
     }
     
     #endregion

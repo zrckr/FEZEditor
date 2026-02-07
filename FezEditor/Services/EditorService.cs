@@ -1,7 +1,6 @@
 ﻿using FezEditor.Components;
 using FezEditor.Structure;
 using JetBrains.Annotations;
-using Microsoft.Xna.Framework;
 using Serilog;
 
 namespace FezEditor.Services;
@@ -23,9 +22,13 @@ public class EditorService : IEditorService
 
     public void OpenEditor(EditorComponent editor)
     {
-        editor.Initialize();
-        _editors.Add(editor);
-        ActiveEditor = editor;
+        if (_editors.All(e => e.Title != editor.Title))
+        {
+            editor.Initialize();
+            _editors.Add(editor);
+            ActiveEditor = editor;
+            UpdateFlags();
+        }
     }
 
     public void CloseEditor(EditorComponent editor)
@@ -43,11 +46,6 @@ public class EditorService : IEditorService
         if (ActiveEditor != editor)
         {
             ActiveEditor = editor;
-            Flags = EditorFlags.None;
-            if (ActiveEditor is not WelcomeComponent)
-            {
-                Flags |= EditorFlags.CloseFile | EditorFlags.QuitToWelcome;
-            }
         }
     }
 
@@ -68,9 +66,30 @@ public class EditorService : IEditorService
             if (editor == ActiveEditor)
             {
                 ActiveEditor = _editors.Count > 0 ? _editors[^1] : null;
+                UpdateFlags();
             }
         }
 
         _pendingClose.Clear();
+    }
+    
+    private void UpdateFlags()
+    {
+        if (ActiveEditor is WelcomeComponent)
+        {
+            Flags &= ~(EditorFlags.CloseFile | EditorFlags.QuitToWelcome);
+        }
+        else
+        {
+            Flags |= EditorFlags.QuitToWelcome;
+            if (Editors.Any())
+            {
+                Flags |= EditorFlags.CloseFile;
+            }
+            else
+            {
+                Flags &= ~EditorFlags.CloseFile;
+            }
+        }
     }
 }

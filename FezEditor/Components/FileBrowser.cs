@@ -1,4 +1,5 @@
-﻿using FezEditor.Services;
+﻿using System.Security.Cryptography;
+using FezEditor.Services;
 using FezEditor.Tools;
 using ImGuiNET;
 using JetBrains.Annotations;
@@ -25,6 +26,8 @@ public class FileBrowser : DrawableGameComponent
 
     private SortMode _sortMode = SortMode.NameAscending;
     
+    private readonly IEditorService _editorService;
+    
     private readonly IResourceService _resourceService;
 
     private enum SortMode
@@ -35,18 +38,20 @@ public class FileBrowser : DrawableGameComponent
         TypeDescending
     }
 
-    public FileBrowser(Game game, IResourceService resourceService) : base(game)
+    public FileBrowser(Game game, IEditorService editorService, IResourceService resourceService) : base(game)
     {
+        _editorService = editorService;
         _resourceService = resourceService;
-        _resourceService.ProviderOpened += UpdateNodeTree;
-        _resourceService.ProviderClosed += UpdateNodeTree;
+        _resourceService.ProviderChanged += UpdateNodeTree;
     }
 
     public void Draw()
     {
         if (_resourceService.Provider == null)
         {
-            ImGui.TextDisabled("No resources loaded.");
+            const string text = "No resources loaded...";
+            ImGuiX.SetTextCentered(text);
+            ImGui.TextDisabled(text);
         }
         else
         {
@@ -112,6 +117,16 @@ public class FileBrowser : DrawableGameComponent
         {
             ImGui.SetNextItemWidth(-30);
             ImGui.InputTextWithHint("", "Filter Files", ref _filter, 255);
+            
+            if (!string.IsNullOrEmpty(_filter))
+            {
+                ImGui.SameLine();
+                if (ImGui.Button("X"))
+                {
+                    _filter = "";
+                }
+            }
+            
             ImGui.SameLine();
             if (ImGui.Button("^"))
             {
@@ -165,6 +180,12 @@ public class FileBrowser : DrawableGameComponent
                 _path = "";
             }
 
+            var filtering = !string.IsNullOrEmpty(_filter);
+            if (filtering)
+            {
+                UpdateFilterMatches(_root);
+            }
+
             _tree.Clear();
             _tree.Push((_root, false));
 
@@ -181,13 +202,19 @@ public class FileBrowser : DrawableGameComponent
                     continue;
                 }
 
-                // Skip if it doesn't match filter (fuzzy search)
-                if (!string.IsNullOrEmpty(_filter) && !FuzzyMatch(node.Name, _filter))
+                // Skip non-root nodes that don't match the filter
+                if (filtering && node != _root && !node.MatchesFilter)
                 {
                     continue;
                 }
 
+                var isRoot = node == _root;
                 var nodeFlags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
+                if (isRoot)
+                {
+                    nodeFlags |= ImGuiTreeNodeFlags.DefaultOpen;
+                }
+
                 if (!node.IsDirectory)
                 {
                     nodeFlags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
@@ -196,6 +223,12 @@ public class FileBrowser : DrawableGameComponent
                 if (_selected == node)
                 {
                     nodeFlags |= ImGuiTreeNodeFlags.Selected;
+                }
+
+                // Force open directories when filtering so matched children are visible
+                if (filtering && node.IsDirectory)
+                {
+                    ImGui.SetNextItemOpen(true);
                 }
 
                 var nodeOpen = ImGui.TreeNodeEx($"{node.Path}##{node.Path}", nodeFlags, $"{node.Name}");
@@ -220,6 +253,16 @@ public class FileBrowser : DrawableGameComponent
                     }
                 }
 
+                if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                {
+                    if (!node.IsDirectory && ImGui.IsItemHovered())
+                    {
+                        var path = node.Path[(_root.Path.Length + 1)..];
+                        var editor = _resourceService.CreateEditorFor(path);
+                        _editorService.OpenEditor(editor);
+                    }
+                }
+                
                 // if (ImGui.BeginPopupContextItem())
                 // {
                 //     if (ImGui.MenuItem("Open"))
@@ -250,6 +293,27 @@ public class FileBrowser : DrawableGameComponent
         ImGui.EndChild();
     }
 
+    private bool UpdateFilterMatches(FileNode node)
+    {
+        if (!node.IsDirectory)
+        {
+            node.MatchesFilter = FuzzyMatch(node.Name, _filter);
+            return node.MatchesFilter;
+        }
+
+        var anyChildMatches = false;
+        foreach (var child in node.Children)
+        {
+            if (UpdateFilterMatches(child))
+            {
+                anyChildMatches = true;
+            }
+        }
+
+        node.MatchesFilter = anyChildMatches;
+        return anyChildMatches;
+    }
+
     private void UpdateNodeTree()
     {
         BuildNodeTree();
@@ -261,6 +325,7 @@ public class FileBrowser : DrawableGameComponent
         if (_resourceService.Provider == null)
         {
             _root = null;
+            _filter = "";
             return;
         }
 
@@ -431,5 +496,6 @@ public class FileBrowser : DrawableGameComponent
         public List<FileNode> Children { get; set; } = new();
         public int Depth { get; init; } // Track depth for indentation
         public string Extension { get; init; } = "";
+        public bool MatchesFilter { get; set; }
     }
 }

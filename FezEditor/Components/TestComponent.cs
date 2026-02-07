@@ -1,5 +1,6 @@
 ﻿using FezEditor.Services;
 using FezEditor.Structure;
+using FezEditor.Tools;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,8 +9,6 @@ namespace FezEditor.Components;
 
 public class TestComponent : EditorComponent
 {
-    public override string Title => "Test";
-
     private readonly IRenderingService _rs;
 
     private Rid _world;
@@ -26,9 +25,9 @@ public class TestComponent : EditorComponent
 
     private float _elapsed;
     
-    public TestComponent(Game game, IRenderingService renderingService) : base(game)
+    public TestComponent(Game game, string title) : base(game, title)
     {
-        _rs = renderingService;
+        _rs = game.GetService<IRenderingService>();
     }
 
     public override void Initialize()

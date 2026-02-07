@@ -56,6 +56,7 @@ public partial class ImGuiService : IImGuiService
             SetupStyle();
             PopulateKeyMappings();
             TextInputEXT.TextInput += HandleInput;
+            TextInputEXT.StartTextInput();
             ImGuiX.Bind = BindTexture;
             ImGuiX.Unbind = UnbindTexture;
             ImGuiX.GetTexture = GetBoundTexture;
