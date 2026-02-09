@@ -74,7 +74,7 @@ public partial class RenderingService
             throw new ArgumentException($"Parameter of type {typeof(T)} does not supported");
         }
 
-        var parameter = effect.Parameters.GetParameterBySemantic(name);
+        var parameter = effect.Parameters[name];
         if (parameter == null)
         {
             throw new ArgumentException($"Parameter of name {name} does not exist");
@@ -106,32 +106,32 @@ public partial class RenderingService
         var worldInverseTranspose = Matrix.Transpose(Matrix.Invert(matrices.World));
         
         // Matrices
-        parameters.GetParameterBySemantic("Matrices_WorldViewProjection")?.SetValue(worldViewProjection);
-        parameters.GetParameterBySemantic("Matrices_WorldInverseTranspose")?.SetValue(worldInverseTranspose);
-        parameters.GetParameterBySemantic("Matrices_World")?.SetValue(matrices.World);
-        parameters.GetParameterBySemantic("Matrices_ViewProjection")?.SetValue(matrices.ViewProjection);
-        parameters.GetParameterBySemantic("Matrices_Texture")?.SetValue(material.TextureTransform);
+        parameters["Matrices_WorldViewProjection"].SetValue(worldViewProjection);
+        parameters["Matrices_WorldInverseTranspose"].SetValue(worldInverseTranspose);
+        parameters["Matrices_World"].SetValue(matrices.World);
+        parameters["Matrices_ViewProjection"].SetValue(matrices.ViewProjection);
+        parameters["Matrices_Texture"].SetValue(material.TextureTransform);
 
         // Material
-        parameters.GetParameterBySemantic("Material_Diffuse")?.SetValue(material.Diffuse);
-        parameters.GetParameterBySemantic("Material_Opacity")?.SetValue(material.Opacity);
-        parameters.GetParameterBySemantic("BaseTexture")?.SetValue(material.Texture);
+        parameters["Material_Diffuse"].SetValue(material.Diffuse);
+        parameters["Material_Opacity"].SetValue(material.Opacity);
+        parameters["BaseTexture"].SetValue(material.Texture);
 
         // Lighting
-        parameters.GetParameterBySemantic("BaseAmbient")?.SetValue(world.AmbientLight);
-        parameters.GetParameterBySemantic("DiffuseLight")?.SetValue(world.DiffuseLight);
+        parameters["BaseAmbient"].SetValue(world.AmbientLight);
+        parameters["DiffuseLight"].SetValue(world.DiffuseLight);
 
         // Fog
-        parameters.GetParameterBySemantic("Fog_Type")?.SetValue((float)world.FogType);
-        parameters.GetParameterBySemantic("Fog_Color")?.SetValue(world.FogColor.ToVector3());
-        parameters.GetParameterBySemantic("Fog_Density")?.SetValue(world.FogDensity);
+        parameters["Fog_Type"].SetValue((float)world.FogType);
+        parameters["Fog_Color"].SetValue(world.FogColor.ToVector3());
+        parameters["Fog_Density"].SetValue(world.FogDensity);
 
         // Render Target
-        parameters.GetParameterBySemantic("AspectRatio")?.SetValue((float)rt.Width / rt.Height);
-        parameters.GetParameterBySemantic("TexelOffset")?.SetValue(new Vector2(-0.5f / rt.Width, 0.5f / rt.Height));
+        parameters["AspectRatio"].SetValue((float)rt.Width / rt.Height);
+        parameters["TexelOffset"].SetValue(new Vector2(-0.5f / rt.Width, 0.5f / rt.Height));
 
         // Camera
         var invView = Matrix.Invert(matrices.View);
-        parameters.GetParameterBySemantic("Eye")?.SetValue(invView.Forward);
+        parameters["Eye"].SetValue(invView.Forward);
     }
 }
