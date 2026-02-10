@@ -115,7 +115,10 @@ public partial class RenderingService
         // Material
         parameters["Material_Diffuse"].SetValue(material.Albedo.ToVector3());
         parameters["Material_Opacity"].SetValue(material.Albedo.A / 255f);
-        parameters["BaseTexture"].SetValue(material.Texture);
+        if (material.Texture != null && parameters["BaseTexture"] != null)
+        {
+            parameters["BaseTexture"].SetValue(material.Texture);
+        }
 
         // Lighting
         parameters["BaseAmbient"].SetValue(world.AmbientLight);
