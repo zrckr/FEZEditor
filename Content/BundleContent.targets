@@ -2,7 +2,7 @@
   <Import Project="../FXC/CompileShaders.targets"/>
 
   <!-- Debug: Copy to folder -->
-  <Target Name="BundleContentDebug" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+  <Target Name="BundleContentDebug" AfterTargets="Build" DependsOnTargets="CompileShaders" Condition="'$(Configuration)' == 'Debug'">
     <ReadLinesFromFile File="$(MSBuildThisFileDirectory).ignore" Condition="Exists('$(MSBuildThisFileDirectory).ignore')">
       <Output TaskParameter="Lines" ItemName="IgnorePatterns"/>
     </ReadLinesFromFile>
@@ -14,11 +14,12 @@
 
     <Copy SourceFiles="@(ContentFiles)"
           DestinationFiles="@(ContentFiles->'$(OutputPath)Content\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true"/>
+          SkipUnchangedFiles="true"
+          OverwriteReadOnlyFiles="true"/>
   </Target>
 
   <!-- Release: Bundle to pkz -->
-  <Target Name="BundleContent" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+  <Target Name="BundleContent" AfterTargets="Build" DependsOnTargets="CompileShaders" Condition="'$(Configuration)' == 'Release'">
     <ReadLinesFromFile File="$(MSBuildThisFileDirectory).ignore" Condition="Exists('$(MSBuildThisFileDirectory).ignore')">
       <Output TaskParameter="Lines" ItemName="IgnorePatterns"/>
     </ReadLinesFromFile>
@@ -30,7 +31,8 @@
 
     <Copy SourceFiles="@(ContentFiles)"
           DestinationFiles="@(ContentFiles->'$(IntermediateOutputPath)Content\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true"/>
+          SkipUnchangedFiles="true"
+          OverwriteReadOnlyFiles="true"/>
 
     <Delete Files="$(OutputPath)Content.pkz" Condition="Exists('$(OutputPath)Content.pkz')"/>
     <ZipDirectory SourceDirectory="$(IntermediateOutputPath)Content"
