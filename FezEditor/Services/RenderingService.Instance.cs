@@ -10,30 +10,13 @@ public partial class RenderingService
         public Rid Parent;
         public readonly List<Rid> Children = new();
         public bool Visible = true;
-        public Vector3 Position = Vector3.Zero;
-        public Quaternion Rotation = Quaternion.Identity;
-        public Vector3 Scale = Vector3.One;
+        public Dirty<Vector3> Position = new(Vector3.Zero);
+        public Dirty<Quaternion> Rotation = new(Quaternion.Identity);
+        public Dirty<Vector3> Scale = new(Vector3.One);
+        public Dirty<Matrix> WorldMatrix = new(Matrix.Identity);
+        public Dirty<Matrix> LocalMatrix = new(Matrix.Identity);
         public InstanceType Type = InstanceType.None;
         public Rid Internal;
-
-        public bool LocalDirty = true;
-        public bool WorldDirty = true;
-        public Matrix WorldMatrix = Matrix.Identity;
-        private Matrix _localMatrix = Matrix.Identity;
-
-        public Matrix GetLocalMatrix()
-        {
-            if (!LocalDirty)
-            {
-                return _localMatrix;
-            }
-
-            _localMatrix = Matrix.CreateScale(Scale)
-                           * Matrix.CreateFromQuaternion(Rotation)
-                           * Matrix.CreateTranslation(Position);
-            LocalDirty = false;
-            return _localMatrix;
-        }
     }
     
     private readonly Dictionary<Rid, InstanceData> _instances = new();
@@ -86,24 +69,21 @@ public partial class RenderingService
     public void InstanceSetPosition(Rid instance, Vector3 position)
     {
         var data = GetResource(_instances, instance);
-        data.Position = position;
-        data.LocalDirty = true;
+        data.Position = new Dirty<Vector3>(position, true);
         MarkWorldMatrixDirty(instance);
     }
 
     public void InstanceSetRotation(Rid instance, Quaternion rotation)
     {
         var data = GetResource(_instances, instance);
-        data.Rotation = rotation;
-        data.LocalDirty = true;
+        data.Rotation = new Dirty<Quaternion>(rotation, true);
         MarkWorldMatrixDirty(instance);
     }
 
     public void InstanceSetScale(Rid instance, Vector3 scale)
     {
         var data = GetResource(_instances, instance);
-        data.Scale = scale;
-        data.LocalDirty = true;
+        data.Scale = new Dirty<Vector3>(scale, true);
         MarkWorldMatrixDirty(instance);
     }
 
@@ -152,17 +132,17 @@ public partial class RenderingService
 
     public Vector3 InstanceGetPosition(Rid instance)
     {
-        return GetResource(_instances, instance).Position;
+        return GetResource(_instances, instance).Position.Value;
     }
 
     public Quaternion InstanceGetRotation(Rid instance)
     {
-        return GetResource(_instances, instance).Rotation;
+        return GetResource(_instances, instance).Rotation.Value;
     }
 
     public Vector3 InstanceGetScale(Rid instance)
     {
-        return GetResource(_instances, instance).Scale;
+        return GetResource(_instances, instance).Scale.Value;
     }
 
     public bool InstanceIsVisible(Rid instance)
@@ -185,7 +165,8 @@ public partial class RenderingService
         {
             var rid = stack.Pop();
             var instance = GetResource(_instances, rid);
-            instance.WorldDirty = true;
+            if (instance.WorldMatrix.IsDirty) continue;
+            instance.WorldMatrix = instance.WorldMatrix.Marked();
             foreach (var childRid in instance.Children)
             {
                 stack.Push(childRid);
@@ -195,28 +176,44 @@ public partial class RenderingService
     
     private Matrix ComputeWorldMatrix(InstanceData instance)
     {
-        if (!instance.WorldDirty)
+        if (!instance.WorldMatrix.IsDirty)
         {
-            return instance.WorldMatrix;
+            return instance.WorldMatrix.Value;
         }
-        
-        var current = instance;
-        while (current is { WorldDirty: true })
+
+        _transformChain.Push(instance);
+        TryGetResource(_instances, instance.Parent, out var parentData);
+        while (parentData is { WorldMatrix.IsDirty: true })
         {
-            _transformChain.Push(current);
-            TryGetResource(_instances, current.Parent, out current);
+            _transformChain.Push(parentData);
+            TryGetResource(_instances, parentData.Parent, out parentData);
         }
-        
-        var parentWorld = current?.WorldMatrix ?? Matrix.Identity;
+
+        var parentWorld = parentData?.WorldMatrix.Value ?? Matrix.Identity;
         while (_transformChain.Count > 0)
         {
             var instanceData = _transformChain.Pop();
-            instanceData.WorldMatrix = instanceData.GetLocalMatrix() * parentWorld;
-            instanceData.WorldDirty = false;
-            parentWorld = instanceData.WorldMatrix;
+            
+            if ( instanceData is 
+                { Position.IsDirty: true } or
+                { Rotation.IsDirty: true } or
+                { Scale.IsDirty: true })
+            {
+                var localMatrix = Matrix.CreateScale(instanceData.Scale.Value)
+                                  * Matrix.CreateFromQuaternion(instanceData.Rotation.Value)
+                                  * Matrix.CreateTranslation(instanceData.Position.Value);
+
+                instanceData.LocalMatrix = new Dirty<Matrix>(localMatrix);
+                instanceData.Position = new Dirty<Vector3>(instanceData.Position.Value);
+                instanceData.Rotation = new Dirty<Quaternion>(instanceData.Rotation.Value);
+                instanceData.Scale = new Dirty<Vector3>(instanceData.Scale.Value);
+            }
+
+            instanceData.WorldMatrix = new Dirty<Matrix>(instanceData.LocalMatrix.Value * parentWorld);
+            parentWorld = instanceData.WorldMatrix.Value;
         }
 
-        return instance.WorldMatrix;
+        return instance.WorldMatrix.Value;
     }
 
     private void DisposeInstanceTree(Rid instance)
