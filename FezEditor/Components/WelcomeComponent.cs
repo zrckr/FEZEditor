@@ -89,17 +89,11 @@ public class WelcomeComponent : EditorComponent
 
         if (ImGui.Button("Open SaveSlot file to edit"))
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var fezPath = Path.Combine(appData, "FEZ", "SaveSlot");
-            
-            FileDialog.Show(FileDialog.Type.OpenFile, OpenSaveSlot, new FileDialog.Options
+            var path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            FileDialog.Show(FileDialog.Type.OpenFolder, OpenDirectory, new FileDialog.Options
             {
-                Title = "Choose SaveSlot file...",
-                DefaultLocation = fezPath,
-                Filters = new FileDialog.Filter[]
-                {
-                    new("SaveSlot", "*")
-                }
+                Title = "Choose FEZ application directory...",
+                DefaultLocation = Path.Combine(path, "FEZ", "")
             });
         }
 
@@ -139,18 +133,6 @@ public class WelcomeComponent : EditorComponent
         {
             _resourceService.OpenProvider(new DirectoryInfo(dirPath));
             _editorService.CloseEditor(this);
-        }
-    }
-    
-    private void OpenSaveSlot(FileDialog.Result result)
-    {
-        var saveSlotPath = result.Files.FirstOrDefault();
-        if (!string.IsNullOrEmpty(saveSlotPath))
-        {
-            var title = Path.GetFileNameWithoutExtension(saveSlotPath);
-            var saveSlot = ResourceService.ReadSaveData(saveSlotPath);
-            _editorService.CloseEditor(this);
-            _editorService.OpenEditor(new SallyEditor(Game, title, saveSlot));
         }
     }
 }

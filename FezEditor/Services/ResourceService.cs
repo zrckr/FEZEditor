@@ -67,26 +67,33 @@ public class ResourceService : IDisposable
 
     public object Load(string path)
     {
+        if (path.Contains("SaveSlot", StringComparison.OrdinalIgnoreCase))
+        {
+            using var stream = _provider!.OpenStream(path, string.Empty);
+            return SaveData.Read(stream);
+        }
+        
         return _provider!.Load<object>(path);
+    }
+    
+    public SaveData LoadSaveDataFromContent(string path)
+    {
+        var bytes = _game.Content.LoadBytes(path);
+        using var stream = new MemoryStream(bytes);
+        return SaveData.Read(stream);
     }
 
     public void Save(string path, object asset)
     {
         if (asset is SaveData saveData)
         {
-            using var stream = SaveDataLoader.Write(saveData);
+            using var stream = SaveData.Write(saveData);
             using var fileStream = new FileStream(path, FileMode.Create);
             stream.CopyTo(fileStream);
             return;
         }
         
         _provider!.Save(path, asset);
-    }
-    
-    public static SaveData ReadSaveData(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return SaveDataLoader.Read(stream);
     }
 
     public void Dispose()

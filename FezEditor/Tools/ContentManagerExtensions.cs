@@ -32,7 +32,7 @@ public static class ContentManagerExtensions
         return content.LoadBytes(Path.ChangeExtension(assetName, ".ttf"));
     }
 
-    private static byte[] LoadBytes(this ContentManager content, string assetName)
+    public static byte[] LoadBytes(this ContentManager content, string assetName)
     {
         if (content is ZipContentManager zip)
         {

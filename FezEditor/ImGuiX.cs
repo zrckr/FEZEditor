@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -469,6 +470,277 @@ public static class ImGuiX
     public static bool InputTextMultiline(string label, ref string input, uint maxLength, Vector2 size)
     {
         return ImGui.InputTextMultiline(label, ref input, maxLength, size.ToNumerics());
+    }
+    
+    public static bool TimeSpanInput(string label, ref TimeSpan timeSpan)
+    {
+        const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
+        var hash = timeSpan.GetHashCode();
+        
+        var hours = timeSpan.Hours;
+        var minutes = timeSpan.Minutes;
+        var seconds = timeSpan.Seconds;
+        var milliseconds = timeSpan.Milliseconds;
+        
+        var changed = false;
+        ImGui.Text(label);
+        ImGui.SameLine();
+        
+        var header = $"{timeSpan.ToString("g", CultureInfo.InvariantCulture)}##Header_{hash}";
+        if (ImGui.CollapsingHeader(header))
+        {
+            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            {
+                if (ImGui.InputInt("Hours", ref hours))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Minutes", ref minutes))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Seconds", ref seconds))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Millis", ref milliseconds))
+                {
+                    changed = true;
+                }
+                
+                ImGui.EndChild();
+            }
+        }
+        
+        if (changed)
+        {
+            timeSpan = new TimeSpan(0, hours, minutes, seconds, milliseconds);
+        }
+        
+        return changed;
+    }
+    
+    public static bool DateTimeInput(string label, ref DateTime dateTime)
+    {
+        const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
+        var hash = dateTime.GetHashCode();
+        var year = dateTime.Year;
+        var month = dateTime.Month;
+        var day = dateTime.Day;
+        var hour = dateTime.Hour;
+        var minute = dateTime.Minute;
+        var second = dateTime.Second;
+        
+        var changed = false;
+        ImGui.Text(label);
+        ImGui.SameLine();
+
+        var header = $"{dateTime.ToString("s", CultureInfo.InvariantCulture)}##Header_{hash}";
+        if (ImGui.CollapsingHeader(header))
+        {
+            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            {
+                if (ImGui.InputInt("Year", ref year))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Month", ref month))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Day", ref day))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Hour", ref hour))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Minute", ref minute))
+                {
+                    changed = true;
+                }
+        
+                if (ImGui.InputInt("Second", ref second))
+                {
+                    changed = true;
+                } 
+                
+                ImGui.EndChild();
+            }
+        }
+
+        if (changed)
+        {
+            year = Math.Clamp(year, 1, 9999);
+            month = Math.Clamp(month, 1, 12);
+            day = Math.Clamp(day, 1, DateTime.DaysInMonth(year, month));
+            hour = Math.Clamp(hour, 0, 23);
+            minute = Math.Clamp(minute, 0, 59);
+            second = Math.Clamp(second, 0, 59);
+            
+            dateTime = new DateTime(year, month, day, hour, minute, second);
+        }
+        
+        return changed;
+    }
+
+    public delegate bool RenderItem<T>(int index, ref T item);
+    
+    public static bool EditableList<T>(string label, ref List<T> items, RenderItem<T> renderItem, Func<T> createNew)
+    {
+        const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
+        var hash = label.GetHashCode();
+        
+        var changed = false;
+        ImGui.Text(label);
+        ImGui.SameLine();
+        
+        var count = "item" + (items.Count > 1 ? "s" : "");
+        var header = $"List ({items.Count} {count})##Header_{hash}";
+        if (ImGui.CollapsingHeader(header))
+        {
+            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            {
+                if (BeginListBox($"##ListBox_{hash}", new Vector2(-1, 0)))
+                {
+                    for (var i = 0; i < items.Count; i++)
+                    {
+                        ImGui.PushID(i);
+                        ImGui.SetNextItemWidth(-48);
+
+                        var item = items[i]; 
+                        if (renderItem(i, ref item))
+                        {
+                            items[i] = item;
+                            changed = true;
+                        }
+            
+                        ImGui.SameLine();
+                        if (ImGui.Button("(x)"))
+                        {
+                            items.RemoveAt(i);
+                            i--;
+                            changed = true;
+                        }
+            
+                        ImGui.PopID();
+                    }
+        
+                    ImGui.EndListBox();
+                }
+    
+                if (ImGui.Button("(+) Add"))
+                {
+                    items.Add(createNew());
+                    changed = true;
+                }
+                
+                ImGui.EndChild();
+            }
+        }
+    
+        return changed;
+    }
+
+    public delegate bool RenderKeyValuePair<in K, V>(K key, ref V value) where K : IEquatable<K>;
+    
+    public delegate bool RenderNewKey<K>(ref K key) where K : IEquatable<K>;
+    
+    public static bool EditableDict<K, V>(string label, ref Dictionary<K, V> items, 
+        RenderKeyValuePair<K, V> renderItem, 
+        RenderNewKey<K> renderNewKey,
+        Func<V> createDefaultValue) where K : IEquatable<K>
+    {
+        const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
+        var hash = label.GetHashCode();
+        
+        var changed = false;
+        ImGui.Text(label);
+        ImGui.SameLine();
+
+        var count = "key" + (items.Count > 1 ? "s" : "");
+        var header = $"Dictionary ({items.Count} {count})##Header_{hash}";
+        if (ImGui.CollapsingHeader(header))
+        {
+            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            {
+                if (BeginListBox($"##ListBox_{hash}", new Vector2(-1, 0)))
+                {
+                    var keys = items.Keys.ToList();
+        
+                    for (var i = 0; i < keys.Count; i++)
+                    {
+                        var key = keys[i];
+                        var value = items[key];
+            
+                        ImGui.PushID(i);
+                        ImGui.SetNextItemWidth(-48);
+                
+                        if (renderItem(key, ref value))
+                        {
+                            items[key] = value;
+                            changed = true;
+                        }
+            
+                        ImGui.SameLine();
+                        if (ImGui.Button("(x)"))
+                        {
+                            items.Remove(key);
+                            changed = true;
+                        }
+            
+                        ImGui.PopID();
+                    }
+        
+                    ImGui.EndListBox();
+                }
+                
+                // New entry input
+                K newKey = default!;
+                ImGui.Button("(+) Add New Key");
+                ImGui.SameLine();
+        
+                if (renderNewKey(ref newKey))
+                {
+                    if (!items.ContainsKey(newKey))
+                    {
+                        items.Add(newKey, createDefaultValue());
+                        changed = true;
+                    }
+                }
+                
+                ImGui.EndChild();
+            }
+        }
+        
+        return changed;
+    }
+    
+    public static bool SelectableWithImage(Texture2D texture, Vector2 imageSize, string label, bool selected)
+    {
+        var itemHeight = Math.Max(imageSize.Y, ImGui.GetTextLineHeight());
+    
+        // Selectable
+        var clicked = Selectable($"##{label}_sel", selected, ImGuiSelectableFlags.None, new Vector2(0, itemHeight));
+    
+        // Go back to draw image and text
+        ImGui.SameLine(0, 0);
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (itemHeight - imageSize.Y) * 0.5f);
+        Image(texture, imageSize);
+    
+        ImGui.SameLine();
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - (itemHeight - imageSize.Y) * 0.5f + (itemHeight - ImGui.GetTextLineHeight()) * 0.5f);
+        ImGui.Text(label);
+    
+        return clicked;
     }
     
     #endregion

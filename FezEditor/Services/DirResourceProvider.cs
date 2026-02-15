@@ -115,7 +115,11 @@ internal class DirResourceProvider : IResourceProvider
         foreach (var file in _directory.EnumerateFiles("*", SearchOption.AllDirectories))
         {
             var path = file.FullName.WithoutBaseDirectory(_directory.FullName);
-            var normalizedPath = path.Replace(path.GetExtension(), "").Replace('\\', '/');
+            if (Path.HasExtension(path))
+            {
+                path = path.Replace(path.GetExtension(), "");
+            }
+            var normalizedPath = path.Replace('\\', '/');
             _files[normalizedPath] = file;
         }
     }
