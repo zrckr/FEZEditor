@@ -157,30 +157,38 @@ public class MenuBar : DrawableGameComponent
 
     private void ShowCloseDialog()
     {
-        if (_editorService.HasAnyEditorUnsavedChanges())
+        if (!_editorService.HasAnyEditorUnsavedChanges())
         {
-            _confirmWindow.Text = "You have unsaved changes. Close the file?";
-            _confirmWindow.Title = "Confirm Closing";
-            _confirmWindow.Confirmed += () =>
-            {
-                _editorService.CloseActiveEditor();
-            };
+            _editorService.CloseActiveEditor();
+            return;
         }
+        
+        _confirmWindow.Text = "You have unsaved changes. Close the file?";
+        _confirmWindow.Title = "Confirm Closing";
+        _confirmWindow.Confirmed = () =>
+        {
+            _editorService.CloseActiveEditor();
+        };
     }
     
     private void ShowCloseAllDialog()
     {
-        if (_editorService.HasAnyEditorUnsavedChanges())
+        if (!_editorService.HasAnyEditorUnsavedChanges())
         {
-            _confirmWindow.Text= "You have unsaved changes. Close all files?";
-            _confirmWindow.Title = "Confirm Closing All";
-            _confirmWindow.Confirmed += () =>
-            {
-                _resourceService.CloseProvider();
-                _editorService.CloseAllEditors();
-                _editorService.OpenEditor(new WelcomeComponent(Game));
-            };
+            _resourceService.CloseProvider();
+            _editorService.CloseAllEditors();
+            _editorService.OpenEditor(new WelcomeComponent(Game));
+            return;
         }
+
+        _confirmWindow.Text = "You have unsaved changes. Close all files?";
+        _confirmWindow.Title = "Confirm Closing All";
+        _confirmWindow.Confirmed = () =>
+        {
+            _resourceService.CloseProvider();
+            _editorService.CloseAllEditors();
+            _editorService.OpenEditor(new WelcomeComponent(Game));
+        };
     }
 
     private void ShowQuitDialog()
@@ -190,10 +198,10 @@ public class MenuBar : DrawableGameComponent
             Game.Exit();
             return;
         }
-        
+
         _confirmWindow.Text = "You have unsaved changes. Quit the editor?";
-        _confirmWindow.Title = "Confirm Quiting";
-        _confirmWindow.Confirmed += () =>
+        _confirmWindow.Title = "Confirm Quitting";
+        _confirmWindow.Confirmed = () =>
         {
             Game.Exit();
         };
