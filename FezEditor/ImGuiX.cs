@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using FezEditor.Structure;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -624,7 +625,7 @@ public static class ImGuiX
                         }
             
                         ImGui.SameLine();
-                        if (ImGui.Button("(x)"))
+                        if (ImGui.Button(Icons.Close))
                         {
                             items.RemoveAt(i);
                             i--;
@@ -637,7 +638,7 @@ public static class ImGuiX
                     ImGui.EndListBox();
                 }
     
-                if (ImGui.Button("(+) Add"))
+                if (ImGui.Button($"{Icons.Add} Add"))
                 {
                     items.Add(createNew());
                     changed = true;
@@ -691,7 +692,7 @@ public static class ImGuiX
                         }
             
                         ImGui.SameLine();
-                        if (ImGui.Button("(x)"))
+                        if (ImGui.Button(Icons.Close))
                         {
                             items.Remove(key);
                             changed = true;
@@ -705,7 +706,7 @@ public static class ImGuiX
                 
                 // New entry input
                 K newKey = default!;
-                ImGui.Button("(+) Add New Key");
+                ImGui.Button($"{Icons.Add} Add New Key");
                 ImGui.SameLine();
         
                 if (renderNewKey(ref newKey))

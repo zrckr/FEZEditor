@@ -1,4 +1,5 @@
 ﻿using FezEditor.Services;
+using FezEditor.Structure;
 using FezEditor.Tools;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -102,7 +103,7 @@ public class MainLayout : DrawableGameComponent
                 }
                 else
                 {
-                    const string text = "Open an asset from File Browser on the left...";
+                    const string text = $"{Icons.ArrowLeft} Open a file from File Browser";
                     ImGuiX.SetTextCentered(text);
                     ImGui.Text(text);
                 }

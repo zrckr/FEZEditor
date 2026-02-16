@@ -20,7 +20,7 @@ public class WelcomeComponent : EditorComponent
     
     private readonly ResourceService _resourceService;
 
-    public WelcomeComponent(Game game) : base(game, "Welcome")
+    public WelcomeComponent(Game game) : base(game, "Welcome!")
     {
         _editorService = game.GetService<EditorService>();
         _resourceService = game.GetService<ResourceService>();

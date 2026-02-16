@@ -1,4 +1,5 @@
-﻿using ImGuiNET;
+﻿using FezEditor.Structure;
+using ImGuiNET;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components;
@@ -14,7 +15,7 @@ public class NotSupportedComponent : EditorComponent
 
     public override void Draw()
     {
-        var text = $"(!) There's no editor for the asset of {_type.Name} type!";
+        var text = $"{Icons.Warning} There's no editor for {_type.Name} asset!";
         ImGuiX.SetTextCentered(text);
         ImGui.Text(text);
     }

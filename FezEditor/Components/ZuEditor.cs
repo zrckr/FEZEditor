@@ -1,4 +1,5 @@
-﻿using FezEditor.Tools;
+﻿using FezEditor.Structure;
+using FezEditor.Tools;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -194,7 +195,7 @@ public class ZuEditor : EditorComponent
 
         _lastSelectedIndex = _selectedIndex;
 
-        if (ImGuiX.Button("(+) Add", Vector2.Zero))
+        if (ImGuiX.Button($"{Icons.Add} Add", Vector2.Zero))
         {
             AddCharacter('?');
         }
@@ -202,14 +203,14 @@ public class ZuEditor : EditorComponent
         ImGui.SameLine();
         ImGui.BeginDisabled(_selectedIndex < 0);
 
-        if (ImGuiX.Button("(*) Duplicate", Vector2.Zero))
+        if (ImGuiX.Button($"{Icons.Copy} Duplicate", Vector2.Zero))
         {
             DuplicateSelected();
         }
 
         ImGui.SameLine();
 
-        if (ImGuiX.Button("(-) Delete", Vector2.Zero))
+        if (ImGuiX.Button($"{Icons.Remove} Remove", Vector2.Zero))
         {
             DeleteSelected();
         }

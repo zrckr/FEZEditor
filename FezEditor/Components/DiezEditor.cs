@@ -1,4 +1,5 @@
-﻿using FEZRepacker.Core.Definitions.Game.TrackedSong;
+﻿using FezEditor.Structure;
+using FEZRepacker.Core.Definitions.Game.TrackedSong;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
@@ -75,7 +76,7 @@ public class DiezEditor : EditorComponent
         ImGui.Separator();
             
         ImGui.BeginDisabled(_loopIndex == -1 || _loopIndex == _trackedSong.Loops.Count - 1);
-        if (ImGui.Button("(_) Down"))
+        if (ImGui.Button($"{Icons.ChevronDown} Down"))
         {
             MoveLoop(_loopIndex, ++_loopIndex);
         }
@@ -83,14 +84,14 @@ public class DiezEditor : EditorComponent
             
         ImGui.SameLine();
         ImGui.BeginDisabled(_loopIndex is -1 or 0);
-        if (ImGui.Button("(^) Up"))
+        if (ImGui.Button($"{Icons.ChevronUp} Up"))
         {
             MoveLoop(_loopIndex, --_loopIndex);
         }
         ImGui.EndDisabled();
             
         ImGui.SameLine();
-        if (ImGui.Button("(+) Add"))
+        if (ImGui.Button($"{Icons.Add} Add"))
         {
             using (History.BeginScope("Add New Loop"))
             {
@@ -103,7 +104,7 @@ public class DiezEditor : EditorComponent
             
         ImGui.SameLine();
         ImGui.BeginDisabled(_loopIndex == -1);
-        if (ImGui.Button("(-) Remove"))
+        if (ImGui.Button($"{Icons.Remove} Remove"))
         {
             using (History.BeginScope("Remove The Loop"))
             {
@@ -203,7 +204,7 @@ public class DiezEditor : EditorComponent
                 ImGui.BeginDisabled();
             }
                 
-            if (ImGui.Button("(>) Play Assemble Chord to Preview"))
+            if (ImGui.Button($"{Icons.Play} Preview the Assemble Chord"))
             {
                 var path = $"Sounds/Collects/SplitUpCube/Assemble_{_trackedSong.AssembleChord}";
                 using var stream = ResourceService.OpenStream(path, ".wav");

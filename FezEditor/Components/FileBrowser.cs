@@ -1,4 +1,5 @@
 ﻿using FezEditor.Services;
+using FezEditor.Structure;
 using FezEditor.Tools;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -46,7 +47,7 @@ public class FileBrowser : DrawableGameComponent
     {
         if (_resourceService.HasNoProvider)
         {
-            const string text = "No resources loaded...";
+            const string text = $"{Icons.Info} No resources";
             ImGuiX.SetTextCentered(text);
             ImGui.TextDisabled(text);
         }
@@ -112,20 +113,20 @@ public class FileBrowser : DrawableGameComponent
 
         ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 4));
         {
-            ImGui.SetNextItemWidth(-30);
+            ImGui.SetNextItemWidth(-40);
             ImGui.InputTextWithHint("", "Filter Files", ref _filter, 255);
             
             if (!string.IsNullOrEmpty(_filter))
             {
                 ImGui.SameLine();
-                if (ImGui.Button("X"))
+                if (ImGui.Button(Icons.ClearAll))
                 {
                     _filter = "";
                 }
             }
             
             ImGui.SameLine();
-            if (ImGui.Button("^"))
+            if (ImGui.Button(Icons.ListFilter))
             {
                 ImGui.OpenPopup("SortOptions");
             }

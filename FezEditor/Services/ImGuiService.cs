@@ -75,6 +75,7 @@ public partial class ImGuiService : IDisposable
         {
             var io = ImGui.GetIO();
             io.Fonts.AddFontDefault();
+            LoadIconsFont("Fonts/Codicon");
             ImGuiX.Fonts.NotoSans = LoadFont("Fonts/NotoSans", io.Fonts.GetGlyphRangesDefault());
             ImGuiX.Fonts.NotoSansJp = LoadFont("Fonts/NotoSansJP", io.Fonts.GetGlyphRangesJapanese());
             ImGuiX.Fonts.NotoSansKr = LoadFont("Fonts/NotoSansKR", io.Fonts.GetGlyphRangesKorean());
@@ -348,7 +349,7 @@ public partial class ImGuiService : IDisposable
     }
     
     /// <summary>
-    /// Loads font into ImGui from the game resources
+    /// Loads font into ImGui from game content.
     /// </summary>
     private unsafe ImFontPtr LoadFont(string path, nint glyphRanges, float size = 24f)
     {
@@ -360,6 +361,34 @@ public partial class ImGuiService : IDisposable
             var config = ImGuiNative.ImFontConfig_ImFontConfig();
             config->MergeMode = 0;
             return io.Fonts.AddFontFromMemoryTTF((nint)ptr, data.Length, size, config, glyphRanges);
+        }
+    }
+    
+    /// <summary>
+    /// Loads icons font into ImGui from game content.
+    /// </summary>
+    /// <remarks>
+    /// This method merges icons into previously loaded font.
+    /// </remarks>
+    private unsafe void LoadIconsFont(string path, float size = 16f)
+    {
+        var io = ImGui.GetIO();
+        var content = _game.GetService<ContentService>().Global;
+        var data = content.LoadBytes(path);
+        fixed (byte* ptr = data)
+        {
+            var config = ImGuiNative.ImFontConfig_ImFontConfig();
+            config->MergeMode = 1;
+            config->GlyphMinAdvanceX = size;
+            config->GlyphOffset = new NVector2(0, size > 16 ? 7 : 5);
+        
+            var ranges = new ushort[] { Icons.IconMin, Icons.IconMax, 0 };
+            fixed (ushort* rangesPtr = ranges)
+            {
+                io.Fonts.AddFontFromMemoryTTF((nint)ptr, data.Length, size, config, (nint)rangesPtr);
+            }
+        
+            ImGuiNative.ImFontConfig_destroy(config);
         }
     }
     
