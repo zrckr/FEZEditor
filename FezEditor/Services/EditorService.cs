@@ -48,19 +48,19 @@ public partial class EditorService
         
         _activeEditor.Update(gameTime);
         
-        if (_inputService.IsActionPressed(InputActions.UiUndo))
+        if (_inputService.IsActionJustPressed(InputActions.UiUndo))
         {
             UndoActiveEditorChanges();
         }
-        else if (_inputService.IsActionPressed(InputActions.UiRedo))
+        else if (_inputService.IsActionJustPressed(InputActions.UiRedo))
         {
             RedoActiveEditorChanges();
         }
-        else if (_inputService.IsActionPressed(InputActions.UiSave))
+        else if (_inputService.IsActionJustPressed(InputActions.UiSave))
         {
             SaveActiveEditorChanges();
         }
-        else if (_inputService.IsActionPressed(InputActions.UiSaveAll))
+        else if (_inputService.IsActionJustPressed(InputActions.UiSaveAll))
         {
             foreach (var editor in Editors)
             {
@@ -134,6 +134,11 @@ public partial class EditorService
     public bool HasEditorUnsavedChanges(EditorComponent editor)
     {
         return _tracking.Any(kv => kv.Key == editor && kv.Value.HasChanges) && editor.History.UndoCount > 0;
+    }
+    
+    public bool HasAnyEditorUnsavedChanges()
+    {
+        return _tracking.Any(kv => kv.Value.HasChanges);
     }
 
     public void SaveActiveEditorChanges()

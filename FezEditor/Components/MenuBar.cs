@@ -13,6 +13,8 @@ public class MenuBar : DrawableGameComponent
 
     private AboutWindow? _aboutWindow;
     
+    private readonly ConfirmWindow _confirmWindow;
+    
     private readonly EditorService _editorService;
     
     private readonly ResourceService _resourceService;
@@ -21,14 +23,37 @@ public class MenuBar : DrawableGameComponent
 
     public MenuBar(Game game) : base(game)
     {
+        game.AddComponent(_confirmWindow = new ConfirmWindow(game));
         _editorService = game.GetService<EditorService>();
         _resourceService = game.GetService<ResourceService>();
         _inputService = game.GetService<InputService>();
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        _confirmWindow.Dispose();
+        _aboutWindow?.Dispose();
+    }
+
     protected override void LoadContent()
     {
         _logoTexture = Game.Content.Load<Texture2D>("Icon");
+    }
+
+    public override void Update(GameTime gameTime)
+    {
+        if (_inputService.IsActionJustPressed(InputActions.UiClose))
+        {
+            ShowCloseDialog();
+        }
+        else if (_inputService.IsActionJustPressed(InputActions.UiQuitToWelcome))
+        {
+            ShowCloseAllDialog();
+        }
+        else if (_inputService.IsActionJustPressed(InputActions.UiQuit))
+        {
+            ShowQuitDialog();
+        }
     }
 
     public override void Draw(GameTime gameTime)
@@ -85,25 +110,20 @@ public class MenuBar : DrawableGameComponent
                 shortcut = _inputService.GetActionBinding(InputActions.UiClose);
                 if (ImGui.MenuItem("Close File", shortcut, false, enabled))
                 {
-                    // TODO: add safeguard modal
-                    _editorService.CloseActiveEditor();
+                    ShowCloseDialog();
                 }
 
                 enabled = _editorService.Flags.HasFlag(EditorFlags.QuitToWelcome);
                 shortcut = _inputService.GetActionBinding(InputActions.UiQuitToWelcome);
                 if (ImGui.MenuItem("Close All", shortcut, false, enabled))
                 {
-                    // TODO: add safeguard modal
-                    _resourceService.CloseProvider();
-                    _editorService.CloseAllEditors();
-                    _editorService.OpenEditor(new WelcomeComponent(Game));
+                    ShowCloseAllDialog();
                 }
                 
                 shortcut = _inputService.GetActionBinding(InputActions.UiQuit);
                 if (ImGui.MenuItem("Quit", shortcut))
                 {
-                    // TODO: add safeguard modal
-                    Game.Exit();
+                    ShowQuitDialog();
                 }
 
                 ImGui.EndMenu();
@@ -124,7 +144,7 @@ public class MenuBar : DrawableGameComponent
             ImGui.EndMainMenuBar();
         }
     }
-
+    
     private void ShowAboutWindow()
     {
         if (_aboutWindow == null)
@@ -133,5 +153,49 @@ public class MenuBar : DrawableGameComponent
             _aboutWindow.Disposed += (_, _) => { _aboutWindow = null; };
             Game.AddComponent(_aboutWindow);
         }
+    }
+
+    private void ShowCloseDialog()
+    {
+        if (_editorService.HasAnyEditorUnsavedChanges())
+        {
+            _confirmWindow.Text = "You have unsaved changes. Close the file?";
+            _confirmWindow.Title = "Confirm Closing";
+            _confirmWindow.Confirmed += () =>
+            {
+                _editorService.CloseActiveEditor();
+            };
+        }
+    }
+    
+    private void ShowCloseAllDialog()
+    {
+        if (_editorService.HasAnyEditorUnsavedChanges())
+        {
+            _confirmWindow.Text= "You have unsaved changes. Close all files?";
+            _confirmWindow.Title = "Confirm Closing All";
+            _confirmWindow.Confirmed += () =>
+            {
+                _resourceService.CloseProvider();
+                _editorService.CloseAllEditors();
+                _editorService.OpenEditor(new WelcomeComponent(Game));
+            };
+        }
+    }
+
+    private void ShowQuitDialog()
+    {
+        if (!_editorService.HasAnyEditorUnsavedChanges())
+        {
+            Game.Exit();
+            return;
+        }
+        
+        _confirmWindow.Text = "You have unsaved changes. Quit the editor?";
+        _confirmWindow.Title = "Confirm Quiting";
+        _confirmWindow.Confirmed += () =>
+        {
+            Game.Exit();
+        };
     }
 }

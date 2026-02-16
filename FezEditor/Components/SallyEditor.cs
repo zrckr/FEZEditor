@@ -15,6 +15,8 @@ public class SallyEditor : EditorComponent
     
     public override object Asset => _saveData;
 
+    private readonly ConfirmWindow _confirm;
+
     private readonly ResourceService _resources;
     
     private readonly SaveData _saveData;
@@ -31,9 +33,15 @@ public class SallyEditor : EditorComponent
 
     public SallyEditor(Game game, string title, SaveData saveData) : base(game, title)
     {
+        game.AddComponent(_confirm = new ConfirmWindow(game));
         _resources = game.GetService<ResourceService>();
         _saveData = saveData;
         History.Track(saveData);
+    }
+
+    public override void Dispose()
+    {
+        _confirm.Dispose();
     }
 
     public override void LoadContent()
@@ -462,7 +470,7 @@ public class SallyEditor : EditorComponent
         ImGui.BeginDisabled(_levelIndex == -1);
         if (ImGui.Button("(-) Remove"))
         {
-            _nextState = State.DeleteLevel;
+            _nextState = State.RemoveLevel;
         }
         ImGui.EndDisabled();
             
@@ -759,7 +767,7 @@ public class SallyEditor : EditorComponent
             {
                 ImGuiX.TextColored(new Color(1, 0.3f, 0.3f, 1), "Level already exists.");
             }
-            
+
             var levelEmpty = string.IsNullOrWhiteSpace(_levelName);
             if (levelEmpty)
             {
@@ -796,85 +804,49 @@ public class SallyEditor : EditorComponent
 
     private void DrawDeleteLevelModal()
     {
-        if (_nextState == State.DeleteLevel)
+        if (_nextState != State.RemoveLevel)
         {
-            ImGuiX.SetNextWindowCentered();
-            ImGui.OpenPopup("##DeleteLevel");
-            _levelName = _saveData.World.GetAt(_levelIndex).Key;
-            _nextState = State.PropertiesView;
+            return;
         }
-
-        if (ImGui.BeginPopupModal("##DeleteLevel",
-                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoTitleBar))
+        
+        _nextState = State.PropertiesView;
+        _levelName = _saveData.World.GetAt(_levelIndex).Key;
+        
+        _confirm.Text = "Are you sure you want to delete " + _levelName + "?";
+        _confirm.Confirmed = () =>
         {
-            ImGui.Text("Delete this level?");
-            ImGui.Separator();
-            
-            if (ImGui.Button("Yes"))
+            using (History.BeginScope("Delete Level"))
             {
-                using (History.BeginScope("Delete Level"))
-                {
-                    _saveData.World.Remove(_levelName);
-                    _levelIndex = -1;
-                }
-
-                _levelName = "";
-                ImGui.CloseCurrentPopup();
+                _saveData.World.Remove(_levelName);
+                _levelIndex = -1;
             }
-            
-            ImGui.SameLine();
-
-            if (ImGui.Button("No") || ImGui.IsKeyPressed(ImGuiKey.Escape))
-            {
-                _levelName = "";
-                ImGui.CloseCurrentPopup();
-            }
-            
-            ImGui.EndChild();
-        }
+        };
     }
 
     private void DrawOverrideSaveSlotModal()
     {
-        if (_nextState == State.OverrideSaveSlot)
+        if (_nextState != State.OverrideSaveSlot)
         {
-            ImGuiX.SetNextWindowCentered();
-            ImGui.OpenPopup("##OverrideSaveSlot");
-            _nextState = State.PropertiesView;
+            return;
         }
-
-        if (ImGui.BeginPopupModal("##OverrideSaveSlot",
-                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoTitleBar))
+        
+        _nextState = State.PropertiesView;
+        _confirm.Text = "Are you sure you want to override this SaveSlot?";
+        _confirm.Confirmed = () =>
         {
-            ImGui.Text("Are you sure you want to override this SaveSlot?");
-            ImGui.Separator();
-            
-            if (ImGui.Button("Yes"))
+            using (History.BeginScope("Override SaveSlot"))
             {
-                using (History.BeginScope("Override SaveSlot"))
-                {
-                    var saveData = _saveSlotOverrider!.Invoke();
-                    saveData.CopyTo(_saveData);
-                }
-                ImGui.CloseCurrentPopup();
+                var saveData = _saveSlotOverrider!.Invoke();
+                saveData.CopyTo(_saveData);
             }
-            
-            ImGui.SameLine();
-
-            if (ImGui.Button("No") || ImGui.IsKeyPressed(ImGuiKey.Escape))
-            {
-                ImGui.CloseCurrentPopup();
-            }
-            
-            ImGui.EndChild();
-        }
+        };
     }
 
     private enum State
     {
         PropertiesView,
         RenameLevel,
-        DeleteLevel,
+        RemoveLevel,
         OverrideSaveSlot
     }
 }
