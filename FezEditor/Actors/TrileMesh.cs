@@ -47,10 +47,11 @@ public class TrileMesh : ActorComponent
         var effect = Game.Content.Load<Effect>("Effects/Trile");
         _rendering.MaterialAssignEffect(_material, effect);
 
-        var texture = trileSet.TextureAtlas.ToXna(_rendering.GraphicsDevice);
+        var texture = RepackerExtensions.ConvertToTexture2D(trileSet.TextureAtlas);
         _rendering.MaterialAssignBaseTexture(_material, texture);
 
-        var surface = trileSet.Triles[id].Geometry.ToXna(); 
+        var trile = trileSet.Triles[id];
+        var surface = RepackerExtensions.ConvertToMesh(trile.Geometry.Vertices, trile.Geometry.Indices); 
         _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
         
         _rendering.MultiMeshAllocate(_multiMesh, MaxInstancesCount, MultiMeshDataType.Vector4);

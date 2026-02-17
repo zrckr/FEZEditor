@@ -23,13 +23,13 @@ public class ArtObjectMesh : ActorComponent
 
     public void Load(ArtObject ao)
     {
-        var texture = ao.Cubemap.ToXna(_rendering.GraphicsDevice);
+        var texture = RepackerExtensions.ConvertToTexture2D(ao.Cubemap);
         _rendering.MaterialAssignBaseTexture(_material, texture);
         
         var effect = Game.Content.Load<Effect>("Effects/ArtObject");
         _rendering.MaterialAssignEffect(_material, effect);
 
-        var surface = ao.Geometry.ToXna();
+        var surface = RepackerExtensions.ConvertToMesh(ao.Geometry.Vertices, ao.Geometry.Indices);
         _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
         _rendering.InstanceSetMesh(Actor.InstanceRid, _mesh);
     }

@@ -24,8 +24,6 @@ public class FezEditor : Game
     private ImGuiService _imGui = null!;
     
     private RenderingService _rendering = null!;
-
-    private ResourceService _resource = null!;
     
     private InputService _input = null!;
     
@@ -62,10 +60,12 @@ public class FezEditor : Game
 
     protected override void Initialize()
     {
+        RepackerExtensions.Gd = GraphicsDevice;
+
         _content = this.CreateService<ContentService>();
         _imGui = this.CreateService<ImGuiService>();
         _rendering = this.CreateService<RenderingService>();
-        _resource = this.CreateService<ResourceService>();
+        this.CreateService<ResourceService>();
         _input = this.CreateService<InputService>();
         _editor = this.CreateService<EditorService>();
 

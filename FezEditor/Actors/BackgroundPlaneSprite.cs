@@ -59,7 +59,7 @@ public class BackgroundPlaneSprite : ActorComponent
             {
                 frames = animatedTexture.Frames;
                 effect = Game.Content.Load<Effect>("Effects/AnimatedPlane");
-                baseTexture = animatedTexture.ToXna(_rendering.GraphicsDevice);
+                baseTexture = RepackerExtensions.ConvertToTexture2D(animatedTexture);
                 PlaneSize = new Vector3(animatedTexture.AtlasWidth / 16f, animatedTexture.AtlasHeight / 16f, 0.125f);
                 break;
             }
@@ -68,7 +68,7 @@ public class BackgroundPlaneSprite : ActorComponent
             {
                 frames = new List<FrameContent>();
                 effect = Game.Content.Load<Effect>("StaticPlane");
-                baseTexture = texture.ToXna(_rendering.GraphicsDevice);
+                baseTexture = RepackerExtensions.ConvertToTexture2D(texture);
                 PlaneSize = new Vector3(texture.Width / 16f, texture.Height / 16f, 0.125f);
                 break;
             }

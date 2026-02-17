@@ -1,6 +1,8 @@
 ﻿using FezEditor.Components;
 using FezEditor.Structure;
+using FEZRepacker.Core.Definitions.Game.ArtObject;
 using FEZRepacker.Core.Definitions.Game.TrackedSong;
+using FEZRepacker.Core.Definitions.Game.TrileSet;
 
 namespace FezEditor.Services;
 
@@ -14,6 +16,7 @@ public partial class EditorService
             TextStorage text => new PoEditor(_game, path, text),
             FezFont font => new ZuEditor(_game, path, font),
             SaveData saveData => new SallyEditor(_game, path, saveData),
+            ArtObject ao => new ChrisEditor(_game, path, ao),
             _ => new NotSupportedComponent(_game, path, asset.GetType())
         };
     }

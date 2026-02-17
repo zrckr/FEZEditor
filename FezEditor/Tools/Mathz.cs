@@ -1,9 +1,13 @@
-﻿using Microsoft.Xna.Framework;
+﻿using FEZRepacker.Core.Definitions.Game.Common;
+using FEZRepacker.Core.Definitions.Game.Level;
+using Microsoft.Xna.Framework;
 
 namespace FezEditor.Tools;
 
 public static class Mathz
 {
+    public const float TrixelSize = 1f / 16f;
+    
     public static bool IsZeroApprox(float value)
     {
         return MathF.Abs(value) < float.Epsilon;
@@ -61,5 +65,23 @@ public static class Mathz
         }
     
         return new BoundingBox(min, max);
+    }
+    
+    public static Vector3 Abs(this Vector3 vector)
+    {
+        return new Vector3(
+            Math.Abs(vector.X), 
+            Math.Abs(vector.Y), 
+            Math.Abs(vector.Z)
+        );
+    }
+    
+    public static Vector3 Round(this Vector3 vector, int decimals = 10)
+    {
+        return new Vector3(
+            MathF.Round(vector.X, decimals), 
+            MathF.Round(vector.Y, decimals), 
+            MathF.Round(vector.Z, decimals)
+        );
     }
 }

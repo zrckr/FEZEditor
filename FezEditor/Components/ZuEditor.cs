@@ -55,7 +55,7 @@ public class ZuEditor : EditorComponent
 
     public override void LoadContent()
     {
-        _fontTexture = _font.Texture.ToXna(RenderingService.GraphicsDevice);
+        _fontTexture = RepackerExtensions.ConvertToTexture2D(_font.Texture);
         _fontTexturePtr = ImGuiX.Bind(_fontTexture);
         
         if (Title.Contains("japanese", StringComparison.OrdinalIgnoreCase))
