@@ -101,6 +101,11 @@ public class InputService
     {
         return _currentMouseState.RightButton == ButtonState.Pressed;
     }
+    
+    public bool IsMiddleMousePressed()
+    {
+        return _currentMouseState.MiddleButton == ButtonState.Pressed;
+    }
 
     public bool IsLeftMousePressed()
     {
@@ -117,6 +122,11 @@ public class InputService
         var deltaX = _currentMouseState.X - _previousMouseState.X;
         var deltaY = _currentMouseState.Y - _previousMouseState.Y;
         return new Vector2(deltaX, deltaY);
+    }
+
+    public int GetScrollWheelDelta()
+    {
+        return _currentMouseState.ScrollWheelValue - _previousMouseState.ScrollWheelValue;
     }
 
     public void CaptureMouse(bool captured)

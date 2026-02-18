@@ -31,23 +31,18 @@ public class Camera : ActorComponent
 
     private Rid _world;
     
-    private Transform _transform = null!;
-    
     public override void Initialize()
     {
         _rendering = Game.GetService<RenderingService>();
         _camera = _rendering.CameraCreate();
         _world = _rendering.InstanceGetWorld(Actor.InstanceRid);
         _rendering.WorldSetCamera(_world, _camera);
-        _transform = Actor.GetComponent<Transform>();
     }
 
     public override void Update(GameTime gameTime)
     {
-        var rotationMatrix = Matrix.CreateFromQuaternion(_transform.Rotation);
-        var target = _transform.Position - rotationMatrix.Forward;
-        
-        var viewMatrix = Matrix.CreateLookAt(_transform.Position, target, rotationMatrix.Up);
+        var world = _rendering.InstanceGetWorldMatrix(Actor.InstanceRid);
+        var viewMatrix = Matrix.CreateLookAt(world.Translation, world.Translation + world.Forward, world.Up);
         var projectionMatrix = Projection switch
         {
             ProjectionType.Perspective => Matrix
