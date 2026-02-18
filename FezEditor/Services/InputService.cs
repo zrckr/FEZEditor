@@ -25,6 +25,8 @@ public class InputService
 
     private bool _mouseCaptured;
 
+    private bool _mouseWasCaptured;
+
     public InputService(Game game)
     {
         _game = game;
@@ -153,8 +155,24 @@ public class InputService
                 _previousMouseState.XButton1,
                 _previousMouseState.XButton2
             );
+            // If capture just started this frame, also align current to center
+            // so the delta is zero and the capture-start position doesn't bleed in.
+            if (!_mouseWasCaptured)
+            {
+                _currentMouseState = new MouseState(
+                    MouseCenter.X, MouseCenter.Y,
+                    _currentMouseState.ScrollWheelValue,
+                    _currentMouseState.LeftButton,
+                    _currentMouseState.MiddleButton,
+                    _currentMouseState.RightButton,
+                    _currentMouseState.XButton1,
+                    _currentMouseState.XButton2
+                );
+            }
             Mouse.SetPosition(MouseCenter.X, MouseCenter.Y);
         }
+        _mouseWasCaptured = _mouseCaptured;
+        _mouseCaptured = false;
     }
 
     private List<Binding> GetLazyBindings(string action)
