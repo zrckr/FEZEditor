@@ -192,12 +192,24 @@ public partial class RenderingService
         }
         else
         {
-            var geometry = Enumerable.Range(0, surface.Vertices.Length)
-                .Select(i => new VertexPositionColor(surface.Vertices[i], hasColors ? surface.Colors![i] : Color.White))
-                .ToArray();
+            if (hasNormals)
+            {
+                var geometry = Enumerable.Range(0, surface.Vertices.Length)
+                    .Select(i => new VertexPositionNormalColor(surface.Vertices[i], surface.Normals![i], hasColors ? surface.Colors![i] : Color.White))
+                    .ToArray();
+                
+                entry.VertexBuffer = new VertexBuffer(GraphicsDevice, typeof(VertexPositionNormalColor), geometry.Length, BufferUsage.WriteOnly);
+                entry.VertexBuffer.SetData(geometry);
+            }
+            else
+            {
+                var geometry = Enumerable.Range(0, surface.Vertices.Length)
+                    .Select(i => new VertexPositionColor(surface.Vertices[i], hasColors ? surface.Colors![i] : Color.White))
+                    .ToArray();
 
-            entry.VertexBuffer = new VertexBuffer(GraphicsDevice, typeof(VertexPositionColor), geometry.Length, BufferUsage.WriteOnly);
-            entry.VertexBuffer.SetData(geometry);
+                entry.VertexBuffer = new VertexBuffer(GraphicsDevice, typeof(VertexPositionColor), geometry.Length, BufferUsage.WriteOnly);
+                entry.VertexBuffer.SetData(geometry);
+            }
         }
         
         entry.IndexBuffer = new IndexBuffer(GraphicsDevice, IndexElementSize.ThirtyTwoBits, surface.Indices.Length, BufferUsage.WriteOnly);
