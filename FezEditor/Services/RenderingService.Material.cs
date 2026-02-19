@@ -6,6 +6,8 @@ namespace FezEditor.Services;
 
 public partial class RenderingService
 {
+    private static readonly Dictionary<(CullMode, FillMode), RasterizerState> RasterizerStateCache = new();
+    
     private static readonly Dictionary<int, BlendState> BlendStateCache = new();
 
     private class MaterialData
@@ -16,6 +18,7 @@ public partial class RenderingService
         public Color Albedo = Color.White;
         public BlendMode BlendMode = BlendMode.AlphaBlend;
         public CullMode CullMode = CullMode.CullCounterClockwiseFace;
+        public FillMode FillMode = FillMode.Solid;
         public ColorWriteChannels ColorWriteChannels = ColorWriteChannels.All;
         public SamplerState? SamplerState = SamplerState.PointClamp;
         public BlendState BlendState = ResolveBlendState(BlendMode.AlphaBlend, ColorWriteChannels.All);
@@ -85,6 +88,16 @@ public partial class RenderingService
         GetResource(_materials, material).CullMode = mode;
     }
 
+    public void MaterialSetFillMode(Rid material, FillMode mode)
+    {
+        GetResource(_materials, material).FillMode = mode;
+    }
+
+    public FillMode MaterialGetFillMode(Rid material)
+    {
+        return GetResource(_materials, material).FillMode;
+    }
+
     public void MaterialSetDepthWrite(Rid material, bool enabled)
     {
         var dss = GetResource(_materials, material).DepthStencilState;
@@ -116,12 +129,28 @@ public partial class RenderingService
         GraphicsDevice.SamplerStates[0] = mat.SamplerState;
         GraphicsDevice.BlendState = mat.BlendState;
         GraphicsDevice.DepthStencilState = mat.DepthStencilState;
-        GraphicsDevice.RasterizerState = mat.CullMode switch
+        GraphicsDevice.RasterizerState = ResolveRasterizerState(mat.CullMode, mat.FillMode);
+    }
+
+    private static RasterizerState ResolveRasterizerState(CullMode cullMode, FillMode fillMode)
+    {
+        if (fillMode == FillMode.Solid)
         {
-            CullMode.None => RasterizerState.CullNone,
-            CullMode.CullClockwiseFace => RasterizerState.CullClockwise,
-            _ => RasterizerState.CullCounterClockwise
-        };
+            return cullMode switch
+            {
+                CullMode.None => RasterizerState.CullNone,
+                CullMode.CullClockwiseFace => RasterizerState.CullClockwise,
+                _ => RasterizerState.CullCounterClockwise
+            };
+        }
+
+        var key = (cullMode, fillMode);
+        if (!RasterizerStateCache.TryGetValue(key, out var state))
+        {
+            state = new RasterizerState { CullMode = cullMode, FillMode = fillMode };
+            RasterizerStateCache[key] = state;
+        }
+        return state;
     }
 
     private static BlendState ResolveBlendState(BlendMode mode, ColorWriteChannels colorWriteChannels)
