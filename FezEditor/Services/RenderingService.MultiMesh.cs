@@ -88,17 +88,6 @@ public partial class RenderingService
         // Allocate instance buffer.
         data.InstanceDeclaration = new VertexDeclaration(offset, elements);
         data.InstanceBuffer = new DynamicVertexBuffer(GraphicsDevice, data.InstanceDeclaration, instances, BufferUsage.WriteOnly);
-
-        // Build template GPU buffers from the first surface of the referenced mesh.
-        if (TryGetResource(_meshes, data.Mesh, out var mesh) && mesh!.Surfaces.Count != 0)
-        {
-            var surface = mesh.Surfaces[0];
-            data.TemplatePrimitiveType = surface.PrimitiveType;
-            data.TemplatePrimitiveCount = surface.PrimitiveCount;
-            data.TemplateVertexCount = surface.VertexCount;
-            data.TemplateVertexBuffer = surface.VertexBuffer;
-            data.TemplateIndexBuffer = surface.IndexBuffer;
-        }
     }
 
     public void MultiMeshDeallocate(Rid multiMesh)
@@ -182,10 +171,28 @@ public partial class RenderingService
             return;
         }
 
-        if (mm!.TemplateVertexBuffer == null || mm.TemplateIndexBuffer == null ||
-            mm.InstanceBuffer == null || mm.InstanceDeclaration == null)
+        if (mm!.InstanceBuffer == null || mm.InstanceDeclaration == null)
         {
-            return;
+            throw new InvalidOperationException($"MultiMesh {multiMeshRid} was not allocated.");
+        }
+
+        if (mm.TemplateVertexBuffer == null || mm.TemplateIndexBuffer == null)
+        {
+            if (!TryGetResource(_meshes, mm.Mesh, out var md))
+            {
+                throw new InvalidOperationException($"MultiMesh {multiMeshRid} does not have assigned mesh.");
+            }
+                
+            // Build template GPU buffers from the first surface of the referenced mesh.
+            if (md!.Surfaces.Count > 0)
+            {
+                var surface = md.Surfaces[0];
+                mm.TemplatePrimitiveType = surface.PrimitiveType;
+                mm.TemplatePrimitiveCount = surface.PrimitiveCount;
+                mm.TemplateVertexCount = surface.VertexCount;
+                mm.TemplateVertexBuffer = surface.VertexBuffer;
+                mm.TemplateIndexBuffer = surface.IndexBuffer;
+            }
         }
 
         var visible = mm.VisibleInstances < 0 ? mm.InstanceCount : mm.VisibleInstances;
