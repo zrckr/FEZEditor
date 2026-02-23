@@ -218,6 +218,7 @@ public partial class RenderingService
             return;
         }
 
+        CheckMaterialEffect(mat);
         ApplyMaterialState(mat);
         if (mat.Effect is BasicEffect)
         {
@@ -236,7 +237,7 @@ public partial class RenderingService
         GraphicsDevice.Indices = mm.TemplateIndexBuffer;
 
         // Draw instanced.
-        foreach (var pass in mat.Effect.CurrentTechnique.Passes)
+        foreach (var pass in mat.Effect!.CurrentTechnique.Passes)
         {
             pass.Apply();
             GraphicsDevice.DrawInstancedPrimitives(

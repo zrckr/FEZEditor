@@ -93,6 +93,7 @@ public partial class RenderingService
             {
                 if (TryGetResource(_materials, surface.Material, out var mat) && mat != null)
                 {
+                    CheckMaterialEffect(mat);
                     ApplyMaterialState(mat);
                     if (mat.Effect is BasicEffect)
                     {
@@ -102,7 +103,7 @@ public partial class RenderingService
                     {
                         UpdateBaseEffect(rt, world, mat, matrices);
                     }
-                    DrawSurfaceEntry(surface, mat.Effect);
+                    DrawSurfaceEntry(surface, mat.Effect!);
                     RestoreDefaultState();
                 }
             }

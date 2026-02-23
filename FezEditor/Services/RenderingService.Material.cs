@@ -12,7 +12,7 @@ public partial class RenderingService
 
     private class MaterialData
     {
-        public required Effect Effect;
+        public Effect? Effect;
         public Texture2D? Texture;
         public Matrix TextureTransform = Matrix.Identity;
         public Color Albedo = Color.White;
@@ -33,22 +33,28 @@ public partial class RenderingService
     public Rid MaterialCreate()
     {
         var rid = AllocateRid(typeof(MaterialData));
-        _materials[rid] = new MaterialData { Effect = new BasicEffect(GraphicsDevice) { VertexColorEnabled = true } };
+        _materials[rid] = new MaterialData();
         return rid;
     }
 
     public void MaterialReset(Rid material)
     {
-        GetResource(_materials, material);  // Validation step
-        _materials[material].Effect.Dispose();
-        _materials[material] = new MaterialData { Effect = new BasicEffect(GraphicsDevice) };
+        var data = GetResource(_materials, material);
+        if (data.Effect is not BasicEffect)
+        {
+            data.Effect?.Dispose();
+        }
+        data.Effect = null;
     }
 
     public void MaterialAssignEffect(Rid material, Effect effect)
     {
-        GetResource(_materials, material);  // Validation step
-        _materials[material].Effect.Dispose();
-        _materials[material] = new MaterialData { Effect = effect.Clone() };
+        var data = GetResource(_materials, material);
+        if (data.Effect is not BasicEffect)
+        {
+            data.Effect?.Dispose();
+        }
+        data.Effect = effect.Clone();
     }
 
     public void MaterialAssignBaseTexture(Rid material, Texture2D texture)
@@ -300,5 +306,10 @@ public partial class RenderingService
                 surface.Material = Rid.Invalid;
             }
         }
+    }
+
+    private void CheckMaterialEffect(MaterialData material)
+    {
+        material.Effect ??= new BasicEffect(GraphicsDevice) { VertexColorEnabled = true };
     }
 }

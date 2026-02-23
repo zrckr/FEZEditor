@@ -152,8 +152,9 @@ public partial class RenderingService : IDisposable
         }
         else if (rid.Type == typeof(MaterialData))
         {
-            if (RemoveResource(_materials, rid, out _))
+            if (RemoveResource(_materials, rid, out var material))
             {
+                material!.Effect?.Dispose();
                 InvalidateMaterial(rid);
             }
         }
