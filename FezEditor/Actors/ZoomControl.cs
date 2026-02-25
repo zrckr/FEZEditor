@@ -16,12 +16,12 @@ public class ZoomControl : ActorComponent
 
     private readonly InputService _input;
 
-    private readonly Transform _transform;
+    private readonly Camera _camera;
 
     internal ZoomControl(Game game, Actor actor) : base(game, actor)
     {
         _input = game.GetService<InputService>();
-        _transform = actor.GetComponent<Transform>();
+        _camera = actor.GetComponent<Camera>();
     }
 
     public override void Update(GameTime gameTime)
@@ -33,6 +33,6 @@ public class ZoomControl : ActorComponent
             Distance = MathHelper.Clamp(Distance, MinDistance, MaxDistance);
         }
         
-        _transform.Position = new Vector3(0f, 0f, Distance);
+        _camera.Offset = new Vector3(0f, 0f, Distance);
     }
 }

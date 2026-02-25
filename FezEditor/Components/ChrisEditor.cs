@@ -13,42 +13,47 @@ public class ChrisEditor : EditorComponent
 
     private readonly ArtObject _ao;
     
-    private readonly Scene _scene;
+    private Scene _scene = null!;
 
-    private readonly TrixelsMesh _mesh;
+    private Actor _cameraActor = null!;
+
+    private Actor _meshActor = null!;
 
     private TrixelObject _obj = null!;
     
     public ChrisEditor(Game game, string title, ArtObject ao) : base(game, title)
     {
         _ao = ao;
-        _scene = new Scene(game);
-        {
-            var pivot = _scene.CreateActor();
-            pivot.AddComponent<OrbitControl>();
-            {
-                var cameraActor = _scene.CreateActor(pivot);
-                var camera = cameraActor.AddComponent<Camera>();
-                camera.Projection = Camera.ProjectionType.Perspective;
-                camera.FieldOfView = 90f;
-
-                var zoom = cameraActor.AddComponent<ZoomControl>();
-                zoom.Distance = _ao.Size.X;
-                zoom.MinDistance = 10f / 16f;
-                zoom.MaxDistance = 16f;
-            }
-        }
-        {
-            var actor = _scene.CreateActor();
-            _mesh = actor.AddComponent<TrixelsMesh>();
-        }
+        History.Track(ao);
     }
 
     public override void LoadContent()
     {
+        _scene = new Scene(Game);
+        {
+            _cameraActor = _scene.CreateActor();
+            _cameraActor.Name = "Camera";
+            
+            var camera = _cameraActor.AddComponent<Camera>();
+            var zoom = _cameraActor.AddComponent<ZoomControl>();
+            _cameraActor.AddComponent<OrbitControl>();
+            _cameraActor.AddComponent<OrientationGizmo>();
+
+            camera.Projection = Camera.ProjectionType.Perspective;
+            camera.FieldOfView = 90f;
+            zoom.Distance = _ao.Size.X;
+            zoom.MinDistance = 10f / 16f;
+            zoom.MaxDistance = 16f;
+        }
+        {
+            _meshActor = _scene.CreateActor();
+            _meshActor.AddComponent<TrixelsMesh>();
+        }
+        
         _obj = TrixelMaterializer.Materialize(_ao);
-        _mesh.Texture = RepackerExtensions.ConvertToTexture2D(_ao.Cubemap);
-        _mesh.Visualize(_obj);
+        var mesh = _meshActor.GetComponent<TrixelsMesh>();
+        mesh.Texture = RepackerExtensions.ConvertToTexture2D(_ao.Cubemap);
+        mesh.Visualize(_obj);
     }
     
     private object SaveContent()
@@ -82,6 +87,13 @@ public class ChrisEditor : EditorComponent
             if (texture is { IsDisposed: false })
             {
                 ImGuiX.Image(texture, size);
+
+                var gizmo = _cameraActor.GetComponent<OrientationGizmo>();
+                {
+                    var imageMin = ImGuiX.GetItemRectMin();
+                    gizmo.UseFaceLabels = true;
+                    gizmo.Draw(imageMin + new Vector2(size.X - 8f, 8f));
+                }
             }
         }
     }
