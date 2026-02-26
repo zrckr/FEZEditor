@@ -39,7 +39,7 @@ public class OrientationGizmo : ActorComponent
         var center = screenCenter.ToNumerics() + new NVector2(-Radius, Radius);
         var view = _rendering.CameraGetView(_cameraRid);
 
-        var dl = ImGui.GetForegroundDrawList();
+        var dl = ImGui.GetWindowDrawList();
         dl.AddCircleFilled(center, Radius, 0x44000000);
 
         var sorted = Axes
