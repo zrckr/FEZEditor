@@ -10,6 +10,8 @@ namespace FezEditor.Components;
 
 public class ArtObjectSubject : ITrixelSubject
 {
+    private const int BytesPerPixel = 4;  
+
     public string TextureExportKey { get; }
 
     private readonly ArtObject _ao;
@@ -59,7 +61,7 @@ public class ArtObjectSubject : ITrixelSubject
 
     public void UpdateTexture(Texture2D texture)
     {
-        var pixels = new byte[texture.Width * texture.Height * 4];
+        var pixels = new byte[texture.Width * texture.Height * BytesPerPixel];
         texture.GetData(pixels);
         _ao.Cubemap.TextureData = pixels;
         _ao.Cubemap.Width = texture.Width;
