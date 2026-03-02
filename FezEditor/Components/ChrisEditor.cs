@@ -10,11 +10,11 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace FezEditor.Components;
 
-public class ChrisEditor : EditorComponent
+public partial class ChrisEditor : EditorComponent
 {
     public override object Asset => _subject.GetAsset(_obj);
 
-    private readonly ITrixelSubject _subject;
+    private readonly ISubject _subject;
     
     private readonly ExportService _exportService;
 
@@ -43,12 +43,12 @@ public class ChrisEditor : EditorComponent
         History.Track(ao);
     }
 
-    public ChrisEditor(Game game, string title, TrileSet set) : this(game, title, new TrileSubject(set, game))
+    public ChrisEditor(Game game, string title, TrileSet set) : this(game, title, new TrileSetSubject(set, game))
     {
         History.Track(set);
     }
 
-    private ChrisEditor(Game game, string title, ITrixelSubject subject) : base(game, title)
+    private ChrisEditor(Game game, string title, ISubject subject) : base(game, title)
     {
         _subject = subject;
         _exportService = game.GetService<ExportService>();
@@ -95,7 +95,7 @@ public class ChrisEditor : EditorComponent
         
         DrawToolbar();
 
-        if (_subject is TrileSubject subject)
+        if (_subject is TrileSetSubject subject)
         {
             var width = ImGui.GetContentRegionAvail().X;
             if (ImGuiX.BeginChild("##SceneViewport", new Vector2(width - 300, 0)))
@@ -140,7 +140,7 @@ public class ChrisEditor : EditorComponent
         }
         ImGui.EndDisabled();
 
-        if (_subject is TrileSubject)
+        if (_subject is TrileSetSubject)
         {
             var collision = _meshActor.GetComponent<TrileCollisionMesh>();
             var icon = collision.Visible ? Icons.EyeClosed : Icons.Eye;
@@ -154,15 +154,15 @@ public class ChrisEditor : EditorComponent
         ImGui.Separator();
     }
     
-    private void DrawTrileList(TrileSubject subject)
+    private void DrawTrileList(TrileSetSubject setSubject)
     {
-        var name = subject.Name;
+        var name = setSubject.Name;
         ImGui.SetNextItemWidth(150f);
         if (ImGui.InputText("Trile Set Name", ref name, 255))
         {
             using (History.BeginScope("Rename Trile Set"))
             {
-                subject.Name = name;
+                setSubject.Name = name;
             }
         }
 
@@ -171,11 +171,11 @@ public class ChrisEditor : EditorComponent
         {
             using (History.BeginScope("Add Trile"))
             {
-                var newId = subject.AddTrile();
+                var newId = setSubject.AddTrile();
                 _selectedTriles.Clear();
                 _selectedTriles.Add(newId);
                 _currentTrile = newId;
-                subject.Id = newId;
+                setSubject.Id = newId;
                 RevisualizeSubject();
             }
         }
@@ -186,11 +186,11 @@ public class ChrisEditor : EditorComponent
         {
             using (History.BeginScope("Remove Trile"))
             {
-                var nextId = subject.RemoveTriles(_selectedTriles);
+                var nextId = setSubject.RemoveTriles(_selectedTriles);
                 _selectedTriles.Clear();
                 _selectedTriles.Add(nextId);
                 _currentTrile = nextId;
-                subject.Id = nextId;
+                setSubject.Id = nextId;
                 RevisualizeSubject();
             }
         }
@@ -202,11 +202,11 @@ public class ChrisEditor : EditorComponent
         {
             using (History.BeginScope("Copy Triles"))
             {
-                var newId = subject.CopyTriles(_selectedTriles);
+                var newId = setSubject.CopyTriles(_selectedTriles);
                 _selectedTriles.Clear();
                 _selectedTriles.Add(newId);
                 _currentTrile = newId;
-                subject.Id = newId;
+                setSubject.Id = newId;
                 RevisualizeSubject();
             }
         }
@@ -238,7 +238,7 @@ public class ChrisEditor : EditorComponent
                 {
                     var path = result.Files[0];
                     var targetSet = (TrileSet)ResourceService.Load(path);
-                    subject.AppendTriles(_selectedTriles, targetSet);
+                    setSubject.AppendTriles(_selectedTriles, targetSet);
                     ResourceService.Save(path, targetSet);
                 }
             }, options);
@@ -261,7 +261,7 @@ public class ChrisEditor : EditorComponent
 
         if (ImGuiX.BeginChild("##TrileSetList", Vector2.Zero))
         {
-            foreach (var entry in subject.EnumerateTriles(_filterTriles))
+            foreach (var entry in setSubject.EnumerateTriles(_filterTriles))
             {
                 var toggled = _selectedTriles.Contains(entry.Id);
                 if (ImGui.Checkbox($"##chk_{entry.Id}", ref toggled))
@@ -285,7 +285,7 @@ public class ChrisEditor : EditorComponent
                 if (ImGuiX.SelectableWithImage(entry.Texture, size, entry.Uv0, entry.Uv1, text, sel))
                 {
                     _currentTrile = entry.Id;
-                    subject.Id = _currentTrile;
+                    setSubject.Id = _currentTrile;
                     RevisualizeSubject();
                 }
             }
@@ -422,7 +422,7 @@ public class ChrisEditor : EditorComponent
         mesh.Texture = _subject.LoadTexture();
         mesh.Visualize(_obj);
 
-        if (_subject is TrileSubject subject)
+        if (_subject is TrileSetSubject subject)
         {
             var collision = _meshActor.GetComponent<TrileCollisionMesh>();
             collision.Visualize(subject.GetTrileCollision(), _obj.Size);
@@ -451,5 +451,20 @@ public class ChrisEditor : EditorComponent
         _confirm.CancelButtonText = "No";
         _confirm.Confirmed = () => ResourceService.Save(Title, _subject.GetAsset(_obj));
         _confirm.Canceled = null;
+    }
+    
+    private interface ISubject : IDisposable
+    {
+        string TextureExportKey { get; }
+    
+        TrixelObject Materialize();
+
+        object GetAsset(TrixelObject obj);
+    
+        Texture2D LoadTexture();
+    
+        void UpdateTexture(Texture2D texture);
+
+        bool DrawProperties(History history);
     }
 }
