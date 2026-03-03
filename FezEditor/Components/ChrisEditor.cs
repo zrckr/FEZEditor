@@ -67,7 +67,7 @@ public partial class ChrisEditor : EditorComponent
     private ChrisEditor(Game game, string title, ISubject subject) : base(game, title)
     {
         _subject = subject;
-        History.StateChanged += RevisualizeSubject;
+        History.StateChanged += () => RevisualizeSubject(materialize: false);
         Game.AddComponent(_confirm = new ConfirmWindow(game));
     }
 
@@ -97,6 +97,8 @@ public partial class ChrisEditor : EditorComponent
         }
         
         RevisualizeSubject();
+        var zoom1 = _cameraActor.GetComponent<ZoomControl>();
+        zoom1.Distance = _obj.Size.X * 1.1f;
     }
 
     public override void Update(GameTime gameTime)
@@ -572,9 +574,14 @@ public partial class ChrisEditor : EditorComponent
         base.Dispose();
     }
 
-    private void RevisualizeSubject()
+    private void RevisualizeSubject(bool materialize = true)
     {
-        _obj = _subject.Materialize();
+        if (materialize)
+        {
+            History.Untrack(_obj);
+            _obj = _subject.Materialize();
+            History.Track(_obj);
+        }
 
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
         mesh.Texture = _subject.LoadTexture();
@@ -588,9 +595,6 @@ public partial class ChrisEditor : EditorComponent
 
         var bounds = _meshActor.GetComponent<BoundsMesh>();
         bounds.Visualize(_obj.Size);
-
-        var zoom = _cameraActor.GetComponent<ZoomControl>();
-        zoom.Distance = _obj.Size.X * 1.1f;
     }
     
     private void OnTextureReload(Texture2D newTexture)
