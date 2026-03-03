@@ -45,6 +45,8 @@ public class SceneLighting : IDisposable
     {
         _rendering = game.GetService<RenderingService>();
         _world = worldRid;
+        _rendering.WorldSetAmbientLight(_world, _ambient.ToVector3());
+        _rendering.WorldSetDiffuseLight(_world, _diffuse.ToVector3());
     }
 
     public void Dispose()
