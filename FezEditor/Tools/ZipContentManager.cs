@@ -35,32 +35,40 @@ public class ZipContentManager : ContentManager, IContentManager
 
     public byte[] LoadBytes(string assetName)
     {
+        // DeflateStream doesn't support Length property
         using var stream = LoadStream(assetName);
-        var data = new byte[stream.Length];
-        stream.ReadExactly(data);
-        return data;
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
     }
 
     public Stream LoadStream(string assetName)
     {
-        var entry = _archive.GetEntry(assetName)!;
-        return entry.Open();
+        var entry = _archive.GetEntry(assetName);
+        if (entry != null)
+        {
+            return entry.Open();
+        }
+
+        foreach (var entry1 in _archive.Entries)
+        {
+            var path = Path.ChangeExtension(entry1.FullName, null);
+            if (path.Equals(assetName, StringComparison.Ordinal))
+            {
+                return entry1.Open();
+            }
+        }
+
+        throw new FileNotFoundException();
     }
 
     protected override Stream OpenStream(string assetName)
     {
-        var entry = _archive.Entries
-            .First(e => e.FullName.StartsWith(assetName, StringComparison.Ordinal));
-
-        var memoryStream = new MemoryStream();
-        using (var stream = entry.Open())
-        {
-            stream.CopyTo(memoryStream);
-        }
-
-        memoryStream.Position = 0;
-
-        return memoryStream;
+        using var stream = LoadStream(assetName);
+        var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        memory.Position = 0;
+        return memory;
     }
 
     private void CheckContentsVersion()
