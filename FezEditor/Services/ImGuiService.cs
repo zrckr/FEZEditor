@@ -79,7 +79,7 @@ public partial class ImGuiService : IDisposable
             ImGuiX.Fonts.NotoSans = LoadFont("Fonts/NotoSans", io.Fonts.GetGlyphRangesDefault());
             ImGuiX.Fonts.NotoSansJp = LoadFont("Fonts/NotoSansJP", io.Fonts.GetGlyphRangesJapanese());
             ImGuiX.Fonts.NotoSansKr = LoadFont("Fonts/NotoSansKR", io.Fonts.GetGlyphRangesKorean());
-            ImGuiX.Fonts.NotoSansTc = LoadFont("Fonts/NotoSansTc", io.Fonts.GetGlyphRangesChineseFull());
+            ImGuiX.Fonts.NotoSansTc = LoadFont("Fonts/NotoSansTC", io.Fonts.GetGlyphRangesChineseFull());
         }
 
         // Rebuild Font atlas
@@ -356,12 +356,10 @@ public partial class ImGuiService : IDisposable
         var io = ImGui.GetIO();
         var content = _game.GetService<ContentService>().Global;
         var data = content.LoadBytes(path);
-        fixed (byte* ptr = data)
-        {
-            var config = ImGuiNative.ImFontConfig_ImFontConfig();
-            config->MergeMode = 0;
-            return io.Fonts.AddFontFromMemoryTTF((nint)ptr, data.Length, size, config, glyphRanges);
-        }
+        var nativeData = CopyToNative(data);
+        var config = ImGuiNative.ImFontConfig_ImFontConfig();
+        config->MergeMode = 0;
+        return io.Fonts.AddFontFromMemoryTTF(nativeData, data.Length, size, config, glyphRanges);
     }
 
     /// <summary>
@@ -375,21 +373,26 @@ public partial class ImGuiService : IDisposable
         var io = ImGui.GetIO();
         var content = _game.GetService<ContentService>().Global;
         var data = content.LoadBytes(path);
-        fixed (byte* ptr = data)
+        var nativeData = CopyToNative(data);
+        var config = ImGuiNative.ImFontConfig_ImFontConfig();
+        config->MergeMode = 1;
+        config->GlyphMinAdvanceX = size;
+        config->GlyphOffset = new NVector2(0, size > 16 ? 7 : 5);
+
+        var ranges = new ushort[] { Icons.IconMin, Icons.IconMax, 0 };
+        fixed (ushort* rangesPtr = ranges)
         {
-            var config = ImGuiNative.ImFontConfig_ImFontConfig();
-            config->MergeMode = 1;
-            config->GlyphMinAdvanceX = size;
-            config->GlyphOffset = new NVector2(0, size > 16 ? 7 : 5);
-
-            var ranges = new ushort[] { Icons.IconMin, Icons.IconMax, 0 };
-            fixed (ushort* rangesPtr = ranges)
-            {
-                io.Fonts.AddFontFromMemoryTTF((nint)ptr, data.Length, size, config, (nint)rangesPtr);
-            }
-
-            ImGuiNative.ImFontConfig_destroy(config);
+            io.Fonts.AddFontFromMemoryTTF(nativeData, data.Length, size, config, (nint)rangesPtr);
         }
+
+        ImGuiNative.ImFontConfig_destroy(config);
+    }
+
+    private static nint CopyToNative(byte[] data)
+    {
+        var ptr = Marshal.AllocHGlobal(data.Length);
+        Marshal.Copy(data, 0, ptr, data.Length);
+        return ptr;
     }
 
     private static class DrawVertDeclaration
