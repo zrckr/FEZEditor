@@ -12,6 +12,9 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
     <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
+    <TrimMode Condition="'$(Configuration)' == 'Release'">partial</TrimMode>
+    <JsonSerializerIsReflectionEnabledByDefault Condition="'$(Configuration)' == 'Release'">true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
