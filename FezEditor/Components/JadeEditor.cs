@@ -86,12 +86,11 @@ public class JadeEditor : EditorComponent
                 ImGuiX.Image(texture, size);
                 InputService.CaptureScroll(ImGui.IsItemHovered());
 
+                var imageMin = ImGuiX.GetItemRectMin();
                 var gizmo = _cameraActor.GetComponent<OrientationGizmo>();
-                {
-                    var imageMin = ImGuiX.GetItemRectMin();
-                    gizmo.UseFaceLabels = true;
-                    gizmo.Draw(imageMin + new Vector2(size.X - 8f, 8f));
-                }
+                gizmo.UseFaceLabels = true;
+                gizmo.Draw(imageMin + new Vector2(size.X - 8f, 8f));
+                ImGuiX.DrawStats(imageMin + new Vector2(8, 8), RenderingService.GetStats());
 
                 if (ImGui.IsItemHovered() && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                 {

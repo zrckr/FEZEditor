@@ -133,6 +133,8 @@ public partial class RenderingService
                     0,
                     surface.PrimitiveCount
                 );
+                _drawCalls++;
+                _primitives += surface.PrimitiveCount;
             }
         }
     }

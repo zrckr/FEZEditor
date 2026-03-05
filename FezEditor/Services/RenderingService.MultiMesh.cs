@@ -262,6 +262,8 @@ public partial class RenderingService
                 mm.TemplatePrimitiveCount,
                 visible
             );
+            _drawCalls++;
+            _primitives += mm.TemplatePrimitiveCount * visible;
         }
 
         RestoreDefaultState();

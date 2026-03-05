@@ -14,6 +14,18 @@ public partial class RenderingService : IDisposable
 
     private uint _nextRid = 1;
 
+    private int _drawCalls;
+
+    private int _primitives;
+
+    private float _fps;
+
+    private float _frameTimeMs;
+
+    private int _fpsFrameCount;
+
+    private TimeSpan _fpsElapsed;
+
     public RenderingService(Game game)
     {
         GraphicsDevice = game.GraphicsDevice;
@@ -22,6 +34,18 @@ public partial class RenderingService : IDisposable
 
     public void Draw(GameTime gameTime)
     {
+        _drawCalls = 0;
+        _primitives = 0;
+        _frameTimeMs = (float)gameTime.ElapsedGameTime.TotalMilliseconds;
+        _fpsElapsed += gameTime.ElapsedGameTime;
+        _fpsFrameCount++;
+        if (_fpsElapsed >= TimeSpan.FromSeconds(1))
+        {
+            _fps = _fpsFrameCount / (float)_fpsElapsed.TotalSeconds;
+            _fpsFrameCount = 0;
+            _fpsElapsed = TimeSpan.Zero;
+        }
+
         foreach (var rt in _renderTargets.Values)
         {
             if (!TryGetResource(_worlds, rt.World, out var world))
@@ -86,6 +110,24 @@ public partial class RenderingService : IDisposable
                 GraphicsDevice.SetRenderTarget(null);
             }
         }
+    }
+
+    public Dictionary<string, string> GetStats()
+    {
+        var instances = _multiMeshes.Values.Sum(mm => mm.VisibleInstances < 0 ? mm.InstanceCount : mm.VisibleInstances);
+        var textures = _materials.Values.Select(md => md.Texture).Where(t => t is { IsDisposed: false }).Distinct().Count();
+
+        return new Dictionary<string, string>
+        {
+            ["FPS"] = $"{_fps:F2}",
+            ["Frame Time"] = $"{_frameTimeMs:F1} ms",
+            ["Draw Calls"] = _drawCalls.ToString(),
+            ["Primitives"] = _primitives.ToString(),
+            ["Meshes"] = _meshes.Count.ToString(),
+            ["Materials"] = _materials.Count.ToString(),
+            ["Textures"] = textures.ToString(),
+            ["Instances"] = instances.ToString()
+        };
     }
 
     public void Dispose()

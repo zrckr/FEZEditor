@@ -12,17 +12,17 @@ namespace ImGuiNET;
 public static class ImGuiX
 {
     #region Texture Bindings
-    
+
     public static Func<Texture2D, IntPtr> Bind { get; set; } = null!;
 
     public static Func<Texture2D, bool> Unbind { get; set; } = null!;
 
     public static Func<IntPtr, Texture2D?> GetTexture { get; set; } = null!;
-    
+
     #endregion
-    
+
     #region Texture / Image
-        
+
     public static void Image(Texture2D texture)
         => ImGui.Image(Bind(texture), new NVector2(texture.Width, texture.Height));
 
@@ -40,7 +40,7 @@ public static class ImGuiX
 
     public static bool ImageButton(string strId, Texture2D texture)
         => ImGui.ImageButton(strId, Bind(texture), new NVector2(texture.Width, texture.Height));
-        
+
     public static bool ImageButton(string strId, Texture2D texture, Vector2 size)
         => ImGui.ImageButton(strId, Bind(texture), size.ToNumerics());
 
@@ -239,7 +239,7 @@ public static class ImGuiX
 
     #region Text
 
-    public static void TextColored(Color col, string fmt) 
+    public static void TextColored(Color col, string fmt)
         => ImGui.TextColored(col.ToNumerics4(), fmt);
 
     #endregion
@@ -422,7 +422,7 @@ public static class ImGuiX
     public static Color ToXnaColor(this NVector4 v) => new(v.X, v.Y, v.Z, v.W);
 
     #endregion
-    
+
     #region Additions
 
     public static void Hyperlink(string label, string url)
@@ -431,7 +431,7 @@ public static class ImGuiX
         var min = ImGui.GetItemRectMin();
         var max = ImGui.GetItemRectMax();
         ImGui.GetWindowDrawList().AddLine(
-            new NVector2(min.X, max.Y), max, 
+            new NVector2(min.X, max.Y), max,
             new Color(100, 150, 255, 255).PackedValue);
 
         if (ImGui.IsItemClicked())
@@ -473,21 +473,21 @@ public static class ImGuiX
     {
         return ImGui.InputTextMultiline(label, ref input, maxLength, size.ToNumerics());
     }
-    
+
     public static bool TimeSpanInput(string label, ref TimeSpan timeSpan)
     {
         const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
         var hash = timeSpan.GetHashCode();
-        
+
         var hours = timeSpan.Hours;
         var minutes = timeSpan.Minutes;
         var seconds = timeSpan.Seconds;
         var milliseconds = timeSpan.Milliseconds;
-        
+
         var changed = false;
         ImGui.Text(label);
         ImGui.SameLine();
-        
+
         var header = $"{timeSpan.ToString("g", CultureInfo.InvariantCulture)}##Header_{hash}";
         if (ImGui.CollapsingHeader(header))
         {
@@ -497,34 +497,34 @@ public static class ImGuiX
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Minutes", ref minutes))
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Seconds", ref seconds))
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Millis", ref milliseconds))
                 {
                     changed = true;
                 }
-                
+
                 ImGui.EndChild();
             }
         }
-        
+
         if (changed)
         {
             timeSpan = new TimeSpan(0, hours, minutes, seconds, milliseconds);
         }
-        
+
         return changed;
     }
-    
+
     public static bool DateTimeInput(string label, ref DateTime dateTime)
     {
         const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
@@ -535,7 +535,7 @@ public static class ImGuiX
         var hour = dateTime.Hour;
         var minute = dateTime.Minute;
         var second = dateTime.Second;
-        
+
         var changed = false;
         ImGui.Text(label);
         ImGui.SameLine();
@@ -549,32 +549,32 @@ public static class ImGuiX
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Month", ref month))
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Day", ref day))
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Hour", ref hour))
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Minute", ref minute))
                 {
                     changed = true;
                 }
-        
+
                 if (ImGui.InputInt("Second", ref second))
                 {
                     changed = true;
-                } 
-                
+                }
+
                 ImGui.EndChild();
             }
         }
@@ -587,24 +587,24 @@ public static class ImGuiX
             hour = Math.Clamp(hour, 0, 23);
             minute = Math.Clamp(minute, 0, 59);
             second = Math.Clamp(second, 0, 59);
-            
+
             dateTime = new DateTime(year, month, day, hour, minute, second);
         }
-        
+
         return changed;
     }
 
     public delegate bool RenderItem<T>(int index, ref T item);
-    
+
     public static bool EditableList<T>(string label, ref List<T> items, RenderItem<T> renderItem, Func<T> createNew)
     {
         const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
         var hash = label.GetHashCode();
-        
+
         var changed = false;
         ImGui.Text(label);
         ImGui.SameLine();
-        
+
         var count = "item" + (items.Count is > 1 or 0 ? "s" : "");
         var header = $"List ({items.Count} {count})##Header_{hash}";
         if (ImGui.CollapsingHeader(header))
@@ -618,13 +618,13 @@ public static class ImGuiX
                         ImGui.PushID(i);
                         ImGui.SetNextItemWidth(-48);
 
-                        var item = items[i]; 
+                        var item = items[i];
                         if (renderItem(i, ref item))
                         {
                             items[i] = item;
                             changed = true;
                         }
-            
+
                         ImGui.SameLine();
                         if (ImGui.Button(Icons.Close))
                         {
@@ -632,38 +632,38 @@ public static class ImGuiX
                             i--;
                             changed = true;
                         }
-            
+
                         ImGui.PopID();
                     }
-        
+
                     ImGui.EndListBox();
                 }
-    
+
                 if (ImGui.Button($"{Icons.Add} Add"))
                 {
                     items.Add(createNew());
                     changed = true;
                 }
-                
+
                 ImGui.EndChild();
             }
         }
-    
+
         return changed;
     }
 
     public delegate bool RenderKeyValuePair<in K, V>(K key, ref V value) where K : IEquatable<K>;
-    
+
     public delegate bool RenderNewKey<K>(ref K key) where K : IEquatable<K>;
-    
-    public static bool EditableDict<K, V>(string label, ref Dictionary<K, V> items, 
-        RenderKeyValuePair<K, V> renderItem, 
+
+    public static bool EditableDict<K, V>(string label, ref Dictionary<K, V> items,
+        RenderKeyValuePair<K, V> renderItem,
         RenderNewKey<K> renderNewKey,
         Func<V> createDefaultValue) where K : IEquatable<K>
     {
         const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
         var hash = label.GetHashCode();
-        
+
         var changed = false;
         ImGui.Text(label);
         ImGui.SameLine();
@@ -677,39 +677,39 @@ public static class ImGuiX
                 if (BeginListBox($"##ListBox_{hash}", new Vector2(-1, 0)))
                 {
                     var keys = items.Keys.ToList();
-        
+
                     for (var i = 0; i < keys.Count; i++)
                     {
                         var key = keys[i];
                         var value = items[key];
-            
+
                         ImGui.PushID(i);
                         ImGui.SetNextItemWidth(-48);
-                
+
                         if (renderItem(key, ref value))
                         {
                             items[key] = value;
                             changed = true;
                         }
-            
+
                         ImGui.SameLine();
                         if (ImGui.Button(Icons.Close))
                         {
                             items.Remove(key);
                             changed = true;
                         }
-            
+
                         ImGui.PopID();
                     }
-        
+
                     ImGui.EndListBox();
                 }
-                
+
                 // New entry input
                 K newKey = default!;
                 ImGui.Button($"{Icons.Add} Add New Key");
                 ImGui.SameLine();
-        
+
                 if (renderNewKey(ref newKey))
                 {
                     if (!items.ContainsKey(newKey))
@@ -718,66 +718,95 @@ public static class ImGuiX
                         changed = true;
                     }
                 }
-                
+
                 ImGui.EndChild();
             }
         }
-        
+
         return changed;
     }
-    
+
     public static bool SelectableWithImage(Texture2D texture, Vector2 size, string label, bool selected)
     {
         var itemHeight = Math.Max(size.Y, ImGui.GetTextLineHeight());
-    
+
         // Selectable
         var clicked = Selectable($"##{label}_sel", selected, ImGuiSelectableFlags.None, new Vector2(0, itemHeight));
-    
+
         // Go back to draw image and text
         ImGui.SameLine(0, 0);
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (itemHeight - size.Y) * 0.5f);
         Image(texture, size);
-    
+
         ImGui.SameLine();
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - (itemHeight - size.Y) * 0.5f + (itemHeight - ImGui.GetTextLineHeight()) * 0.5f);
         ImGui.Text(label);
-    
+
         return clicked;
     }
 
     public static bool SelectableWithImage(Texture2D texture, Vector2 size, Vector2 uv0, Vector2 uv1, string label, bool selected)
     {
         var itemHeight = Math.Max(size.Y, ImGui.GetTextLineHeight());
-    
+
         // Selectable
         var clicked = Selectable($"##{label}_sel", selected, ImGuiSelectableFlags.None, new Vector2(0, itemHeight));
-    
+
         // Go back to draw image and text
         ImGui.SameLine(0, 0);
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (itemHeight - size.Y) * 0.5f);
         Image(texture, size,  uv0, uv1);
-    
+
         ImGui.SameLine();
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() - (itemHeight - size.Y) * 0.5f + (itemHeight - ImGui.GetTextLineHeight()) * 0.5f);
         ImGui.Text(label);
-    
+
         return clicked;
     }
-    
+
+    public static void DrawStats(Vector2 position, Dictionary<string, string> stats)
+    {
+        var dl = ImGui.GetForegroundDrawList();
+        var pos = position.ToNumerics();
+        var lineHeight = ImGui.GetTextLineHeight();
+        var padding = new NVector2(4, 4);
+
+        // Measure max width
+        var maxWidth = 0f;
+        foreach (var (key, value) in stats)
+        {
+            var textWidth = ImGui.CalcTextSize($"{key}: {value}").X;
+            if (textWidth > maxWidth) maxWidth = textWidth;
+        }
+
+        // Draw background
+        var bgMin = pos - padding;
+        var bgMax = pos + new NVector2(maxWidth, lineHeight * stats.Count) + padding;
+        dl.AddRectFilled(bgMin, bgMax, 0xAA000000, 0f);
+
+        // Draw text
+        var i = 0;
+        foreach (var (key, value) in stats)
+        {
+            dl.AddText(pos + new NVector2(0, lineHeight * i), 0xFFFFFFFF, $"{key}: {value}");
+            i++;
+        }
+    }
+
     #endregion
-    
+
     #region Fonts
 
     public static class Fonts
     {
         public static ImFontPtr NotoSans { get; set; } = null!;
-        
+
         public static ImFontPtr NotoSansJp { get; set; } = null!;
-        
+
         public static ImFontPtr NotoSansKr { get; set; } = null!;
-        
+
         public static ImFontPtr NotoSansTc { get; set; } = null!;
     }
-    
+
     #endregion
 }
