@@ -73,7 +73,7 @@ public partial class ChrisEditor : EditorComponent
 
     public override void LoadContent()
     {
-        _scene = new Scene(Game);
+        _scene = new Scene(Game, ContentManager);
         _scene.Lighting.Ambient = Color.LightGray;
         {
             _cameraActor = _scene.CreateActor();

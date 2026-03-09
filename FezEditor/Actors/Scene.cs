@@ -28,11 +28,11 @@ public class Scene : IDisposable
 
     private bool _disposed;
 
-    public Scene(Game game)
+    public Scene(Game game, IContentManager content)
     {
         _game = game;
+        _content = content;
         _rendering = game.GetService<RenderingService>();
-        _content = game.GetService<ContentService>().Get(this);
 
         _worldRid = _rendering.WorldCreate();
         Viewport = new SceneViewport(game, _worldRid);
@@ -143,7 +143,6 @@ public class Scene : IDisposable
         Lighting.Dispose();
         Viewport.Dispose();
         _rendering.FreeRid(_worldRid);
-        _game.GetService<ContentService>().Unload(this);
     }
 
     private record HierarchyNode(Actor? Parent, List<Actor> Children);

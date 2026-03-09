@@ -6,15 +6,15 @@ namespace FezEditor.Components;
 
 public class TestComponent : EditorComponent
 {
-    private readonly Scene _test;
+    private Scene _test = null!;
 
     public TestComponent(Game game, string title) : base(game, title)
     {
-        _test = new Scene(game);
     }
 
     public override void LoadContent()
     {
+        _test = new Scene(Game, ContentManager);
         {
             var actor = _test.CreateActor();
             var camera = actor.AddComponent<Camera>();

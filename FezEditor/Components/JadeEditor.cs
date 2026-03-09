@@ -41,7 +41,7 @@ public class JadeEditor : EditorComponent
 
     public override void LoadContent()
     {
-        _scene = new Scene(Game);
+        _scene = new Scene(Game, ContentManager);
         _scene.Lighting.Ambient = new Color(new Vector3(1f / 3f));
         {
             _cameraActor = _scene.CreateActor();
