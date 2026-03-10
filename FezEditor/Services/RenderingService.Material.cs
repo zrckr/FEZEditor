@@ -25,7 +25,11 @@ public partial class RenderingService
 
         public readonly DepthStencilState DepthStencilState = new()
         {
-            DepthBufferEnable = true, DepthBufferWriteEnable = true
+            DepthBufferEnable = true, DepthBufferWriteEnable = true,
+            StencilEnable = true,
+            StencilFunction = CompareFunction.Always,
+            StencilPass = StencilOperation.Replace,
+            ReferenceStencil = 1
         };
     }
 
@@ -111,6 +115,14 @@ public partial class RenderingService
         var dss = GetResource(_materials, material).DepthStencilState;
         dss.DepthBufferFunction = func;
         dss.DepthBufferEnable = dss.DepthBufferWriteEnable || dss.DepthBufferFunction != CompareFunction.LessEqual;
+    }
+
+    public void MaterialSetStencilTest(Rid material, CompareFunction func, int referenceValue)
+    {
+        var dss = GetResource(_materials, material).DepthStencilState;
+        dss.StencilFunction = func;
+        dss.StencilPass = StencilOperation.Keep;
+        dss.ReferenceStencil = referenceValue;
     }
 
     public void MaterialSetColorWriteChannels(Rid material, ColorWriteChannels channels)

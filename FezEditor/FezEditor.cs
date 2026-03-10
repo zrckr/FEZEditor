@@ -3,6 +3,7 @@ using FezEditor.Services;
 using FezEditor.Tools;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
+using Microsoft.Xna.Framework.Graphics;
 using Serilog;
 
 namespace FezEditor;
@@ -54,6 +55,7 @@ public class FezEditor : Game
         {
             PreferredBackBufferWidth = 1280,
             PreferredBackBufferHeight = 720,
+            PreferredDepthStencilFormat = DepthFormat.Depth24Stencil8,
             IsFullScreen = false,
             SynchronizeWithVerticalRetrace = true
         };
