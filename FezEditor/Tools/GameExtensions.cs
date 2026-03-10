@@ -1,10 +1,13 @@
 ﻿using System.Reflection;
 using Microsoft.Xna.Framework;
+using Serilog;
 
 namespace FezEditor.Tools;
 
 public static class GameExtensions
 {
+    private static readonly ILogger Logger = Log.ForContext("SourceContext", nameof(FezEditor));
+
     private static readonly Lock Lock = new();
 
     private static readonly List<object> Services = new();
@@ -96,6 +99,7 @@ public static class GameExtensions
 
         game.Services.AddService(typeof(T), service);
         Services.Add(service!);
+        Logger.Debug("Added {0}", service!.GetType().Name);
     }
 
     public static T GetService<T>(this Game game) where T : class
@@ -114,6 +118,7 @@ public static class GameExtensions
         foreach (var service in Services)
         {
             game.Services.RemoveService(service.GetType());
+            Logger.Debug("Removed {0}", service.GetType().Name);
             if (service is IDisposable disposable)
             {
                 disposable.Dispose();

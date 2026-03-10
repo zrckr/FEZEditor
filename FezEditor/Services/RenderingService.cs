@@ -2,12 +2,15 @@
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Serilog;
 
 namespace FezEditor.Services;
 
 [UsedImplicitly]
 public partial class RenderingService : IDisposable
 {
+    private static readonly ILogger Logger = Logging.Create<RenderingService>();
+
     public GraphicsDevice GraphicsDevice { get; }
 
     private readonly Queue<Rid> _instanceTraversal = new();
@@ -30,6 +33,9 @@ public partial class RenderingService : IDisposable
     {
         GraphicsDevice = game.GraphicsDevice;
         _backbufferRid = CreateBackbuffer();
+        Logger.Debug("Initialized with backbuffer {0}x{1}",
+            GraphicsDevice.PresentationParameters.BackBufferWidth,
+            GraphicsDevice.PresentationParameters.BackBufferHeight);
     }
 
     public void Draw(GameTime gameTime)
@@ -156,6 +162,7 @@ public partial class RenderingService : IDisposable
         _materials.Clear();
         _multiMeshes.Clear();
         _renderTargets.Clear();
+        Logger.Debug("Disposed");
     }
 
     public void FreeRid(Rid rid)
@@ -165,6 +172,7 @@ public partial class RenderingService : IDisposable
             if (RemoveResource(_renderTargets, rid, out var rt))
             {
                 DisposeRenderTarget(rt!);
+                Logger.Debug("Freed RenderTarget {0}", rid);
             }
         }
         else if (rid.Type == typeof(WorldData))
@@ -172,6 +180,7 @@ public partial class RenderingService : IDisposable
             if (RemoveResource(_worlds, rid, out var world))
             {
                 DisposeInstanceTree(world!.Root);
+                Logger.Debug("Freed World {0}", rid);
             }
         }
         else if (rid.Type == typeof(InstanceData))
@@ -179,11 +188,13 @@ public partial class RenderingService : IDisposable
             if (_instances.ContainsKey(rid))
             {
                 DisposeInstanceTree(rid);
+                Logger.Debug("Freed Instance {0}", rid);
             }
         }
         else if (rid.Type == typeof(CameraData))
         {
             RemoveResource(_cameras, rid, out _);
+            Logger.Debug("Freed Camera {0}", rid);
         }
         else if (rid.Type == typeof(MeshData))
         {
@@ -191,6 +202,7 @@ public partial class RenderingService : IDisposable
             {
                 DisposeBuffers(mesh!);
                 InvalidateMultiMesh(rid);
+                Logger.Debug("Freed Mesh {0}", rid);
             }
         }
         else if (rid.Type == typeof(MaterialData))
@@ -199,6 +211,7 @@ public partial class RenderingService : IDisposable
             {
                 material!.Effect?.Dispose();
                 InvalidateMaterial(rid);
+                Logger.Debug("Freed Material {0}", rid);
             }
         }
         else if (rid.Type == typeof(MultiMeshData))
@@ -207,6 +220,7 @@ public partial class RenderingService : IDisposable
             {
                 mm!.InstanceBuffer?.Dispose();
                 mm.InstanceDeclaration?.Dispose();
+                Logger.Debug("Freed MultiMesh {0}", rid);
             }
         }
     }

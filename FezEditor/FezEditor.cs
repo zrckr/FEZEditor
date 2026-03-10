@@ -34,9 +34,10 @@ public class FezEditor : Game
 
     private EditorService _editor = null!;
 
-    private static void Main()
+    private static void Main(string[] args)
     {
-        Logging.Initialize();
+        var parsedArgs = Args.Parse(args);
+        Logging.Initialize(parsedArgs.LogLevel);
         Environment.SetEnvironmentVariable("FNA3D_FORCE_DRIVER", "OpenGL");
         try
         {
@@ -65,7 +66,7 @@ public class FezEditor : Game
 
     protected override void Initialize()
     {
-        Logger.Information("Version: {0}", Version);
+        Logger.Information("Version - {0}", Version);
         RepackerExtensions.Gd = GraphicsDevice;
 
         _content = this.CreateService<ContentService>();

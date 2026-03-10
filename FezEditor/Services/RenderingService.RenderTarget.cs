@@ -36,6 +36,7 @@ public partial class RenderingService
                 GraphicsDevice.PresentationParameters.DepthStencilFormat)
         };
 
+        Logger.Debug("RenderTarget created {0} ({1}x{2})", rid, w, h);
         return rid;
     }
 
@@ -75,6 +76,7 @@ public partial class RenderingService
         data.Target = new RenderTarget2D(GraphicsDevice, width, height, false,
             GraphicsDevice.PresentationParameters.BackBufferFormat,
             GraphicsDevice.PresentationParameters.DepthStencilFormat);
+        Logger.Debug("RenderTarget {0} resized to {1}x{2}", rt, width, height);
     }
 
     public void RenderTargetSetClearColor(Rid rt, Color color)
@@ -85,12 +87,15 @@ public partial class RenderingService
     private Rid CreateBackbuffer()
     {
         var rid = AllocateRid(typeof(RenderTargetData));
+        var w = GraphicsDevice.PresentationParameters.BackBufferWidth;
+        var h = GraphicsDevice.PresentationParameters.BackBufferHeight;
         _renderTargets[rid] = new RenderTargetData
         {
             IsBackbuffer = true,
-            Width = GraphicsDevice.PresentationParameters.BackBufferWidth,
-            Height = GraphicsDevice.PresentationParameters.BackBufferHeight
+            Width = w,
+            Height = h
         };
+        Logger.Debug("Backbuffer created {0} ({1}x{2})", rid, w, h);
         return rid;
     }
 

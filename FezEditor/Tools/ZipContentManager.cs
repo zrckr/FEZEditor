@@ -3,11 +3,14 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework.Content;
+using Serilog;
 
 namespace FezEditor.Tools;
 
 public class ZipContentManager : ContentManager, IContentManager
 {
+    private static readonly ILogger Logger = Logging.Create<ZipContentManager>();
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         Converters =
@@ -64,6 +67,7 @@ public class ZipContentManager : ContentManager, IContentManager
 
     protected override Stream OpenStream(string assetName)
     {
+        Logger.Debug("Loading asset - {0}", assetName);
         using var stream = LoadStream(assetName);
         var memory = new MemoryStream();
         stream.CopyTo(memory);

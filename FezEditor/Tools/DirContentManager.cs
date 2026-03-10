@@ -2,11 +2,14 @@
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
+using Serilog;
 
 namespace FezEditor.Tools;
 
 public class DirContentManager : ContentManager, IContentManager
 {
+    private static readonly ILogger Logger = Logging.Create<DirContentManager>();
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         Converters =
@@ -42,5 +45,11 @@ public class DirContentManager : ContentManager, IContentManager
     {
         var file = _directory.GetFiles($"{assetName}.*").Single();
         return file.OpenRead();
+    }
+
+    protected override Stream OpenStream(string assetName)
+    {
+        Logger.Debug("Loading asset - {0}", assetName);
+        return base.OpenStream(assetName);
     }
 }

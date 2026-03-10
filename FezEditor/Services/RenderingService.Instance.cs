@@ -28,6 +28,7 @@ public partial class RenderingService
         var rid = AllocateRid(typeof(InstanceData));
         _instances[rid] = new InstanceData();
         InstanceSetParent(rid, parent);
+        Logger.Debug("Instance created {0} (parent {1})", rid, parent);
         return rid;
     }
 

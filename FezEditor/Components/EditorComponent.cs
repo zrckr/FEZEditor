@@ -51,4 +51,9 @@ public abstract class EditorComponent
         History.Dispose();
         Game.GetService<ContentService>().Unload(this);
     }
+
+    public override string ToString()
+    {
+        return $"{GetType().Name} ({Title})";
+    }
 }

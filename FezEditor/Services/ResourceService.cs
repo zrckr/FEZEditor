@@ -3,12 +3,16 @@ using FezEditor.Structure;
 using FezEditor.Tools;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
+using Serilog;
+using Serilog.Core;
 
 namespace FezEditor.Services;
 
 [UsedImplicitly]
 public class ResourceService : IDisposable
 {
+    private static readonly ILogger Logger = Logging.Create<ResourceService>();
+
     public event Action? ProviderChanged;
 
     public bool HasNoProvider => _provider == null;
@@ -34,13 +38,11 @@ public class ResourceService : IDisposable
 
     private void OnGameActivated(object? o, EventArgs eventArgs)
     {
-#if (!DEBUG)
         if (_provider != null)
         {
             _provider.Refresh();
             ProviderChanged?.Invoke();
         }
-#endif
     }
 
     public void OpenProvider(FileSystemInfo info)
@@ -55,6 +57,8 @@ public class ResourceService : IDisposable
         CloseProvider();
         _provider = provider;
         ProviderChanged?.Invoke();
+        Logger.Information("Opened {0} at {1} with {2} file(s)",
+            provider.GetType().Name, info.FullName, provider.Files.Count());
     }
 
     public void CloseProvider()
@@ -62,6 +66,7 @@ public class ResourceService : IDisposable
         ProviderChanged?.Invoke();
         _provider?.Dispose();
         _provider = null;
+        Logger.Information("Provider closed");
     }
 
     public Stream OpenStream(string path, string extension)
@@ -90,16 +95,22 @@ public class ResourceService : IDisposable
         if (path.Contains("SaveSlot", StringComparison.OrdinalIgnoreCase))
         {
             using var stream = _provider!.OpenStream(path, string.Empty);
-            return SaveData.Read(stream);
+            var saveData = SaveData.Read(stream);
+            Logger.Information("Loaded save data - {0}", path);
+            return saveData;
         }
 
-        return _provider!.Load<object>(path);
+        var @object = _provider!.Load<object>(path);
+        Logger.Information("Loaded - {0} ({1})", path, @object.GetType().Name);
+        return @object;
     }
 
     public SaveData LoadSaveDataFromContent(string path)
     {
         using var stream = _content.LoadStream(path);
-        return SaveData.Read(stream);
+        var saveData = SaveData.Read(stream);
+        Logger.Information("Loaded save data from content - {0}", path);
+        return saveData;
     }
 
     public Dictionary<string, RAnimatedTexture> LoadAnimations(string path)
@@ -117,6 +128,7 @@ public class ResourceService : IDisposable
             }
         }
 
+        Logger.Information("Loaded animations - {0}", path);
         return animations;
     }
 
@@ -127,12 +139,14 @@ public class ResourceService : IDisposable
             using var stream = SaveData.Write(saveData);
             using var fileStream = new FileStream(path, FileMode.Create);
             stream.CopyTo(fileStream);
+            Logger.Information("Saved save data - {0}", path);
             return;
         }
 
         _provider!.Save(path, asset);
         _provider.Refresh();
         ProviderChanged?.Invoke();
+        Logger.Information("Saved - {0}", path);
     }
 
     public void Duplicate(string path)
@@ -140,6 +154,7 @@ public class ResourceService : IDisposable
         _provider!.Duplicate(path);
         _provider.Refresh();
         ProviderChanged?.Invoke();
+        Logger.Information("Duplicated - {0}", path);
     }
 
     public void Move(string path, string newPath)
@@ -147,6 +162,7 @@ public class ResourceService : IDisposable
         _provider!.Move(path, newPath);
         _provider.Refresh();
         ProviderChanged?.Invoke();
+        Logger.Information("Moved - {0} -> {1}", path, newPath);
     }
 
     public void Delete(string path)
@@ -154,12 +170,14 @@ public class ResourceService : IDisposable
         _provider!.Remove(path);
         _provider.Refresh();
         ProviderChanged?.Invoke();
+        Logger.Information("Deleted - {0}", path);
     }
 
     public void OpenInFileManager(string path)
     {
         var absolutePath = GetFullPath(path);
         var target = File.Exists(absolutePath) ? absolutePath : Path.GetDirectoryName(absolutePath)!;
+        Logger.Information("Opening in File Manager - {0}", path);
 
         if (OperatingSystem.IsWindows())
         {

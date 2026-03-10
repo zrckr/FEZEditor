@@ -1,12 +1,16 @@
 ﻿using FezEditor.Tools;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
+using Serilog;
+using Serilog.Core;
 
 namespace FezEditor.Services;
 
 [UsedImplicitly]
 public class ContentService : IDisposable
 {
+    private static readonly ILogger Logger = Logging.Create<ContentService>();
+
     private const string Root = "Content";
 
     private readonly Dictionary<object, IContentManager> _managers = new();
@@ -34,6 +38,8 @@ public class ContentService : IDisposable
                 manager = new ZipContentManager(_services, Path.ChangeExtension(Root, ".pkz"));
             }
 
+            Logger.Information("Loaded {0} for {1}",
+                manager.GetType().Name, context.GetType().Name);
             _managers.Add(context, manager);
         }
 
@@ -46,6 +52,8 @@ public class ContentService : IDisposable
         {
             manager.Unload();
             manager.Dispose();
+            Logger.Information("Unloaded {0} for {1}",
+                manager.GetType().Name, context.GetType().Name);
         }
     }
 

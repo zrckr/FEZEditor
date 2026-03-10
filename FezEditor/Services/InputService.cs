@@ -3,12 +3,15 @@ using ImGuiNET;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Serilog;
 
 namespace FezEditor.Services;
 
 [UsedImplicitly]
 public class InputService
 {
+    private static readonly ILogger Logger = Logging.Create<InputService>();
+
     private Point MouseCenter => new(_game.Window.ClientBounds.Width / 2, _game.Window.ClientBounds.Height / 2);
 
     private readonly Game _game;
@@ -34,6 +37,7 @@ public class InputService
         _game = game;
         _bindings = game.GetService<ContentService>()
             .Global.LoadJson<Dictionary<string, List<Binding>>>("InputActions");
+        Logger.Information("Loaded {0} binding(s)", _bindings.Count);
     }
 
     public void AddAction(string action, params Keys[] keys)

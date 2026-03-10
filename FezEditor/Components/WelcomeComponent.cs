@@ -114,7 +114,7 @@ public class WelcomeComponent : EditorComponent
         if (_resourceExtractor == null)
         {
             _resourceExtractor = new ResourceExtractor(Game, source.Files, target.Files[0]);
-            _resourceExtractor.Disposed += (_, _) => { _resourceExtractor = null; };
+            _resourceExtractor.Disposed += (_, _) => _resourceExtractor = null;
             _resourceExtractor.Competed += () => OpenDirectory(target);
             Game.AddComponent(_resourceExtractor);
         }

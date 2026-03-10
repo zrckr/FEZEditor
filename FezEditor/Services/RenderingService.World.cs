@@ -24,6 +24,7 @@ public partial class RenderingService
         _instances[rootRid] = new InstanceData();
         var worldRid = AllocateRid(typeof(WorldData));
         _worlds[worldRid] = new WorldData { Root = rootRid };
+        Logger.Debug("World created {0} (root instance {1})", worldRid, rootRid);
         return worldRid;
     }
 

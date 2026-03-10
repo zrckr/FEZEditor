@@ -17,6 +17,7 @@ public partial class RenderingService
     {
         var rid = AllocateRid(typeof(CameraData));
         _cameras[rid] = new CameraData();
+        Logger.Debug("Camera created {0}", rid);
         return rid;
     }
 

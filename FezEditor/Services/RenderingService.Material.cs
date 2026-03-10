@@ -39,6 +39,7 @@ public partial class RenderingService
     {
         var rid = AllocateRid(typeof(MaterialData));
         _materials[rid] = new MaterialData();
+        Logger.Debug("Material created {0}", rid);
         return rid;
     }
 
@@ -47,6 +48,7 @@ public partial class RenderingService
         var data = GetResource(_materials, material);
         data.Effect?.Dispose();
         data.Effect = null;
+        Logger.Debug("Material {0} reset", material);
     }
 
     public void MaterialAssignEffect(Rid material, Effect effect)
@@ -54,6 +56,7 @@ public partial class RenderingService
         var data = GetResource(_materials, material);
         data.Effect?.Dispose();
         data.Effect = effect is BasicEffect ? effect : effect.Clone();
+        Logger.Debug("Material {0} assigned effect {1}", material, effect.GetType().Name);
     }
 
     public void MaterialAssignBaseTexture(Rid material, Texture2D texture)

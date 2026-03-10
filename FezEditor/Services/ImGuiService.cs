@@ -121,7 +121,7 @@ public partial class ImGuiService : IDisposable
             };
         }
 
-        Logger.Information("Dear ImGui Version: {0}", ImGui.GetVersion());
+        Logger.Information("Dear ImGui Version - {0}", ImGui.GetVersion());
     }
 
     /// <summary>
@@ -157,12 +157,12 @@ public partial class ImGuiService : IDisposable
             }
         }
 
-        io.DisplaySize = new System.Numerics.Vector2
+        io.DisplaySize = new NVector2
         {
             X = _game.GraphicsDevice.PresentationParameters.BackBufferWidth,
             Y = _game.GraphicsDevice.PresentationParameters.BackBufferHeight
         };
-        io.DisplayFramebufferScale = new System.Numerics.Vector2(1, 1);
+        io.DisplayFramebufferScale = new NVector2(1, 1);
 
         _game.GraphicsDevice.Clear(ClearColor);
         ImGui.NewFrame();
@@ -353,6 +353,7 @@ public partial class ImGuiService : IDisposable
     /// </summary>
     private unsafe ImFontPtr LoadFont(string path, nint glyphRanges, float size = 24f)
     {
+        Logger.Debug("Loading font - {0}", path);
         var io = ImGui.GetIO();
         var content = _game.GetService<ContentService>().Global;
         var data = content.LoadBytes(path);
@@ -370,6 +371,7 @@ public partial class ImGuiService : IDisposable
     /// </remarks>
     private unsafe void LoadIconsFont(string path, float size = 16f)
     {
+        Logger.Debug("Loading icons font - {0}", path);
         var io = ImGui.GetIO();
         var content = _game.GetService<ContentService>().Global;
         var data = content.LoadBytes(path);

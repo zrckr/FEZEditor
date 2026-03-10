@@ -224,7 +224,7 @@ public class ResourceExtractor : DrawableGameComponent
                 }
                 else
                 {
-                    Logger.Warning("Missing listed asset: {0}", path);
+                    Logger.Warning("Missing listed asset - {0}", path);
                 }
             }
         }
@@ -233,8 +233,11 @@ public class ResourceExtractor : DrawableGameComponent
         if (_totalFiles == 0)
         {
             _status = "No files to extract";
+            Logger.Warning("No files to extract");
             return;
         }
+
+        Logger.Information("Files to extract - {0}", _totalFiles);
 
         foreach (var file in _pakFiles)
         {
@@ -294,6 +297,9 @@ public class ResourceExtractor : DrawableGameComponent
 
                 _filesProcessed++;
                 _progress = (float)_filesProcessed / _totalFiles;
+
+                Logger.Information("Asset extracted ({0}/{1}) - {2}",
+                    _filesProcessed,  _totalFiles, bundle.BundlePath);
             }
         }
     }

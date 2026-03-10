@@ -97,22 +97,26 @@ public partial class EditorService
             };
             editor.LoadContent();
             UpdateFlags();
+            Logger.Information("Opened the {0}", editor);
         }
     }
 
     public void CloseEditor(EditorComponent editor)
     {
         _pendingClose.Add(editor);
+        Logger.Debug("Closing the {0}...", editor);
     }
 
     public void CloseActiveEditor()
     {
         _pendingClose.Add(_activeEditor!);
+        Logger.Debug("Closing the {0}...", _activeEditor!);
     }
 
     public void CloseAllEditors()
     {
         _pendingClose.AddRange(_editors);
+        Logger.Debug("Closing {0} editor(s)...", _editors.Count);
     }
 
     public void MarkEditorActive(EditorComponent editor)
@@ -124,11 +128,13 @@ public partial class EditorService
     public void UndoActiveEditorChanges()
     {
         _activeEditor!.History.Undo();
+        Logger.Debug("Undo at {0}", _activeEditor);
     }
 
     public void RedoActiveEditorChanges()
     {
         _activeEditor!.History.Redo();
+        Logger.Debug("Redo at {0}", _activeEditor);
     }
 
     public bool HasEditorUnsavedChanges(EditorComponent editor)
@@ -148,6 +154,7 @@ public partial class EditorService
             _resourceService.Save(tracking.Path, _activeEditor!.Asset);
             tracking.HasChanges = false;
             _tracking[_activeEditor] = tracking;
+            Logger.Information("Saving {0}", _activeEditor);
         }
     }
 
@@ -161,6 +168,7 @@ public partial class EditorService
                 _resourceService.Save(result.Files[0], _activeEditor!.Asset);
                 tracking.HasChanges = false;
                 _tracking[_activeEditor] = tracking;
+                Logger.Information("Saving {0} as...", _activeEditor);
             }
         });
     }
@@ -172,6 +180,7 @@ public partial class EditorService
             _resourceService.Save(editor.Title, editor.Asset);
             tracking.HasChanges = false;
             _tracking[_activeEditor!] = tracking;
+            Logger.Information("Saving {0}", editor);
         }
     }
 
