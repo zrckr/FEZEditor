@@ -70,33 +70,29 @@ public class FileBrowser : DrawableGameComponent
             return;
         }
 
-        var relativePath = _selected == _root
-            ? string.Empty
-            : _selected.Path[(_root!.Path.Length + 1)..];
-
         if (_inputService.IsActionJustPressed(InputActions.FileBrowserRename))
         {
-            ShowRenameDialog(relativePath);
+            ShowRenameDialog(_selected.Path);
         }
         else if (_inputService.IsActionJustPressed(InputActions.FileBrowserDelete))
         {
-            ShowDeleteDialog(relativePath);
+            ShowDeleteDialog(_selected.Path);
         }
         else if (_inputService.IsActionJustPressed(InputActions.FileBrowserMove))
         {
-            ShowMoveDialog(relativePath);
+            ShowMoveDialog(_selected.Path);
         }
         else if (_inputService.IsActionJustPressed(InputActions.FileBrowserCopyRelativePath))
         {
-            ImGui.SetClipboardText(relativePath);
+            ImGui.SetClipboardText(_selected.Path);
         }
         else if (_inputService.IsActionJustPressed(InputActions.FileBrowserCopyAbsolutePath))
         {
-            ImGui.SetClipboardText(_resourceService.GetFullPath(relativePath));
+            ImGui.SetClipboardText(_resourceService.GetFullPath(_selected.Path));
         }
         else if (_inputService.IsActionJustPressed(InputActions.FileBrowserOpenInFileManager))
         {
-            _resourceService.OpenInFileManager(relativePath);
+            _resourceService.OpenInFileManager(_selected.Path);
         }
     }
 
@@ -119,6 +115,13 @@ public class FileBrowser : DrawableGameComponent
     private void DrawToolbar()
     {
         ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(4, 4));
+        {
+            ImGui.TextDisabled(_resourceService.GetFullPath(string.Empty));
+            ImGui.Separator();
+        }
+        ImGui.PopStyleVar();
+
+        ImGuiX.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 4));
         {
             ImGui.BeginDisabled(_historyIndex <= 0);
             if (ImGui.ArrowButton("GoBack", ImGuiDir.Left))
@@ -143,7 +146,7 @@ public class FileBrowser : DrawableGameComponent
 
             ImGui.SameLine();
             ImGui.SetNextItemWidth(-1);
-            if (ImGui.InputText("##PathInput", ref _path, 512, ImGuiInputTextFlags.EnterReturnsTrue))
+            if (ImGui.InputTextWithHint("##PathInput", "Selected Path", ref _path, 512, ImGuiInputTextFlags.EnterReturnsTrue))
             {
                 // Try to find and select the node at this path
                 var node = FindNodeByPath(_path);
@@ -254,7 +257,10 @@ public class FileBrowser : DrawableGameComponent
 
             _hoveredDir = null;
             _tree.Clear();
-            _tree.Push((_root, false));
+            for (var i = _root.Children.Count - 1; i >= 0; i--)
+            {
+                _tree.Push((_root.Children[i], false));
+            }
 
             ImGui.PushStyleVar(ImGuiStyleVar.IndentSpacing, 8);
             ImGuiX.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 6));
@@ -269,18 +275,13 @@ public class FileBrowser : DrawableGameComponent
                     continue;
                 }
 
-                // Skip non-root nodes that don't match the filter
-                if (filtering && node != _root && !node.MatchesFilter)
+                // Skip nodes that don't match the filter
+                if (filtering && !node.MatchesFilter)
                 {
                     continue;
                 }
 
-                var isRoot = node == _root;
                 var nodeFlags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanAvailWidth;
-                if (isRoot)
-                {
-                    nodeFlags |= ImGuiTreeNodeFlags.DefaultOpen;
-                }
 
                 if (!node.IsDirectory)
                 {
@@ -352,8 +353,7 @@ public class FileBrowser : DrawableGameComponent
                 {
                     if (!node.IsDirectory && ImGui.IsItemHovered())
                     {
-                        var path = node.Path[(_root.Path.Length + 1)..];
-                        _editorService.OpenEditorFor(path);
+                        _editorService.OpenEditorFor(node.Path);
                     }
                 }
 
@@ -375,9 +375,9 @@ public class FileBrowser : DrawableGameComponent
 
             ImGui.PopStyleVar(2);
             _filter = _filter.Clean();
-        }
 
-        ImGui.EndChild();
+            ImGui.EndChild();
+        }
     }
 
     private void DrawContextMenu(FileNode node, bool flatten)
@@ -387,53 +387,52 @@ public class FileBrowser : DrawableGameComponent
             return;
         }
 
-        var relativePath = node == _root ? string.Empty : node.Path[(_root!.Path.Length + 1)..];
         if (flatten)
         {
-            DrawNewAssetMenuItems("New ", relativePath);
+            DrawNewAssetMenuItems("New ", node.Path);
         }
         else
         {
             if (ImGui.BeginMenu($"{Icons.FileAdd} Create New Asset..."))
             {
-                DrawNewAssetMenuItems(string.Empty, relativePath);
+                DrawNewAssetMenuItems(string.Empty, node.Path);
                 ImGui.EndMenu();
             }
 
             var shortcut = _inputService.GetActionBinding(InputActions.FileBrowserCopyRelativePath);
             if (ImGui.MenuItem($"{Icons.Copy} Copy Relative Path", shortcut))
             {
-                ImGui.SetClipboardText(relativePath);
+                ImGui.SetClipboardText(node.Path);
             }
 
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserCopyAbsolutePath);
             if (ImGui.MenuItem("\tCopy Absolute Path", shortcut))
             {
-                ImGui.SetClipboardText(_resourceService.GetFullPath(relativePath));
+                ImGui.SetClipboardText(_resourceService.GetFullPath(node.Path));
             }
 
             ImGui.Separator();
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserRename);
             if (ImGui.MenuItem($"{Icons.Rename} Rename", shortcut))
             {
-                ShowRenameDialog(relativePath);
+                ShowRenameDialog(node.Path);
             }
 
             if (ImGui.MenuItem($"{Icons.Copy} Duplicate"))
             {
-                _resourceService.Duplicate(relativePath);
+                _resourceService.Duplicate(node.Path);
             }
 
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserMove);
             if (ImGui.MenuItem($"{Icons.Move} Move", shortcut))
             {
-                ShowMoveDialog(relativePath);
+                ShowMoveDialog(node.Path);
             }
 
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserDelete);
             if (ImGui.MenuItem($"{Icons.Remove} Delete", shortcut))
             {
-                ShowDeleteDialog(relativePath);
+                ShowDeleteDialog(node.Path);
             }
         }
 
@@ -442,7 +441,7 @@ public class FileBrowser : DrawableGameComponent
         var openShortcut = _inputService.GetActionBinding(InputActions.FileBrowserOpenInFileManager);
         if (ImGui.MenuItem($"{Icons.FolderOpened} Open in File Manager", openShortcut))
         {
-            _resourceService.OpenInFileManager(relativePath);
+            _resourceService.OpenInFileManager(node.Path);
         }
     }
 
@@ -558,8 +557,8 @@ public class FileBrowser : DrawableGameComponent
 
         _root = new FileNode
         {
-            Name = _resourceService.Root,
-            Path = _resourceService.Root,
+            Name = string.Empty,
+            Path = string.Empty,
             IsDirectory = true,
             Depth = 0,
             IsOpen = true
@@ -590,7 +589,7 @@ public class FileBrowser : DrawableGameComponent
                     var dirNode = new FileNode
                     {
                         Name = segments[i],
-                        Path = _root.Path + "/" + currentPath,
+                        Path = currentPath,
                         IsDirectory = true,
                         Depth = parentNode.Depth + 1
                     };
@@ -608,7 +607,7 @@ public class FileBrowser : DrawableGameComponent
             var fileNode = new FileNode
             {
                 Name = fileName,
-                Path = _root.Path + "/" + path,
+                Path = path,
                 IsDirectory = false,
                 Depth = parentNodeForFile.Depth + 1,
                 Extension = _resourceService.GetExtension(path)

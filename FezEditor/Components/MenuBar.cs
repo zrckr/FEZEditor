@@ -115,7 +115,8 @@ public class MenuBar : DrawableGameComponent
 
                 enabled = _editorService.Flags.HasFlag(EditorFlags.QuitToWelcome);
                 shortcut = _inputService.GetActionBinding(InputActions.UiQuitToWelcome);
-                if (ImGui.MenuItem("Close All", shortcut, false, enabled))
+                var provider = _resourceService.IsReadonly ? "PAK" : "Directory";
+                if (ImGui.MenuItem($"Close {provider}", shortcut, false, enabled))
                 {
                     ShowCloseAllDialog();
                 }
