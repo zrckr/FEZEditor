@@ -8,7 +8,7 @@ namespace FezEditor;
 public static class Logging
 {
     private const string LogTemplate =
-        "({Timestamp:HH:mm:ss.fff}) [{SourceContext}] {Level} : {Message:lj}{NewLine}{Exception}";
+        "({Timestamp:HH:mm:ss.fff}) {Level:u4} [{SourceContext}] {Message:lj}{NewLine}{Exception}";
 
     private const string DateTimeFormat = "yyyy-MM-dd_HH-mm-ss";
 
