@@ -88,10 +88,14 @@ public class MainLayout : DrawableGameComponent
                                     title = "(*) " + title;
                                 }
 
+                                var tabFlags = _editorService.PendingActiveEditor == editor
+                                    ? ImGuiTabItemFlags.SetSelected
+                                    : ImGuiTabItemFlags.None;
+
                                 var isOpen = true;
                                 var beginTabItem = editor is WelcomeComponent
                                     ? ImGui.BeginTabItem(title)
-                                    : ImGui.BeginTabItem(title, ref isOpen);
+                                    : ImGui.BeginTabItem(title, ref isOpen, tabFlags);
 
                                 if (beginTabItem)
                                 {
@@ -114,6 +118,7 @@ public class MainLayout : DrawableGameComponent
                         ImGuiX.SetTextCentered(text);
                         ImGui.Text(text);
                     }
+
                     ImGui.EndChild();
 
                     DrawStatusBar();
@@ -129,9 +134,9 @@ public class MainLayout : DrawableGameComponent
 
     private void DrawEditor(EditorComponent editor)
     {
-        _editorService.MarkEditorActive(editor);
         if (!_editorService.IsEditorLoading(editor))
         {
+            _editorService.MarkEditorActive(editor);
             editor.Draw();
             return;
         }
@@ -170,6 +175,8 @@ public class MainLayout : DrawableGameComponent
         ImGui.EndChild();
     }
 
+    private bool _confirmPending;
+
     private void SaveAndCloseEditor(EditorComponent editor)
     {
         if (!_editorService.HasEditorUnsavedChanges(editor))
@@ -178,16 +185,24 @@ public class MainLayout : DrawableGameComponent
             return;
         }
 
+        if (_confirmPending)
+        {
+            return;
+        }
+
+        _confirmPending = true;
         _confirm.Title = "Before closing the editor...";
         _confirm.Text = "Save current changes?";
         _confirm.Confirmed = () =>
         {
             _editorService.SaveEditorChanges(editor);
             _editorService.CloseEditor(editor);
+            _confirmPending = false;
         };
         _confirm.Canceled = () =>
         {
             _editorService.CloseEditor(editor);
+            _confirmPending = false;
         };
     }
 }

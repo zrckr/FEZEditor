@@ -14,6 +14,8 @@ public partial class EditorService
 
     public EditorFlags Flags { get; private set; }
 
+    public EditorComponent? PendingActiveEditor { get; private set; }
+
     public IEnumerable<EditorComponent> Editors => _editors;
 
     private readonly List<EditorComponent> _editors = new();
@@ -76,14 +78,20 @@ public partial class EditorService
 
     public void OpenEditorFor(string path)
     {
-        if (_tracking.Values.All(et => et.Path != path))
+        foreach (var (editor, tracking) in _tracking)
         {
-            var asset = _resourceService.Load(path);
-            var editor = CreateEditorFor(asset, path);
-
-            _tracking.Add(editor, new EditorTracking(path, false));
-            OpenEditor(editor);
+            if (tracking.Path == path)
+            {
+                RequestEditorFocus(editor);
+                return;
+            }
         }
+
+        var asset = _resourceService.Load(path);
+        var newEditor = CreateEditorFor(asset, path);
+
+        _tracking.Add(newEditor, new EditorTracking(path, false));
+        OpenEditor(newEditor);
     }
 
     public void OpenEditor(EditorComponent editor)
@@ -92,6 +100,7 @@ public partial class EditorService
         {
             _editors.Add(editor);
             _activeEditor = editor;
+            PendingActiveEditor = editor;
             _activeEditor.History.StateChanged += () =>
             {
                 if (_tracking.TryGetValue(editor, out var tracking))
@@ -99,6 +108,7 @@ public partial class EditorService
                     tracking.HasChanges = true;
                     _tracking[editor] = tracking;
                 }
+                UpdateFlags();
             };
             editor.LoadContent();
             UpdateFlags();
@@ -127,7 +137,13 @@ public partial class EditorService
     public void MarkEditorActive(EditorComponent editor)
     {
         _activeEditor = editor;
+        PendingActiveEditor = null;
         UpdateFlags();
+    }
+
+    public void RequestEditorFocus(EditorComponent editor)
+    {
+        PendingActiveEditor = editor;
     }
 
     public void UndoActiveEditorChanges()
@@ -144,7 +160,7 @@ public partial class EditorService
 
     public bool HasEditorUnsavedChanges(EditorComponent editor)
     {
-        return _tracking.Any(kv => kv.Key == editor && kv.Value.HasChanges) && editor.History.UndoCount > 0;
+        return _tracking.TryGetValue(editor, out var tracking) && tracking.HasChanges;
     }
 
     public bool HasAnyEditorUnsavedChanges()
@@ -160,6 +176,7 @@ public partial class EditorService
             tracking.HasChanges = false;
             _tracking[_activeEditor] = tracking;
             Logger.Information("Saving {0}", _activeEditor);
+            UpdateFlags();
         }
     }
 
@@ -173,18 +190,20 @@ public partial class EditorService
                 tracking.HasChanges = false;
                 _tracking[_activeEditor] = tracking;
                 Logger.Information("Saving {0} as...", _activeEditor);
+                UpdateFlags();
             }
         });
     }
 
     public void SaveEditorChanges(EditorComponent editor)
     {
-        if (_tracking.TryGetValue(_activeEditor!, out var tracking) && tracking.HasChanges)
+        if (_tracking.TryGetValue(editor, out var tracking) && tracking.HasChanges)
         {
-            _resourceService.Save(editor.Title, editor.Asset);
+            _resourceService.Save(tracking.Path, editor.Asset);
             tracking.HasChanges = false;
-            _tracking[_activeEditor!] = tracking;
+            _tracking[editor] = tracking;
             Logger.Information("Saving {0}", editor);
+            UpdateFlags();
         }
     }
 
@@ -197,10 +216,9 @@ public partial class EditorService
 
         foreach (var editor in _pendingClose)
         {
-            if (_editors.Remove(editor) && _tracking.Remove(editor))
-            {
-                editor.Dispose();
-            }
+            _editors.Remove(editor);
+            _tracking.Remove(editor);
+            editor.Dispose();
 
             if (editor == _activeEditor)
             {
@@ -221,7 +239,7 @@ public partial class EditorService
     {
         if (_activeEditor is WelcomeComponent)
         {
-            Flags &= ~(EditorFlags.CloseFile | EditorFlags.QuitToWelcome);
+            Flags = EditorFlags.None;
             return;
         }
 
@@ -256,13 +274,22 @@ public partial class EditorService
             return;
         }
 
-        if (_tracking.Values.Any(et => et.HasChanges))
+        if (_tracking.TryGetValue(_activeEditor, out var activeTracking) && activeTracking.HasChanges)
         {
             Flags |= EditorFlags.SaveFile;
         }
         else
         {
             Flags &= ~EditorFlags.SaveFile;
+        }
+
+        if (_tracking.Values.Any(et => et.HasChanges))
+        {
+            Flags |= EditorFlags.SaveAll;
+        }
+        else
+        {
+            Flags &= ~EditorFlags.SaveAll;
         }
     }
 
