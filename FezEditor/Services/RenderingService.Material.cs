@@ -55,7 +55,7 @@ public partial class RenderingService
     {
         var data = GetResource(_materials, material);
         data.Effect?.Dispose();
-        data.Effect = effect is BasicEffect ? effect : effect.Clone();
+        data.Effect = effect.Clone();
         Logger.Debug("Material {0} assigned effect {1}", material, effect.GetType().Name);
     }
 

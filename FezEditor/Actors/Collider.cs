@@ -86,8 +86,7 @@ public class Collider : ActorComponent
             _debugInstance = _rendering.InstanceCreate(Actor.InstanceRid);
             _rendering.InstanceSetMesh(_debugInstance, _debugMesh);
 
-            var effect = new BasicEffect(_rendering.GraphicsDevice);
-            _rendering.MaterialAssignEffect(_debugMaterial, effect);
+            _rendering.MaterialAssignEffect(_debugMaterial, _rendering.BasicEffect);
             _meshDirty = true;
         }
     }

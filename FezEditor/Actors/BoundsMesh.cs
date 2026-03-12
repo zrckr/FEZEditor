@@ -35,9 +35,8 @@ public class BoundsMesh : ActorComponent
 
     public override void LoadContent(IContentManager content)
     {
-        var effect = new BasicEffect(_rendering.GraphicsDevice) { VertexColorEnabled = true };
         _material = _rendering.MaterialCreate();
-        _rendering.MaterialAssignEffect(_material, effect);
+        _rendering.MaterialAssignEffect(_material, _rendering.BasicEffectVertexColor);
         _rendering.MaterialSetCullMode(_material, CullMode.None);
     }
 

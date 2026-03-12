@@ -56,8 +56,7 @@ public class MapNodeMesh : ActorComponent
 
     public override void LoadContent(IContentManager content)
     {
-        var basicEffect = new BasicEffect(_rendering.GraphicsDevice);
-        _rendering.MaterialAssignEffect(_outlineMaterial, basicEffect);
+        _rendering.MaterialAssignEffect(_outlineMaterial, _rendering.BasicEffect);
         _rendering.MaterialSetAlbedo(_outlineMaterial, Color.White);
         _rendering.MaterialSetCullMode(_outlineMaterial, CullMode.CullClockwiseFace);
 

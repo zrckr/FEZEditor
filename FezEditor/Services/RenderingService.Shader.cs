@@ -6,6 +6,14 @@ namespace FezEditor.Services;
 
 public partial class RenderingService
 {
+    private Effect? _basicEffect;
+    public Effect BasicEffect =>
+        _basicEffect ??= new BasicEffect(GraphicsDevice);
+
+    private Effect? _basicEffectVertexColor;
+    public Effect BasicEffectVertexColor =>
+        _basicEffectVertexColor ??= new BasicEffect(GraphicsDevice) { VertexColorEnabled = true };
+    
     private static readonly HashSet<Type> AllowedParameterTypes = new()
     {
         typeof(bool),

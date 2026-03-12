@@ -30,13 +30,11 @@ public class VolumeMesh : ActorComponent
 
     public override void LoadContent(IContentManager content)
     {
-        var effect1 = new BasicEffect(_rendering.GraphicsDevice) { VertexColorEnabled = true };
-        _rendering.MaterialAssignEffect(_material, effect1);
+        _rendering.MaterialAssignEffect(_material, _rendering.BasicEffectVertexColor);
         _rendering.MaterialSetCullMode(_material, CullMode.None);
 
-        var effect2 = new BasicEffect(_rendering.GraphicsDevice);
         var texture = content.Load<Texture2D>("Textures/Volume");
-        _rendering.MaterialAssignEffect(_overlay, effect2);
+        _rendering.MaterialAssignEffect(_overlay, _rendering.BasicEffect);
         _rendering.MaterialAssignBaseTexture(_overlay, texture);
         _rendering.MaterialSetCullMode(_overlay, CullMode.None);
         _rendering.MaterialSetAlbedo(_overlay, Color.White with { A = 102 }); // 40%
