@@ -11,5 +11,6 @@ public enum BlendMode
     Maximum,
     Minimum,
     Subtract,
-    Premultiplied
+    Premultiplied,
+    StarsOverClouds
 }

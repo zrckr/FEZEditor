@@ -271,6 +271,15 @@ public partial class RenderingService
                 alphaDestinationBlend = Blend.One;
                 break;
 
+            case BlendMode.StarsOverClouds:
+                colorBlendFunction = BlendFunction.Add;
+                colorSourceBlend = Blend.One;
+                colorDestinationBlend = Blend.InverseSourceColor;
+                alphaBlendFunction = BlendFunction.Add;
+                alphaSourceBlend = Blend.One;
+                alphaDestinationBlend = Blend.InverseSourceColor;
+                break;
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode));
         }
