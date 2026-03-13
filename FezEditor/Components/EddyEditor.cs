@@ -1,4 +1,5 @@
 ﻿using FezEditor.Actors;
+using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
 using FEZRepacker.Core.Definitions.Game.Level;
@@ -20,6 +21,8 @@ public class EddyEditor : EditorComponent
 
     private Actor _cameraActor = null!;
 
+    private readonly Clock _clock = new();
+
     private readonly Dictionary<int, Actor> _trileActors = new();
 
     private readonly Dictionary<int, HashSet<TrileEmplacement>> _groups = new();
@@ -32,6 +35,7 @@ public class EddyEditor : EditorComponent
 
     public override void Update(GameTime gameTime)
     {
+        _clock.Tick(gameTime);
         _scene.Update(gameTime);
     }
 
@@ -84,6 +88,8 @@ public class EddyEditor : EditorComponent
                 gizmo.UseFaceLabels = true;
                 gizmo.Draw(imageMin + new Vector2(size.X - 8f, 8f));
                 ImGuiX.DrawStats(imageMin + new Vector2(8, 8), RenderingService.GetStats());
+                var topCenter = imageMin + new Vector2(size.X / 2f, 8f);
+                ImGuiX.DrawTime(topCenter, _clock.CurrentTime);
             }
         }
     }

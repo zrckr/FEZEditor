@@ -766,7 +766,7 @@ public static class ImGuiX
 
     public static void DrawStats(Vector2 position, Dictionary<string, string> stats)
     {
-        var dl = ImGui.GetForegroundDrawList();
+        var dl = ImGui.GetWindowDrawList();
         var pos = position.ToNumerics();
         var lineHeight = ImGui.GetTextLineHeight();
         var padding = new NVector2(4, 4);
@@ -791,6 +791,27 @@ public static class ImGuiX
             dl.AddText(pos + new NVector2(0, lineHeight * i), 0xFFFFFFFF, $"{key}: {value}");
             i++;
         }
+    }
+
+    public static void DrawTime(Vector2 position, TimeSpan time)
+    {
+        var dl = ImGui.GetWindowDrawList();
+        var lineHeight = ImGui.GetTextLineHeight();
+        var padding = new NVector2(4, 4);
+
+        var text = $@"{Icons.Clockface} {time:hh\:mm}";
+        var textSize = ImGui.CalcTextSize(text);
+
+        // Center horizontally around the given position
+        var pos = new NVector2(position.X - textSize.X / 2f, position.Y);
+
+        // Draw background
+        var bgMin = pos - padding;
+        var bgMax = pos + textSize with { Y = lineHeight } + padding;
+        dl.AddRectFilled(bgMin, bgMax, 0xAA000000, 0f);
+
+        // Draw text
+        dl.AddText(pos, 0xFFFFFFFF, text);
     }
 
     #endregion
