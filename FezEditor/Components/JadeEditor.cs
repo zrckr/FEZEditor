@@ -58,6 +58,11 @@ public class JadeEditor : EditorComponent
             orbit.Pitch = -MathF.PI / 8f;
             orbit.PitchClamp = new Vector2(-MathF.PI / 8f, MathF.PI / 8f * 3f);
         }
+        {
+            var actor = _scene.CreateActor();
+            var stars = actor.AddComponent<StarsMesh>();
+            stars.Camera = _cameraActor.GetComponent<Camera>();
+        }
 
         RebuildSceneSubTree(_mapTree, _mapTree.Root);
     }

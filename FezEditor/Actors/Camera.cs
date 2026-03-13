@@ -43,6 +43,12 @@ public class Camera : ActorComponent
         }
     }
 
+    public Matrix View => _rendering.CameraGetView(_camera);
+
+    public Matrix ProjectionMatrix => _rendering.CameraGetProjection(_camera);
+
+    public Matrix ViewProjection => View * ProjectionMatrix;
+
     public Vector3 Offset { get; set; } = Vector3.Zero;
 
     public float Near { get; set; } = 0.05f;
