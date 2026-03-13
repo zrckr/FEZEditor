@@ -8,6 +8,11 @@ public static class Mathz
 
     public static Vector3 XzMask { get; set; } = new(1f, 0f, 1f);
 
+    public static float Frac(float number)
+    {
+        return number - (int)number;
+    }
+
     public static bool IsEqualApprox(float lhs, float rhs)
     {
         return Math.Abs(lhs - rhs) < float.Epsilon;

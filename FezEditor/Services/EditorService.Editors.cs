@@ -37,6 +37,7 @@ public partial class EditorService
             TrileSet ts => new ChrisEditor(_game, path, ts),
             MapTree tree => new JadeEditor(_game, path, tree),
             Level level => new EddyEditor(_game, path, level),
+            Sky sky => new LukeEditor(_game, path, sky),
             _ => new NotSupportedComponent(_game, path, asset.GetType())
         };
     }
