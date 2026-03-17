@@ -7,6 +7,7 @@ using FEZRepacker.Core.Definitions.Game.NpcMetadata;
 using FEZRepacker.Core.Definitions.Game.Sky;
 using FEZRepacker.Core.Definitions.Game.TrackedSong;
 using FEZRepacker.Core.Definitions.Game.TrileSet;
+using FEZRepacker.Core.Definitions.Game.XNA;
 
 namespace FezEditor.Services;
 
@@ -37,6 +38,7 @@ public partial class EditorService
             TrileSet ts => new ChrisEditor(_game, path, ts),
             MapTree tree => new JadeEditor(_game, path, tree),
             Level level => new EddyEditor(_game, path, level),
+            SoundEffect soundEffect => new RichardEditor(_game, path, soundEffect),
             _ => new NotSupportedComponent(_game, path, asset.GetType())
         };
     }
