@@ -74,6 +74,11 @@ public class ResourceService : IDisposable
         return _provider!.OpenStream(path, extension);
     }
 
+    public bool Exists(string path)
+    {
+        return _provider?.Exists(path) ?? false;
+    }
+
     public string GetExtension(string path)
     {
         return _provider?.GetExtension(path) ?? string.Empty;

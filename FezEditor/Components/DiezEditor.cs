@@ -1,4 +1,6 @@
-﻿using FezEditor.Structure;
+﻿using FezEditor.Services;
+using FezEditor.Structure;
+using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.TrackedSong;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -15,11 +17,16 @@ public class DiezEditor : EditorComponent
     private int _loopIndex = -1;
 
     private SoundEffect? _assembleChordSound;
+    private string? _requestedLoopToOpen;
 
     private TimeSpan _assembleChordElapsed = TimeSpan.Zero;
 
+    private readonly EditorService _editorService;
+
     public DiezEditor(Game game, string title, TrackedSong trackedSong) : base(game, title)
     {
+        _editorService = game.GetService<EditorService>();
+
         _trackedSong = trackedSong;
         History.Track(trackedSong);
     }
@@ -35,6 +42,15 @@ public class DiezEditor : EditorComponent
                 _assembleChordSound = null;
                 _assembleChordElapsed = TimeSpan.Zero;
             }
+        }
+
+        if (_requestedLoopToOpen != null)
+        {
+            if (TryFindLoopPath(_requestedLoopToOpen, out var loopPath))
+            {
+                _editorService.OpenEditorFor(loopPath);
+            }
+            _requestedLoopToOpen = null;
         }
     }
 
@@ -135,9 +151,14 @@ public class DiezEditor : EditorComponent
             for (var i = 0; i < _trackedSong.Loops.Count; i++)
             {
                 var loop = _trackedSong.Loops[i];
-                if (ImGui.Selectable(loop.Name, _loopIndex == i))
+                if (ImGui.Selectable(loop.Name, _loopIndex == i, ImGuiSelectableFlags.AllowDoubleClick))
                 {
                     _loopIndex = i;
+
+                    if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                    {
+                        _requestedLoopToOpen = loop.Name;
+                    }
                 }
             }
 
@@ -439,6 +460,30 @@ public class DiezEditor : EditorComponent
             _trackedSong.Loops.RemoveAt(from);
             _trackedSong.Loops.Insert(to, loop);
         }
+    }
+
+    private bool TryFindLoopPath(string loopName, out string loopPath)
+    {
+        var loopRelativePath = loopName.Replace(" ^ ", "/").ToLowerInvariant();
+        var trackedSongDirectory = Title[..Title.LastIndexOf('/')];
+
+        var pathsToCheck = new[]
+        {
+            $"{trackedSongDirectory}/{loopRelativePath}",
+            $"music/{loopRelativePath}",
+            loopRelativePath
+        };
+
+        foreach (var path in pathsToCheck)
+        {
+            if (ResourceService.Exists(path))
+            {
+                loopPath = path;
+                return true;
+            }
+        }
+        loopPath = string.Empty;
+        return false;
     }
 
     public static object Create(string name)
