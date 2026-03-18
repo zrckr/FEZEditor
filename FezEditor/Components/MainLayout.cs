@@ -101,10 +101,11 @@ public class MainLayout : DrawableGameComponent
                                     ? ImGuiTabItemFlags.SetSelected
                                     : ImGuiTabItemFlags.None;
 
+                                var tabLabel = title + "###" + editor.Title;
                                 var isOpen = true;
                                 var beginTabItem = editor is WelcomeComponent
-                                    ? ImGui.BeginTabItem(title)
-                                    : ImGui.BeginTabItem(title, ref isOpen, tabFlags);
+                                    ? ImGui.BeginTabItem(tabLabel)
+                                    : ImGui.BeginTabItem(tabLabel, ref isOpen, tabFlags);
 
                                 if (beginTabItem)
                                 {
