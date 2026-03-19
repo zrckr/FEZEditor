@@ -7,7 +7,7 @@ using Vector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FezEditor.Components;
 
-public class RichardEditor : EditorComponent
+public class RickViewer : EditorComponent
 {
     private const float PlayerWidth = 250f;
     private const float PlayerHeight = 100f;
@@ -23,13 +23,13 @@ public class RichardEditor : EditorComponent
 
     private float? _currentSeekRequest = null;
 
-    public RichardEditor(Game game, string title, RSoundEffect soundEffectAsset) : base(game, title)
+    public RickViewer(Game game, string title, RSoundEffect soundEffectAsset) : base(game, title)
     {
         _soundEffectAsset = soundEffectAsset;
         _oggSoundContainer = null;
     }
 
-    public RichardEditor(Game game, string title, VorbisSoundContainer soundContainer) : base(game, title)
+    public RickViewer(Game game, string title, VorbisSoundContainer soundContainer) : base(game, title)
     {
         _soundEffectAsset = new RSoundEffect();
         _oggSoundContainer = soundContainer;
