@@ -89,7 +89,7 @@ public class MainLayout : DrawableGameComponent
                     {
                         if (ImGui.BeginTabBar("##EditorTabs"))
                         {
-                            foreach (var editor in _editorService.Editors)
+                            foreach (var editor in _editorService.Editors.ToArray())
                             {
                                 var title = editor.Title;
                                 if (_editorService.HasEditorUnsavedChanges(editor))
