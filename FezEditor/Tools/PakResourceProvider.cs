@@ -74,11 +74,9 @@ internal class PakResourceProvider : IResourceProvider
         using var stream = _pakFile.OpenRead();
         using var reader = new PakReader(stream);
 
-        var record = reader.ReadFiles().FirstOrDefault(r => r.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
-        if (record == null)
-        {
-            throw new FileNotFoundException(path);
-        }
+        var record = reader.ReadFiles().FirstOrDefault(r =>
+                         r.Path.Replace('\\', '/').Equals(path, StringComparison.OrdinalIgnoreCase))
+                     ?? throw new FileNotFoundException(path);
 
         using var xnbStream = record.Open();
         var initialPosition = xnbStream.Position;
