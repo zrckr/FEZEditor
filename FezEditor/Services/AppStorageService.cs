@@ -17,9 +17,11 @@ public class AppStorageService : IDisposable
 
     private const int MaxRecentPaths = 10;
 
-    public IReadOnlyList<Settings.RecentEntry> RecentPaths => _data.RecentPaths;
+    public IReadOnlyList<Settings.RecentProvider> RecentProviders => _data.RecentProviders;
 
-    private Settings _data = Settings.Default;
+    public IReadOnlyDictionary<string, List<string>> RecentFiles => _data.RecentFiles;
+
+    private Settings _data = new();
 
     private readonly Game _game;
 
@@ -36,20 +38,37 @@ public class AppStorageService : IDisposable
         Save();
     }
 
-    public void AddRecentPath(string path, string kind)
+    public void AddRecentProvider(string path, string kind)
     {
-        _data.RecentPaths.RemoveAll(rp => string.Equals(rp.Path, path, StringComparison.OrdinalIgnoreCase));
-        _data.RecentPaths.Insert(0, new Settings.RecentEntry(path, kind));
+        _data.RecentProviders.RemoveAll(rp => string.Equals(rp.Path, path, StringComparison.OrdinalIgnoreCase));
+        _data.RecentProviders.Insert(0, new Settings.RecentProvider(path, kind));
 
-        if (_data.RecentPaths.Count > MaxRecentPaths)
+        if (_data.RecentProviders.Count > MaxRecentPaths)
         {
-            _data.RecentPaths.RemoveRange(MaxRecentPaths, _data.RecentPaths.Count - MaxRecentPaths);
+            _data.RecentProviders.RemoveRange(MaxRecentPaths, _data.RecentProviders.Count - MaxRecentPaths);
+        }
+    }
+
+    public void AddRecentFile(string provider, string path)
+    {
+        if (!_data.RecentFiles.TryGetValue(provider, out var list))
+        {
+            list = new List<string>();
+            _data.RecentFiles[provider] = list;
+        }
+
+        list.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        list.Insert(0, path);
+
+        if (list.Count > MaxRecentPaths)
+        {
+            list.RemoveRange(MaxRecentPaths, list.Count - MaxRecentPaths);
         }
     }
 
     public void ClearRecentPaths()
     {
-        _data.RecentPaths.Clear();
+        _data.RecentProviders.Clear();
     }
 
     public void SaveWindowState()
@@ -95,7 +114,7 @@ public class AppStorageService : IDisposable
         catch (Exception e)
         {
             Logger.Error(e, "Unable to load application data, using defaults");
-            _data = Settings.Default;
+            _data = new Settings();
         }
     }
 }

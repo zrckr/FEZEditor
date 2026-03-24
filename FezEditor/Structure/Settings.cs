@@ -1,22 +1,20 @@
+using System.Text.Json.Serialization;
 using FezEditor.Services;
 
 namespace FezEditor.Structure;
 
+[JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
 public record Settings
 {
     public static readonly string FilePath = Path.Combine(AppStorageService.BaseDir, "Settings.json");
 
-    public static readonly Settings Default = new()
-    {
-        RecentPaths = new List<RecentEntry>(),
-        Window = new WindowSize(1280, 720)
-    };
+    public List<RecentProvider> RecentProviders { get; init; } = new();
 
-    public List<RecentEntry> RecentPaths { get; init; } = null!;
+    public Dictionary<string, List<string>> RecentFiles { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public WindowSize Window { get; init; } = null!;
+    public WindowSize Window { get; init; } = new(1280, 720);
 
-    public record RecentEntry(string Path, string Kind);
+    public record RecentProvider(string Path, string Kind);
 
     public record WindowSize(int Width, int Height);
 }

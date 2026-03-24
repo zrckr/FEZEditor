@@ -34,6 +34,8 @@ public partial class EditorService
 
     private readonly StatusService _statusService;
 
+    private readonly AppStorageService _storageService;
+
     private EditorComponent? _activeEditor;
 
     public EditorService(Game game)
@@ -42,6 +44,7 @@ public partial class EditorService
         _inputService = game.GetService<InputService>();
         _resourceService = game.GetService<ResourceService>();
         _statusService = game.GetService<StatusService>();
+        _storageService = game.GetService<AppStorageService>();
     }
 
     public void Update(GameTime gameTime)
@@ -87,6 +90,7 @@ public partial class EditorService
             }
         }
 
+        _storageService.AddRecentFile(_resourceService.Root, path);
         var asset = _resourceService.Load(path);
         var newEditor = CreateEditorFor(asset, path);
 

@@ -59,7 +59,7 @@ public class WelcomeComponent : EditorComponent
         {
             if (ImGui.CollapsingHeader("Open Recent"))
             {
-                var recentPaths = _appStorageService.RecentPaths.ToArray();
+                var recentPaths = _appStorageService.RecentProviders.ToArray();
                 if (recentPaths.Length == 0)
                 {
                     ImGui.Indent();
@@ -177,7 +177,7 @@ public class WelcomeComponent : EditorComponent
         var pakPath = files.FirstOrDefault();
         if (!string.IsNullOrEmpty(pakPath))
         {
-            _appStorageService.AddRecentPath(pakPath, "File");
+            _appStorageService.AddRecentProvider(pakPath, "File");
             _appStorageService.Save(); // persist immediately in case of crash
             _resourceService.OpenProvider(new FileInfo(pakPath));
             _editorService.CloseEditor(this);
@@ -189,32 +189,32 @@ public class WelcomeComponent : EditorComponent
         var dirPath = files.FirstOrDefault();
         if (!string.IsNullOrEmpty(dirPath))
         {
-            _appStorageService.AddRecentPath(dirPath, "Directory");
+            _appStorageService.AddRecentProvider(dirPath, "Directory");
             _appStorageService.Save(); // ditto
             _resourceService.OpenProvider(new DirectoryInfo(dirPath));
             _editorService.CloseEditor(this);
         }
     }
 
-    private void OpenRecentEntry(Settings.RecentEntry entry)
+    private void OpenRecentEntry(Settings.RecentProvider provider)
     {
-        var exists = entry.Kind == "File"
-            ? File.Exists(entry.Path)
-            : Directory.Exists(entry.Path);
+        var exists = provider.Kind == "File"
+            ? File.Exists(provider.Path)
+            : Directory.Exists(provider.Path);
 
         if (!exists)
         {
-            Logger.Warning("Recent path no longer exists: {Path}", entry.Path);
+            Logger.Warning("Recent path no longer exists: {Path}", provider.Path);
             return;
         }
 
-        if (entry.Kind == "File")
+        if (provider.Kind == "File")
         {
-            OpenPakFile(new[] { entry.Path });
+            OpenPakFile(new[] { provider.Path });
         }
         else
         {
-            OpenDirectory(new[] { entry.Path });
+            OpenDirectory(new[] { provider.Path });
         }
     }
 }

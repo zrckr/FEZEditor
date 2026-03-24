@@ -21,12 +21,15 @@ public class MenuBar : DrawableGameComponent
 
     private readonly InputService _inputService;
 
+    private readonly AppStorageService _storageService;
+
     public MenuBar(Game game) : base(game)
     {
         game.AddComponent(_confirmWindow = new ConfirmWindow(game));
         _editorService = game.GetService<EditorService>();
         _resourceService = game.GetService<ResourceService>();
         _inputService = game.GetService<InputService>();
+        _storageService = game.GetService<AppStorageService>();
     }
 
     protected override void Dispose(bool disposing)
@@ -62,6 +65,29 @@ public class MenuBar : DrawableGameComponent
         {
             if (ImGui.BeginMenu("File"))
             {
+                if (!_resourceService.HasNoProvider)
+                {
+                    _storageService.RecentFiles.TryGetValue(_resourceService.Root, out var recentFiles);
+                    if (ImGui.BeginMenu("Open Recent", recentFiles?.Count > 0))
+                    {
+                        foreach (var path in recentFiles!)
+                        {
+                            var name = path.Contains('/') ? path[(path.LastIndexOf('/') + 1)..] : path;
+                            if (ImGui.MenuItem(name))
+                            {
+                                _editorService.OpenEditorFor(path);
+                            }
+
+                            if (ImGui.IsItemHovered())
+                            {
+                                ImGui.SetTooltip(path);
+                            }
+                        }
+
+                        ImGui.EndMenu();
+                    }
+                }
+
                 ImGui.Separator();
 
                 var enabled = _editorService.Flags.HasFlag(EditorFlags.SaveFile);

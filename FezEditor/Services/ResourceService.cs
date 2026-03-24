@@ -28,6 +28,8 @@ public class ResourceService : IDisposable
 
     private readonly Game _game;
 
+    private readonly AppStorageService _storage;
+
     private readonly Dictionary<string, WeakReference<object>> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     public ResourceService(Game game)
@@ -35,6 +37,7 @@ public class ResourceService : IDisposable
         _game = game;
         _game.Activated += OnGameActivated;
         _content = game.GetService<ContentService>().Global;
+        _storage = game.GetService<AppStorageService>();
     }
 
     private void OnGameActivated(object? o, EventArgs eventArgs)
