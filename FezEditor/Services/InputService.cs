@@ -222,7 +222,7 @@ public class InputService
 
     private bool CheckAction(string action, Func<Keys, bool> check)
     {
-        if (!_bindings.TryGetValue(action, out var list))
+        if (ImGui.GetIO().WantCaptureKeyboard || !_bindings.TryGetValue(action, out var list))
         {
             return false;
         }
