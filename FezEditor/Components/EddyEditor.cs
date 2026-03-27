@@ -1,10 +1,8 @@
-﻿using FezEditor.Actors;
+using FezEditor.Actors;
+using FezEditor.Components.Eddy;
 using FezEditor.Structure;
 using FezEditor.Tools;
-using FEZRepacker.Core.Definitions.Game.ArtObject;
 using FEZRepacker.Core.Definitions.Game.Level;
-using FEZRepacker.Core.Definitions.Game.Sky;
-using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 
@@ -12,7 +10,7 @@ namespace FezEditor.Components;
 
 public class EddyEditor : EditorComponent
 {
-    private const int InvalidId = -1;
+    private bool _showAssetBrowser;
 
     public override object Asset => _level;
 
@@ -22,71 +20,54 @@ public class EddyEditor : EditorComponent
 
     private Actor _cameraActor = null!;
 
-    private Actor _skyActor = null!;
-
-    private Actor _debugActor = null!;
-
-    private Actor _collisionActor = null!;
-
     private readonly Clock _clock = new();
-
-    private readonly Dictionary<int, Actor> _trileActors = new();
-
-    private readonly Dictionary<int, HashSet<TrileEmplacement>> _groups = new();
 
     private readonly AssetBrowser _assetBrowser;
 
-    private bool _showAssetBrowser;
+    private DefaultEddyContext _defaultContext = null!;
 
-    private bool _showPickableBounds;
+    private TrileContext _trileContext = null!;
 
-    private bool _showCollisionMap;
+    private EddyContext[] _contexts = [];
+
+    private EddyContext _activeContext = null!;
+
+    private EddyContext _propertiesContext = null!;
+
+    private (Actor Actor, PickHit Hit)? _raycastResult;
+
+    private Vector2 _viewportMin;
+
+    private bool _showProperties;
+
+    private bool _queueRevisualization;
 
     public EddyEditor(Game game, string title, Level level) : base(game, title)
     {
         _level = level;
-        _assetBrowser = new AssetBrowser(game, title);
+        _assetBrowser = new AssetBrowser(game);
+        History.RegisterConverter(new TrileEmplacementConverter());
         History.Track(level);
+        History.StateChanged += () => _queueRevisualization = true;
     }
 
     public override void Update(GameTime gameTime)
     {
         _clock.Tick(gameTime);
+        _defaultContext.UpdateLighting();
+        _activeContext.Update();
         _scene.Update(gameTime);
-        UpdateLighting();
-    }
-
-    private void UpdateLighting()
-    {
-        var visualizer = _skyActor.GetComponent<SkyVisualizer>();
-        var actualAmbient = new Color(_level.BaseAmbient, _level.BaseAmbient, _level.BaseAmbient);
-        var actualDiffuse = new Color(_level.BaseDiffuse, _level.BaseDiffuse, _level.BaseDiffuse);
-
-        if (_clock.NightContribution != 0f)
-        {
-            actualDiffuse = Color.Lerp(actualDiffuse, visualizer.FogColor, _clock.NightContribution * 0.4f);
-            actualAmbient = Color.Lerp(actualAmbient, visualizer.FoliageShadows
-                ? Color.Lerp(visualizer.FogColor, Color.White, 0.5f)
-                : Color.White, _clock.NightContribution * 0.5f);
-        }
-
-        actualAmbient = Color.Lerp(actualAmbient, visualizer.FogColor, 23f / 160f);
-
-        _scene.Lighting.Ambient = actualAmbient;
-        _scene.Lighting.Diffuse = actualDiffuse;
     }
 
     public override void LoadContent()
     {
         _assetBrowser.LoadContent(ContentManager);
-
         _scene = new Scene(Game, ContentManager);
-        Camera camera;
         {
             _cameraActor = _scene.CreateActor();
             _cameraActor.Name = "Camera";
 
-            camera = _cameraActor.AddComponent<Camera>();
+            var camera = _cameraActor.AddComponent<Camera>();
             var gizmo = _cameraActor.AddComponent<OrientationGizmo>();
             _cameraActor.AddComponent<FirstPersonControl>();
 
@@ -96,13 +77,44 @@ public class EddyEditor : EditorComponent
             gizmo.UseFaceLabels = false;
         }
         {
-            _skyActor = _scene.CreateActor();
-            _skyActor.Name = "Sky";
-            var visualizer = _skyActor.AddComponent<SkyVisualizer>();
-            visualizer.Initialize(_scene, camera, _clock);
+            _defaultContext = MakeContext<DefaultEddyContext>();
+            _defaultContext.Clock = _clock;
+            _contexts = new EddyContext[]
+            {
+                _trileContext = MakeContext<TrileContext>(),
+                MakeContext<TrileGroupContext>(),
+                MakeContext<ArtObjectContext>(),
+                MakeContext<BackgroundPlaneContext>(),
+                MakeContext<NpcContext>(),
+                MakeContext<GomezContext>(),
+                MakeContext<VolumeContext>(),
+                MakeContext<PathContext>(),
+                MakeContext<ScriptContext>()
+            };
+
+            _defaultContext.Revisualize();
+            foreach (var context in _contexts)
+            {
+                context.Revisualize();
+            }
+
+            _defaultContext.PostRevisualize();
+        }
+        {
+            var actor = _scene.CreateActor();
+            actor.Name = "Cursor";
+
+            var cursor = actor.AddComponent<CursorMesh>();
+            _defaultContext.Cursor = cursor;
+
+            foreach (var context in _contexts)
+            {
+                context.Cursor = cursor;
+            }
         }
 
-        RevisualizeLevel();
+        _activeContext = _defaultContext;
+        _propertiesContext = _defaultContext;
 
         var position = _level.StartingFace.Id.ToXna().ToVector3();
         position += (Vector3.Up * 1.5f) + _level.StartingFace.Face.AsVector() * 10f;
@@ -111,6 +123,12 @@ public class EddyEditor : EditorComponent
 
     public override void Draw()
     {
+        if (_queueRevisualization)
+        {
+            _queueRevisualization = false;
+            _activeContext.Revisualize(partial: true);
+        }
+
         DrawToolbar();
 
         var size = ImGuiX.GetContentRegionAvail();
@@ -130,21 +148,117 @@ public class EddyEditor : EditorComponent
                 ImGuiX.Image(texture, size);
                 InputService.CaptureScroll(ImGui.IsItemHovered());
 
-                var imageMin = ImGuiX.GetItemRectMin();
+                _viewportMin = ImGuiX.GetItemRectMin();
+                _raycastResult = null;
+
+                if (ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+                {
+                    var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), _viewportMin);
+                    _raycastResult = _scene.Raycast(ray);
+
+                    _activeContext = _defaultContext;
+                    foreach (var context in _contexts)
+                    {
+                        if (context.Pick(ray))
+                        {
+                            _activeContext = context;
+                            _propertiesContext = context;
+                            break;
+                        }
+                    }
+                }
+
+                _activeContext.ViewportMin = _viewportMin;
+                var imageMin = _viewportMin;
+
                 var gizmo = _cameraActor.GetComponent<OrientationGizmo>();
                 gizmo.UseFaceLabels = true;
                 gizmo.Draw(imageMin + new Vector2(size.X - 8f, 8f));
+
                 ImGuiX.DrawStats(imageMin + new Vector2(8, 8), RenderingService.GetStats());
+
+                DrawRaycastDebug(imageMin + new Vector2(8, size.Y - 8f));
+
                 var topCenter = imageMin + new Vector2(size.X / 2f, 8f);
                 ImGuiX.DrawClock(topCenter, _clock);
             }
         }
 
-        _assetBrowser.Draw(ref _showAssetBrowser);
+        if (_showProperties)
+        {
+            const ImGuiWindowFlags flags = ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize |
+                                           ImGuiWindowFlags.NoCollapse;
+            if (ImGui.Begin("Properties", ref _showProperties, flags))
+            {
+                _propertiesContext.DrawProperties();
+                ImGui.End();
+            }
+        }
+
+        if (_showAssetBrowser)
+        {
+            const ImGuiWindowFlags flags = ImGuiWindowFlags.NoCollapse;
+            ImGuiX.SetNextWindowSize(new Vector2(700, 500), ImGuiCond.FirstUseEver);
+            if (ImGui.Begin("Asset Browser", ref _showAssetBrowser, flags))
+            {
+                _assetBrowser.Draw();
+                ImGui.End();
+            }
+        }
+    }
+
+    public override void Dispose()
+    {
+        foreach (var ctx in _contexts)
+        {
+            ctx.Dispose();
+        }
+
+        _assetBrowser.Dispose();
+        _scene.Dispose();
+        base.Dispose();
     }
 
     private void DrawToolbar()
     {
+        DrawToolButton(Lucide.MousePointer2, EddyTool.Select);
+
+        ImGui.SameLine();
+        DrawToolButton(Lucide.Move3D, EddyTool.Translate);
+
+        ImGui.SameLine();
+        DrawToolButton(Lucide.Rotate3D, EddyTool.Rotate);
+
+        ImGui.SameLine();
+        DrawToolButton(Lucide.Scale3D, EddyTool.Scale);
+
+        ImGui.SameLine();
+        ImGui.TextDisabled("|");
+
+        ImGui.SameLine();
+        DrawToolButton(Lucide.Paintbrush, EddyTool.Paint);
+
+        ImGui.SameLine();
+        DrawToolButton(Lucide.Pipette, EddyTool.Pick);
+
+        ImGui.SameLine();
+        ImGui.BeginDisabled(_showAssetBrowser);
+        if (ImGui.Button($"{Lucide.Palette}"))
+        {
+            _showAssetBrowser = true;
+        }
+
+        ImGui.EndDisabled();
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Asset Browser");
+        }
+
+        ImGui.SameLine();
+        ImGui.TextDisabled("|");
+
+        ImGui.SameLine();
         if (ImGui.Button($"{Icons.Export}"))
         {
             FileDialog.Show(FileDialog.Type.SaveFile, files =>
@@ -165,15 +279,13 @@ public class EddyEditor : EditorComponent
         }
 
         ImGui.SameLine();
-        if (ImGui.Button($"{Icons.Library}"))
+        ImGui.BeginDisabled(_showProperties);
+        if (ImGui.Button($"{Icons.SymbolProperty} Properties"))
         {
-            _showAssetBrowser = !_showAssetBrowser;
+            _showProperties = true;
         }
 
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Asset Browser");
-        }
+        ImGui.EndDisabled();
 
         ImGui.SameLine();
         if (ImGui.Button($"{Icons.KebabVertical} Perspective"))
@@ -181,264 +293,90 @@ public class EddyEditor : EditorComponent
             ImGui.OpenPopup("ViewOptions");
         }
 
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("View Options");
-        }
-
         if (ImGui.BeginPopup("ViewOptions"))
         {
-            if (ImGui.Checkbox("Collision Map", ref _showCollisionMap))
+            var collisionMap = _trileContext.ShowCollisionMap.Value;
+            if (ImGui.Checkbox("Collision Map", ref collisionMap))
             {
-                _collisionActor.GetComponent<TrileCollisionMesh>().Visible = _showCollisionMap;
+                _trileContext.ShowCollisionMap = collisionMap;
             }
 
-            if (ImGui.Checkbox("Pickable Bounds", ref _showPickableBounds))
+            var pickableBounds = _defaultContext.ShowPickableBounds.Value;
+            if (ImGui.Checkbox("Pickable Bounds", ref pickableBounds))
             {
-                var bounds = _debugActor.GetComponent<PickableBounds>();
-                bounds.Visualize(_showPickableBounds
-                    ? _scene.GetChildren(_scene.Root)
-                    : Enumerable.Empty<Actor>());
+                _defaultContext.ShowPickableBounds = pickableBounds;
             }
 
             ImGui.EndPopup();
         }
     }
 
-    public override void Dispose()
+    private void DrawToolButton(string icon, EddyTool tool)
     {
-        _assetBrowser.Dispose();
-        _scene.Dispose();
-        base.Dispose();
+        var isActive = _activeContext.Tool.Value == tool;
+        if (isActive)
+        {
+            ImGui.BeginDisabled(true);
+        }
+
+        if (ImGui.Button($"{icon}##{tool}"))
+        {
+            foreach (var context in _contexts)
+            {
+                context.Tool = tool; // sync across all contexts
+            }
+        }
+
+        if (isActive)
+        {
+            ImGui.EndDisabled();
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetItemTooltip(tool.GetLabel());
+        }
     }
 
-    private void RevisualizeLevel()
+    private void DrawRaycastDebug(Vector2 position)
     {
-        var sky = (Sky)ResourceService.Load($"Skies/{_level.SkyName}");
-        _scene.Lighting.Ambient = Color.White * _level.BaseAmbient;
-        _scene.Lighting.Diffuse = Color.White * _level.BaseDiffuse;
-
-        #region Sky
-
+        var stats = new Dictionary<string, string>();
+        if (_raycastResult.HasValue)
         {
-            var visualizer = _skyActor.GetComponent<SkyVisualizer>();
-            visualizer.LevelSize = _level.Size.ToXna();
-            visualizer.Visualize(sky);
-        }
-
-        #endregion
-
-        #region Level bounds
-
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = "Level Bounds";
-
-            var mesh = actor.AddComponent<BoundsMesh>();
-            mesh.Size = _level.Size.ToXna();
-        }
-
-        #endregion
-
-        #region Liquid
-
-        if (_level.WaterType != LiquidType.None)
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = $"Water: {_level.WaterType}";
-
-            var mesh = actor.AddComponent<LiquidMesh>();
-            mesh.Visualize(_level.WaterType, _level.WaterHeight, _level.Size.ToXna());
-        }
-
-        #endregion
-
-        #region Triles
-
-        var trileSetPath = $"Trile Sets/{_level.TrileSetName}";
-        var trileSet = (TrileSet)ResourceService.Load(trileSetPath);
-        _assetBrowser.SetTrileSet(trileSetPath, trileSet);
-
-        foreach (var id in _level.Triles.Values.Select(ti => ti.TrileId).Where(id => id != InvalidId).Distinct())
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = $"{id}: {trileSet.Triles[id].Name}";
-            _trileActors.Add(id, actor);
-
-            var mesh = actor.AddComponent<TrilesMesh>();
-            mesh.Visualize(trileSet, id);
-        }
-
-        foreach (var (emplacement, instance) in _level.Triles.Where(kv => kv.Value.TrileId != InvalidId))
-        {
-            var actor = _trileActors[instance.TrileId];
-            var mesh = actor.GetComponent<TrilesMesh>();
-            mesh.SetInstanceData(emplacement, instance.Position.ToXna(), instance.PhiLight);
-        }
-
-        #endregion
-
-        #region Collision Map
-
-        {
-            _collisionActor = _scene.CreateActor();
-            var collision = _collisionActor.AddComponent<TrileCollisionMesh>();
-            foreach (var instance in _level.Triles.Values.Where(ti => ti.TrileId != InvalidId))
+            var (actor, hit) = _raycastResult.Value;
+            stats["Hit"] = actor.Name;
+            stats["Distance"] = $"{hit.Distance:F2}";
+            stats["Triangle"] = $"{hit.Index}";
+            if (actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
             {
-                var trile = trileSet.Triles[instance.TrileId];
-                collision.AddInstanceData(instance.Position.ToXna(), trile.Faces, trile.Size.ToXna());
-            }
-        }
-
-        #endregion
-
-        #region Trile Groups
-
-        _groups.Clear();
-        foreach (var (id, group) in _level.Groups.Where(kv => kv.Key != InvalidId))
-        {
-            // See comment in FEZRepacker.Core.Definitions.Json.TrileGroupJsonModel
-            _groups[id] = group.Triles.Select(ti => new TrileEmplacement(ti.Position)).ToHashSet();
-
-            // TODO: Highlight group for now, selection will be implemented later
-            foreach (var actor in _trileActors.Values)
-            {
-                var mesh = actor.GetComponent<TrilesMesh>();
-                mesh.SetSelectedInstances(_groups[id]);
+                var emp = mesh.GetEmplacement(hit.Index);
+                stats["Emplacement"] = $"{emp.X}, {emp.Y}, {emp.Z}";
             }
 
-            if (group.Path is { Segments.Count: >= 2 })
-            {
-                var actor = _scene.CreateActor();
-                actor.Name = $"{id}: Group Path ({group.ActorType})";
-
-                var segments = group.Path.Segments.Select(ps => ps.Destination.ToXna()).ToArray();
-                var mesh = actor.AddComponent<PathMesh>();
-                mesh.Visualize(segments);
-            }
+            _trileContext.DrawDebug(stats);
         }
-
-        #endregion
-
-        #region ArtObjects
-
-        foreach (var (id, instance) in _level.ArtObjects.Where(kv => kv.Key != InvalidId))
+        else
         {
-            var actor = _scene.CreateActor();
-            actor.Name = $"{id}: {instance.Name}";
-            actor.Transform.Position = instance.Position.ToXna();
-            actor.Transform.Rotation = instance.Rotation.ToXna();
-            actor.Transform.Scale = instance.Scale.ToXna();
-
-            var mesh = actor.AddComponent<ArtObjectMesh>();
-            var ao = (ArtObject)ResourceService.Load($"Art Objects/{instance.Name}");
-            mesh.Visualize(ao);
+            stats["Hit"] = "None";
         }
 
-        #endregion
+        var lineHeight = ImGui.GetTextLineHeight();
+        ImGuiX.DrawStats(position - new Vector2(0, lineHeight * stats.Count + 8), stats);
+    }
 
-        #region Background Planes
-
-        foreach (var (id, bgPlane) in _level.BackgroundPlanes.Where(kv => kv.Key != InvalidId))
+    private T MakeContext<T>() where T : EddyContext, new()
+    {
+        return new T
         {
-            var actor = _scene.CreateActor();
-            actor.Name = $"{id}: {bgPlane.TextureName}";
-            actor.Transform.Position = bgPlane.Position.ToXna();
-            actor.Transform.Rotation = bgPlane.Rotation.ToXna();
-            actor.Transform.Scale = bgPlane.Scale.ToXna();
-
-            var mesh = actor.AddComponent<BackgroundPlaneMesh>();
-            mesh.Billboard = bgPlane.Billboard;
-            mesh.DoubleSided = bgPlane.Doublesided;
-            mesh.Color = bgPlane.Filter.ToXna();
-            mesh.Opacity = bgPlane.Opacity;
-
-            var asset = ResourceService.Load($"Background Planes/{bgPlane.TextureName}");
-            mesh.Visualize(asset);
-        }
-
-        #endregion
-
-        #region Non-Playable Characters
-
-        foreach (var (id, instance) in _level.NonPlayerCharacters.Where(kv => kv.Key != InvalidId))
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = $"{id}: {instance.Name}";
-            actor.Transform.Position = instance.Position.ToXna();
-
-            var mesh = actor.AddComponent<NpcMesh>();
-            var animations = ResourceService.LoadAnimations($"Character Animations/{instance.Name}");
-            mesh.Visualize(animations);
-        }
-
-        #endregion
-
-        #region Gomez
-
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = "Gomez";
-            actor.Transform.Position = _level.StartingFace.Id.ToXna().ToVector3() + Vector3.Up;
-            actor.Transform.Rotation = _level.StartingFace.Face.AsQuaternion();
-
-            var mesh = actor.AddComponent<NpcMesh>();
-            var animations = ResourceService.LoadAnimations("Character Animations/Gomez");
-            mesh.Visualize(animations, "IdleWink");
-
-            var bounds = actor.AddComponent<BoundsMesh>();
-            bounds.Size = Vector3.One;
-            bounds.WireColor = Color.Red;
-        }
-
-        #endregion
-
-        #region Cloud Shadows
-
-        {
-            var visualizer = _skyActor.GetComponent<SkyVisualizer>();
-            visualizer.VisualizeShadows(sky.Name, sky.Shadows);
-        }
-
-        #endregion
-
-        #region Volumes
-
-        foreach (var (id, volume) in _level.Volumes.Where(kv => kv.Key != InvalidId))
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = $"{id}: Volume";
-
-            var mesh = actor.AddComponent<VolumeMesh>();
-            mesh.Visualize(volume.From.ToXna(), volume.To.ToXna());
-        }
-
-        #endregion
-
-        #region Paths
-
-        foreach (var (id, path) in _level.Paths.Where(kv => kv.Key != InvalidId))
-        {
-            var actor = _scene.CreateActor();
-            actor.Name = $"{id}: Path";
-
-            var segments = path.Segments.Select(ps => ps.Destination.ToXna()).ToArray();
-            var mesh = actor.AddComponent<PathMesh>();
-            mesh.Visualize(segments);
-        }
-
-        #endregion
-
-        #region Pickable Bounds
-
-        {
-            _debugActor = _scene.CreateActor();
-            _debugActor.Name = "Debug";
-
-            var bounds = _debugActor.AddComponent<PickableBounds>();
-            bounds.WireColor = Color.Purple;
-        }
-
-        #endregion
+            Scene = _scene,
+            History = History,
+            Level = _level,
+            Camera = _cameraActor.GetComponent<Camera>(),
+            AssetBrowser = _assetBrowser,
+            ResourceService = ResourceService,
+            InputService = InputService,
+            StatusService = StatusService,
+            ContentManager = ContentManager
+        };
     }
 }

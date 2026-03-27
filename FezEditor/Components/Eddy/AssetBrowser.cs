@@ -9,7 +9,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Serilog;
 
-namespace FezEditor.Components;
+namespace FezEditor.Components.Eddy;
 
 public class AssetBrowser : IDisposable
 {
@@ -21,6 +21,8 @@ public class AssetBrowser : IDisposable
 
     private const float ThumbSize = 64f;
 
+    private const float RecentThumbSize = 48f;
+
     private const float CellSpacing = 8f;
 
     private const float CellSize = ThumbSize + CellSpacing;
@@ -31,11 +33,15 @@ public class AssetBrowser : IDisposable
 
     private const int MaxThumbnailsPerFrame = 2;
 
-    private readonly string _title;
+    private const int MaxRecentEntries = 10;
+
+    public Entry SelectedEntry { get; private set; }
+
+    private readonly List<Entry> _recentEntries = new();
 
     private readonly ResourceService _resources;
 
-    private readonly Dictionary<Kind, IReadOnlyList<Entry>> _entries = new();
+    private readonly Dictionary<AssetType, IReadOnlyList<Entry>> _entries = new();
 
     private readonly Queue<Entry> _pendingQueue = new();
 
@@ -47,13 +53,10 @@ public class AssetBrowser : IDisposable
 
     private Texture2D _placeholder = null!;
 
-    private Entry? _selectedEntry;
-
     private string _filterEntries = string.Empty;
 
-    public AssetBrowser(Game game, string title)
+    public AssetBrowser(Game game)
     {
-        _title = title;
         _resources = game.GetService<ResourceService>();
         _resources.ProviderChanged += OnProviderChanged;
         s_instanceCount++;
@@ -83,24 +86,196 @@ public class AssetBrowser : IDisposable
         }
     }
 
-    public bool Select(out Entry? entry)
+    public void Pick(string name, AssetType type)
     {
-        if (_selectedEntry.HasValue)
+        if (_entries.TryGetValue(type, out var entries))
         {
-            entry = _selectedEntry.Value;
-            return true;
+            foreach (var entry in entries)
+            {
+                if (string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    Select(entry);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void Select(Entry entry)
+    {
+        SelectedEntry = entry;
+        if (entry == default)
+        {
+            return;
         }
 
-        entry = null;
-        return false;
+        _recentEntries.Remove(entry);
+        _recentEntries.Insert(0, entry);
+        if (_recentEntries.Count > MaxRecentEntries)
+        {
+            _recentEntries.RemoveAt(_recentEntries.Count - 1);
+        }
     }
 
-    public void Unselect()
+    public void Draw()
     {
-        _selectedEntry = null;
+        ProcessQueue();
+        TryBuildEntries();
+
+        DrawSelectionBar();
+        ImGui.Separator();
+
+        var footerHeight = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().ItemSpacing.Y;
+        ImGui.BeginChild("##Content", new NVector2(0, -footerHeight));
+
+        if (_entries.Count > 0 && ImGui.BeginTabBar("##AssetTabs"))
+        {
+            foreach (var type in Enum.GetValues<AssetType>())
+            {
+                if (ImGui.BeginTabItem(type.GetLabel()))
+                {
+                    if (type == AssetType.Trile && _trileSetPath != null)
+                    {
+                        ImGui.TextDisabled(_trileSetPath);
+                        ImGui.Separator();
+                    }
+
+                    if (_entries.TryGetValue(type, out var entries))
+                    {
+                        IReadOnlyList<Entry> ret;
+                        if (string.IsNullOrEmpty(_filterEntries))
+                        {
+                            ret = entries;
+                        }
+                        else
+                        {
+                            ret = entries
+                                .Where(entry => entry.Name.Contains(_filterEntries, StringComparison.OrdinalIgnoreCase))
+                                .ToList();
+                        }
+
+                        DrawGrid(ret);
+                    }
+
+                    ImGui.EndTabItem();
+                }
+            }
+
+            ImGui.EndTabBar();
+        }
+
+        ImGui.EndChild();
+
+        ImGui.Separator();
+        DrawFooter();
     }
 
-    public void Draw(ref bool isOpen)
+    private void DrawSelectionBar()
+    {
+        var selected = SelectedEntry;
+        var isAnySelected = selected != default;
+
+        // Header line: "Selected: Name (Type)"
+        ImGui.TextDisabled("Selected:");
+        ImGui.SameLine();
+        if (isAnySelected)
+        {
+            ImGui.TextUnformatted($"{selected.Name} ({selected.Type.GetLabel()})");
+        }
+        else
+        {
+            ImGui.TextDisabled("(none)");
+        }
+
+        // Thumbnail row
+        const float barHeight = ThumbSize + CellSpacing * 2;
+        ImGui.BeginChild("##SelectionBar", new NVector2(0, barHeight), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
+
+        var selectedThumb = SharedThumbnails.GetValueOrDefault(selected.CachePath) ?? _placeholder;
+        ImGui.BeginDisabled(!isAnySelected);
+        ImGuiX.Image(selectedThumb, new Vector2(ThumbSize));
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+
+        for (var i = 0; i < MaxRecentEntries; i++)
+        {
+            ImGui.SameLine();
+            ImGui.PushID(i);
+
+            if (i < _recentEntries.Count)
+            {
+                var recent = _recentEntries[i];
+                var thumb = SharedThumbnails.GetValueOrDefault(recent.CachePath) ?? _placeholder;
+
+                if (ImGuiX.ImageButton("##recent", thumb, new Vector2(RecentThumbSize)))
+                {
+                    Select(recent);
+                }
+
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip($"{recent.Name} ({recent.Type.GetLabel()})");
+                }
+            }
+            else
+            {
+                ImGui.BeginDisabled();
+                ImGuiX.Button("##recent", new Vector2(RecentThumbSize));
+                ImGui.EndDisabled();
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.EndChild();
+    }
+
+    private void DrawFooter()
+    {
+        ImGui.SetNextItemWidth(256);
+        ImGui.InputTextWithHint("", "Filter assets...", ref _filterEntries, 255);
+
+        if (!string.IsNullOrEmpty(_filterEntries))
+        {
+            ImGui.SameLine();
+            if (ImGui.Button($"{Icons.Close}"))
+            {
+                _filterEntries = string.Empty;
+            }
+        }
+
+        var isGenerating = _pendingQueue.Count > 0;
+        if (isGenerating)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button($"{Icons.Refresh} Refresh Thumbnails"))
+        {
+            foreach (var entry in _entries.Values.SelectMany(e => e))
+            {
+                new ThumbnailGenerator(entry.CachePath, default).Delete();
+            }
+
+            ClearSharedThumbnails(_placeholder);
+            _entries.Clear();
+        }
+
+        if (isGenerating)
+        {
+            ImGui.EndDisabled();
+        }
+
+        if (_pendingQueue.Count > 0)
+        {
+            var spinner = "|/-\\"[(int)(ImGui.GetTime() * 8) % 4];
+            ImGui.SameLine();
+            ImGui.TextDisabled($"{spinner} Generating thumbnails... ({_pendingQueue.Count} remaining)");
+        }
+    }
+
+    private void ProcessQueue()
     {
         #region Process Queue
 
@@ -131,9 +306,9 @@ public class AssetBrowser : IDisposable
 
                 // Load asset and generate thumbnail
                 ThumbnailGenerator? generator = null;
-                switch (entry.Kind)
+                switch (entry.Type)
                 {
-                    case Kind.ArtObjects:
+                    case AssetType.ArtObject:
                         {
                             var asset = _resources.Load(entry.Path);
                             if (asset is ArtObject ao)  // exclude AOs with texture only
@@ -144,11 +319,16 @@ public class AssetBrowser : IDisposable
                             break;
                         }
 
-                    case Kind.Triles:
+                    case AssetType.Trile:
                         {
                             if (_trileSet != null)
                             {
-                                var trile = _trileSet.FindByName(entry.Name);
+                                var trile = _trileSet.FindByName(entry.Name).Trile;
+                                if (trile == null)
+                                {
+                                    break;
+                                }
+
                                 if (trile.Geometry.Vertices.Length > 0)
                                 {
                                     var atlas = _trileSet.TextureAtlas;
@@ -164,7 +344,7 @@ public class AssetBrowser : IDisposable
                             break;
                         }
 
-                    case Kind.BackgroundPlanes:
+                    case AssetType.BackgroundPlane:
                         {
                             var asset = _resources.Load(entry.Path);
                             if (asset is RAnimatedTexture anim)
@@ -179,7 +359,7 @@ public class AssetBrowser : IDisposable
                             break;
                         }
 
-                    case Kind.NonPlayableCharacters:
+                    case AssetType.NonPlayableCharacter:
                         {
                             var animations = _resources.LoadAnimations(entry.Path);
 
@@ -230,105 +410,6 @@ public class AssetBrowser : IDisposable
         }
 
         #endregion
-
-        if (!isOpen)
-        {
-            return;
-        }
-
-        TryBuildEntries();
-
-        if (ImGui.Begin($"Asset Browser##{_title}", ref isOpen, ImGuiWindowFlags.NoCollapse))
-        {
-            var isGenerating = _pendingQueue.Count > 0;
-            if (isGenerating)
-            {
-                ImGui.BeginDisabled();
-            }
-
-            if (ImGui.Button($"{Icons.Refresh} Refresh Thumbnails"))
-            {
-                foreach (var entry in _entries.Values.SelectMany(e => e))
-                {
-                    new ThumbnailGenerator(entry.CachePath, default).Delete();
-                }
-
-                ClearSharedThumbnails(_placeholder);
-                _entries.Clear();
-            }
-
-            if (isGenerating)
-            {
-                ImGui.EndDisabled();
-            }
-
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(256);
-            ImGui.InputTextWithHint("", "Filter assets...", ref _filterEntries, 255);
-
-            if (!string.IsNullOrEmpty(_filterEntries))
-            {
-                ImGui.SameLine();
-                if (ImGui.Button($"{Icons.Close}"))
-                {
-                    _filterEntries = string.Empty;
-                }
-            }
-
-            if (_pendingQueue.Count > 0)
-            {
-                var spinner = "|/-\\"[(int)(ImGui.GetTime() * 8) % 4];
-                ImGui.SameLine();
-                ImGui.TextDisabled($"{spinner} Generating thumbnails... ({_pendingQueue.Count} remaining)");
-            }
-
-            if (_entries.Count > 0 && ImGui.BeginTabBar("##AssetTabs"))
-            {
-                foreach (var type in Enum.GetValues<Kind>())
-                {
-                    var label = type switch
-                    {
-                        Kind.Triles => "Triles",
-                        Kind.ArtObjects => "Art Objects",
-                        Kind.BackgroundPlanes => "Planes",
-                        Kind.NonPlayableCharacters => "NPCs/Critters",
-                        _ => throw new InvalidOperationException()
-                    };
-
-                    if (ImGui.BeginTabItem(label))
-                    {
-                        if (type == Kind.Triles && _trileSetPath != null)
-                        {
-                            ImGui.TextDisabled(_trileSetPath);
-                            ImGui.Separator();
-                        }
-
-                        if (_entries.TryGetValue(type, out var entries))
-                        {
-                            IReadOnlyList<Entry> ret;
-                            if (string.IsNullOrEmpty(_filterEntries))
-                            {
-                                ret = entries;
-                            }
-                            else
-                            {
-                                ret = entries
-                                    .Where(entry => entry.Name.Contains(_filterEntries, StringComparison.OrdinalIgnoreCase))
-                                    .ToList();
-                            }
-
-                            DrawGrid(ret);
-                        }
-
-                        ImGui.EndTabItem();
-                    }
-                }
-
-                ImGui.EndTabBar();
-            }
-
-            ImGui.End();
-        }
     }
 
     public void Dispose()
@@ -358,18 +439,18 @@ public class AssetBrowser : IDisposable
 
         if (_trileSet != null && _trileSetPath != null)
         {
-            triles.AddRange(_trileSet.Triles.Values.Select(trile => new Entry(trile.Name, _trileSetPath, Kind.Triles)));
+            triles.AddRange(_trileSet.Triles.Values.Select(trile => new Entry(trile.Name, _trileSetPath, AssetType.Trile)));
         }
 
         foreach (var file in _resources.Files)
         {
             if (file.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase))
             {
-                artObjects.Add(new Entry(file["Art Objects/".Length..], file, Kind.ArtObjects));
+                artObjects.Add(new Entry(file["Art Objects/".Length..], file, AssetType.ArtObject));
             }
             else if (file.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
             {
-                planes.Add(new Entry(file["Background Planes/".Length..], file, Kind.BackgroundPlanes));
+                planes.Add(new Entry(file["Background Planes/".Length..], file, AssetType.BackgroundPlane));
             }
             else if (file.StartsWith("Character Animations/", StringComparison.OrdinalIgnoreCase) &&
                      !file.Contains("Metadata", StringComparison.OrdinalIgnoreCase))
@@ -381,7 +462,7 @@ public class AssetBrowser : IDisposable
                     var folder = remainder[..slashIndex];
                     if (npcFolders.Add(folder))
                     {
-                        npcs.Add(new Entry(folder, $"Character Animations/{folder}", Kind.NonPlayableCharacters));
+                        npcs.Add(new Entry(folder, $"Character Animations/{folder}", AssetType.NonPlayableCharacter));
                     }
                 }
             }
@@ -392,10 +473,12 @@ public class AssetBrowser : IDisposable
         planes.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
         npcs.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
-        _entries[Kind.ArtObjects] = artObjects;
-        _entries[Kind.BackgroundPlanes] = planes;
-        _entries[Kind.NonPlayableCharacters] = npcs;
-        _entries[Kind.Triles] = triles;
+        _entries[AssetType.ArtObject] = artObjects;
+        _entries[AssetType.BackgroundPlane] = planes;
+        _entries[AssetType.NonPlayableCharacter] = npcs;
+        _entries[AssetType.Trile] = triles;
+
+        SelectedEntry = triles.FirstOrDefault();
 
         // Pre-fill thumbnails with placeholder and enqueue for generation
         foreach (var entry in _entries.Values.SelectMany(e => e))
@@ -422,6 +505,23 @@ public class AssetBrowser : IDisposable
             return;
         }
 
+        // Scroll to the selected entry when the table first appears
+        var selectedIndex = -1;
+        for (var k = 0; k < entries.Count; k++)
+        {
+            if (entries[k] == SelectedEntry)
+            {
+                selectedIndex = k;
+                break;
+            }
+        }
+
+        if (selectedIndex >= 0 && ImGui.IsWindowAppearing())
+        {
+            var selectedRow = selectedIndex / columns;
+            ImGui.SetScrollY(selectedRow * RowHeight);
+        }
+
         var clipper = new ImGuiListClipperPtr(ImGuiNative.ImGuiListClipper_ImGuiListClipper());
         clipper.Begin(totalRows, RowHeight);
 
@@ -442,7 +542,7 @@ public class AssetBrowser : IDisposable
                     ImGui.TableSetColumnIndex(col);
 
                     var entry = entries[i];
-                    var isSelected = _selectedEntry == entry;
+                    var isSelected = SelectedEntry == entry;
                     var texture = SharedThumbnails.GetValueOrDefault(entry.CachePath, _placeholder);
                     var cellWidth = ImGui.GetColumnWidth();
 
@@ -483,7 +583,12 @@ public class AssetBrowser : IDisposable
                     ImGui.SetCursorPos(cursor);
                     if (ImGui.InvisibleButton("##sel", new NVector2(cellWidth, ThumbSize)))
                     {
-                        _selectedEntry = entry;
+                        Select(entry);
+                    }
+
+                    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                    {
+                        Select(entry);
                     }
 
                     // Label wrapped and centered below thumbnail
@@ -512,7 +617,8 @@ public class AssetBrowser : IDisposable
     {
         _entries.Clear();
         _pendingQueue.Clear();
-        _selectedEntry = null;
+        _recentEntries.Clear();
+        SelectedEntry = default;
     }
 
     private static void ClearSharedThumbnails(Texture2D? placeholder = null)
@@ -528,16 +634,8 @@ public class AssetBrowser : IDisposable
         SharedThumbnails.Clear();
     }
 
-    public readonly record struct Entry(string Name, string Path, Kind Kind)
+    public readonly record struct Entry(string Name, string Path, AssetType Type)
     {
-        public string CachePath => Kind == Kind.Triles ? $"{Path}/{Name}" : Path;
-    }
-
-    public enum Kind
-    {
-        Triles,
-        ArtObjects,
-        BackgroundPlanes,
-        NonPlayableCharacters
+        public string CachePath => Type == AssetType.Trile ? $"{Path}/{Name}" : Path;
     }
 }

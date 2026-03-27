@@ -18,10 +18,6 @@ public class TrilesMesh : ActorComponent, IPickable
         Quaternion.CreateFromAxisAngle(Vector3.Up, +MathF.Tau / 4f)
     };
 
-    private static readonly Color SelectedColor = Color.Red with { A = 85 }; // 33%
-
-    private static readonly Color HoveredColor = Color.White with { A = 85 }; // 53%
-
     private static readonly Vector3 EmplacementCenter = new(0.5f);
 
     public int InstanceCount => _instances.Count;
@@ -37,10 +33,6 @@ public class TrilesMesh : ActorComponent, IPickable
     private readonly Rid _material;
 
     private Texture2D? _texture;
-
-    private TrileEmplacement? _hoveredInstance;
-
-    private HashSet<TrileEmplacement> _selectedInstances = new();
 
     private bool _instancesDirty;
 
@@ -60,8 +52,6 @@ public class TrilesMesh : ActorComponent, IPickable
     {
         var effect = content.Load<Effect>("Effects/TrilesMesh");
         _rendering.MaterialAssignEffect(_material, effect);
-        _rendering.MaterialShaderSetParam(_material, "Selected", SelectedColor);
-        _rendering.MaterialShaderSetParam(_material, "Hovered", HoveredColor);
     }
 
     public override void Dispose()
@@ -76,14 +66,28 @@ public class TrilesMesh : ActorComponent, IPickable
     public void Visualize(TrileSet trileSet, int id)
     {
         _texture?.Dispose();
-        _texture = RepackerExtensions.ConvertToTexture2D(trileSet.TextureAtlas);
-        _rendering.MaterialAssignBaseTexture(_material, _texture);
+        if (id <= -1)
+        {
+            _texture = new Texture2D(_rendering.GraphicsDevice, 1, 1, false, SurfaceFormat.Color);
+            _texture.SetData(new[] { Color.White });
+            _rendering.MaterialAssignBaseTexture(_material, _texture);
 
-        var trile = trileSet.Triles[id];
-        _size = trile.Size.ToXna();
+            _size = Vector3.One;
 
-        var surface = RepackerExtensions.ConvertToMesh(trile.Geometry.Vertices, trile.Geometry.Indices);
-        _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
+            var surface = MeshSurface.CreateTexturedBox(Vector3.One);
+            _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
+        }
+        else
+        {
+            _texture = RepackerExtensions.ConvertToTexture2D(trileSet.TextureAtlas);
+            _rendering.MaterialAssignBaseTexture(_material, _texture);
+
+            var trile = trileSet.Triles[id];
+            _size = trile.Size.ToXna();
+
+            var surface = RepackerExtensions.ConvertToMesh(trile.Geometry.Vertices, trile.Geometry.Indices);
+            _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
+        }
     }
 
     public TrileEmplacement GetEmplacement(int index)
@@ -94,18 +98,6 @@ public class TrilesMesh : ActorComponent, IPickable
     public void SetInstanceData(TrileEmplacement emplacement, Vector3 position, byte phi)
     {
         _instances[emplacement] = new InstanceData(position, phi);
-        _instancesDirty = true;
-    }
-
-    public void SetHoveredInstance(TrileEmplacement? emplacement)
-    {
-        _hoveredInstance = emplacement;
-        _instancesDirty = true;
-    }
-
-    public void SetSelectedInstances(HashSet<TrileEmplacement> emplacements)
-    {
-        _selectedInstances = emplacements;
         _instancesDirty = true;
     }
 
@@ -146,11 +138,14 @@ public class TrilesMesh : ActorComponent, IPickable
         return null;
     }
 
+    public void RemoveInstance(TrileEmplacement emplacement)
+    {
+        _instancesDirty = _instances.Remove(emplacement);
+    }
+
     public void ClearInstances()
     {
         _instances.Clear();
-        _hoveredInstance = null;
-        _selectedInstances.Clear();
         _instancesDirty = true;
     }
 
@@ -163,19 +158,8 @@ public class TrilesMesh : ActorComponent, IPickable
 
             for (var i = 0; i < _instances.Count; i++)
             {
-                var (emplacement, instance) = _instances.GetAt(i);
-
-                var state = InstanceState.None;
-                if (_hoveredInstance?.Equals(emplacement) ?? false)
-                {
-                    state = InstanceState.Hovered;
-                }
-                else if (_selectedInstances.Contains(emplacement))
-                {
-                    state = InstanceState.Selected;
-                }
-
-                var data = instance.ToStride(state);
+                var (_, instance) = _instances.GetAt(i);
+                var data = instance.ToStride();
                 _rendering.MultiMeshSetInstanceMatrix(_multiMesh, i, data);
             }
         }
@@ -183,22 +167,15 @@ public class TrilesMesh : ActorComponent, IPickable
 
     private readonly record struct InstanceData(Vector3 Position, int Phi)
     {
-        public Matrix ToStride(InstanceState state)
+        public Matrix ToStride()
         {
             var quaternion = (Phi is >= 0 and <= 3) ? PhiAngles[Phi] : Quaternion.Identity;
             return new Matrix(
-                Position.X, Position.Y, Position.Z, (float)state,
+                Position.X, Position.Y, Position.Z, 0f,
                 quaternion.X, quaternion.Y, quaternion.Z, quaternion.W,
                 0f, 0f, 0f, 0f,
                 0f, 0f, 0f, 0f
             );
         }
-    }
-
-    private enum InstanceState
-    {
-        None,
-        Hovered,
-        Selected
     }
 }

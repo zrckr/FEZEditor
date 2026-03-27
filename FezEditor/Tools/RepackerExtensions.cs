@@ -53,17 +53,37 @@ public static class RepackerExtensions
         texture.SetData(rgba);
     }
 
-    public static Trile FindByName(this TrileSet set, string name)
+    public static (int Id, Trile? Trile) FindByName(this TrileSet set, string name)
     {
         foreach (var (id, trile) in set.Triles)
         {
             if (string.Equals(trile.Name, name, StringComparison.OrdinalIgnoreCase))
             {
-                return set.Triles[id];
+                return (id, set.Triles[id]);
             }
         }
 
-        throw new IndexOutOfRangeException($"Trile with name '{name}' not found!");
+        return (-1, null);
+    }
+
+    public static TrileEmplacement Min(this TrileEmplacement a, TrileEmplacement b)
+    {
+        return new TrileEmplacement
+        {
+            X = Math.Min(a.X, b.X),
+            Y = Math.Min(a.Y, b.Y),
+            Z = Math.Min(a.Z, b.Z)
+        };
+    }
+
+    public static TrileEmplacement Max(this TrileEmplacement a, TrileEmplacement b)
+    {
+        return new TrileEmplacement
+        {
+            X = Math.Max(a.X, b.X),
+            Y = Math.Max(a.Y, b.Y),
+            Z = Math.Max(a.Z, b.Z)
+        };
     }
 
     public static Vector2 ToXna(this RVector2 v)

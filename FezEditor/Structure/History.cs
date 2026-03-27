@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FezEditor.Structure;
 
@@ -6,11 +7,16 @@ public class History : IDisposable
 {
     private const int MaxHistorySize = byte.MaxValue;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private readonly JsonSerializerOptions _jsonOptions = new()
     {
         IncludeFields = true,
         WriteIndented = false
     };
+
+    public void RegisterConverter(JsonConverter converter)
+    {
+        _jsonOptions.Converters.Add(converter);
+    }
 
     private readonly LinkedList<UndoOperation> _undoStack = new();
 
@@ -121,18 +127,18 @@ public class History : IDisposable
         var states = new Dictionary<object, (Type type, string Json)>();
         foreach (var target in _tracked)
         {
-            var json = JsonSerializer.Serialize(target, target.GetType(), JsonOptions);
+            var json = JsonSerializer.Serialize(target, target.GetType(), _jsonOptions);
             states[target] = (target.GetType(), json);
         }
 
         return new UndoOperation(name, states);
     }
 
-    private static void Restore(UndoOperation op)
+    private void Restore(UndoOperation op)
     {
         foreach (var (target, (type, json)) in op.States)
         {
-            var restored = JsonSerializer.Deserialize(json, type, JsonOptions)!;
+            var restored = JsonSerializer.Deserialize(json, type, _jsonOptions)!;
 
             var targetType = target.GetType();
             foreach (var prop in targetType.GetProperties())

@@ -103,6 +103,26 @@ public class Scene : IDisposable
         return nearest;
     }
 
+    public IEnumerable<(Actor Actor, PickHit Hit)> RaycastAll(Ray ray)
+    {
+        var results = new List<(Actor Actor, PickHit Hit)>();
+
+        foreach (var actor in _actors)
+        {
+            if (actor.TryGetComponent<IPickable>(out var pickable))
+            {
+                var hit = pickable?.Pick(ray);
+                if (hit.HasValue)
+                {
+                    results.Add((actor, hit.Value));
+                }
+            }
+        }
+
+        results.Sort((a, b) => a.Hit.Distance.CompareTo(b.Hit.Distance));
+        return results;
+    }
+
     public Actor? GetParent(Actor actor)
     {
         return _hierarchy.TryGetValue(actor, out var node) ? node.Parent : null;

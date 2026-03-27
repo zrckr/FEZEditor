@@ -652,6 +652,49 @@ public static class ImGuiX
         return changed;
     }
 
+    public static bool EditableArray<T>(string label, ref T[] items, RenderItem<T> renderItem)
+    {
+        const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
+        var hash = label.GetHashCode();
+
+        var changed = false;
+        ImGui.Text(label);
+        ImGui.SameLine();
+
+        var count = "item" + (items.Length is > 1 or 0 ? "s" : "");
+        var header = $"Array ({items.Length} {count})##Header_{hash}";
+        if (ImGui.CollapsingHeader(header))
+        {
+            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            {
+                if (BeginListBox($"##ListBox_{hash}", new Vector2(-1, 0)))
+                {
+                    for (var i = 0; i < items.Length; i++)
+                    {
+                        ImGui.PushID(i);
+                        ImGui.SetNextItemWidth(-48);
+
+                        var item = items[i];
+                        if (renderItem(i, ref item))
+                        {
+                            items[i] = item;
+                            changed = true;
+                        }
+
+                        ImGui.SameLine();
+                        ImGui.PopID();
+                    }
+
+                    ImGui.EndListBox();
+                }
+
+                ImGui.EndChild();
+            }
+        }
+
+        return changed;
+    }
+
     public delegate bool RenderKeyValuePair<in K, V>(K key, ref V value) where K : IEquatable<K>;
 
     public delegate bool RenderNewKey<K>(ref K key) where K : IEquatable<K>;

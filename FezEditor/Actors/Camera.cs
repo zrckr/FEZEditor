@@ -107,6 +107,23 @@ public class Camera : ActorComponent
         _rendering.CameraSetProjection(_camera, projectionMatrix);
     }
 
+    public Vector3 Project(Vector3 position, Vector2 viewport)
+    {
+        var clip = Vector4.Transform(new Vector4(position, 1f), ViewProjection);
+        if (MathF.Abs(clip.W) > float.Epsilon)
+        {
+            clip.X /= clip.W;
+            clip.Y /= clip.W;
+            clip.Z /= clip.W;
+        }
+
+        var (width, height) = _rendering.RenderTargetGetSize(_rt);
+        var screenX = ((clip.X + 1f) * 0.5f * width) + viewport.X;
+        var screenY = ((-clip.Y + 1f) * 0.5f * height) + viewport.Y;
+
+        return new Vector3(screenX, screenY, clip.Z);
+    }
+
     public override void Dispose()
     {
         GC.SuppressFinalize(this);
