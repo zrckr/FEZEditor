@@ -14,11 +14,17 @@ internal abstract class EddyContext : IDisposable
 
     public Scene Scene { get; init; } = null!;
 
+    public Clock Clock { get; init; } = null!;
+
     public History History { get; init; } = null!;
 
     public Level Level { get; init; } = null!;
 
     public Camera Camera { get; init; } = null!;
+
+    public CursorMesh Cursor { get; set; } = null!;
+
+    public EddyContexts Contexts { get; set; } = null!;
 
     public AssetBrowser AssetBrowser { get; init; } = null!;
 
@@ -32,13 +38,12 @@ internal abstract class EddyContext : IDisposable
 
     public Dirty<EddyTool> Tool { get; set; }
 
-    public Vector2 ViewportMin { get; set; }
-
-    public CursorMesh Cursor { get; set; } = null!;
-
-    public virtual bool Pick(Ray ray)
+    public virtual void TestConditions(Ray ray, Vector2 viewport)
     {
-        return false;
+    }
+
+    public virtual void Enter(params object[] args)
+    {
     }
 
     public virtual void Update()
@@ -52,6 +57,10 @@ internal abstract class EddyContext : IDisposable
     public virtual void DrawProperties()
     {
         ImGui.Text("Select any object\nto view its properties");
+    }
+
+    public virtual void End()
+    {
     }
 
     public virtual void Dispose()

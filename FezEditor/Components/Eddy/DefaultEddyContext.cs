@@ -1,17 +1,13 @@
 using FezEditor.Actors;
-using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Level;
 using FEZRepacker.Core.Definitions.Game.Sky;
-using ImGuiNET;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Eddy;
 
 internal class DefaultEddyContext : EddyContext
 {
-    public Clock Clock { get; set; } = null!;
-
     private Sky? _sky;
 
     private Actor? _skyActor;
@@ -21,11 +17,6 @@ internal class DefaultEddyContext : EddyContext
     private Actor? _liquidActor;
 
     private Actor? _pickablesActor;
-
-    public override bool Pick(Ray ray)
-    {
-        throw new InvalidOperationException("Pickable is invalid in default context");
-    }
 
     public void ShowPickableBounds(bool visible)
     {

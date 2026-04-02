@@ -38,11 +38,14 @@ internal class TrileContext : EddyContext
 
     private IDisposable? _paintScope;
 
-    public override bool Pick(Ray ray)
+    private Vector2 _viewport;
+
+    public override void TestConditions(Ray ray, Vector2 viewport)
     {
         Actor? actor = null;
         TrilesMesh? mesh = null;
         PickHit hit = default;
+        _viewport = viewport;
 
         foreach (var (a, h) in Scene.RaycastAll(ray))
         {
@@ -60,14 +63,22 @@ internal class TrileContext : EddyContext
         if (actor == null || mesh == null)
         {
             ClearHover();
-            return !toolNeedsHover;
+            if (toolNeedsHover)
+            {
+                Contexts.TransitionTo<DefaultEddyContext>();
+            }
+            return;
         }
 
         var emplacement = mesh.GetEmplacement(hit.Index);
         if (!Level.Triles.ContainsKey(emplacement) || !toolNeedsHover)
         {
             ClearHover();
-            return !toolNeedsHover;
+            if (toolNeedsHover)
+            {
+                Contexts.TransitionTo<DefaultEddyContext>();
+            }
+            return;
         }
 
         #region Determine Face
@@ -108,7 +119,7 @@ internal class TrileContext : EddyContext
 
         _hoveredEmplacement = emplacement;
         _hoveredFace = face;
-        return true;
+        Contexts.TransitionTo<TrileContext>();
     }
 
     public void ShowCollisionMap(bool visible)
@@ -302,7 +313,7 @@ internal class TrileContext : EddyContext
 
         if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) && _translate.Active)
         {
-            var ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), ViewportMin);
+            var ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), _viewport);
             var t = ray.Intersects(_translate.DragPlane);
             if (t == null)
             {
@@ -528,7 +539,7 @@ internal class TrileContext : EddyContext
         {
             _selectedFace = _scale.Face;
 
-            var ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), ViewportMin);
+            var ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), _viewport);
             var t = ray.Intersects(_scale.DragPlane);
             if (t == null)
             {

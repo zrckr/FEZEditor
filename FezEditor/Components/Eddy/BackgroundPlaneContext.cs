@@ -8,15 +8,6 @@ internal class BackgroundPlaneContext : EddyContext
 {
     private readonly Dictionary<int, Actor> _bgPlaneActors = new();
 
-    public override bool Pick(Ray ray)
-    {
-        return false;
-    }
-
-    public override void Update()
-    {
-    }
-
     public override void Revisualize(bool partial = false)
     {
         if (partial)

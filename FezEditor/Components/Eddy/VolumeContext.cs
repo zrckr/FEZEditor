@@ -8,15 +8,6 @@ internal class VolumeContext : EddyContext
 {
     private readonly Dictionary<int, Actor> _volumeActors = new();
 
-    public override bool Pick(Ray ray)
-    {
-        return false;
-    }
-
-    public override void Update()
-    {
-    }
-
     public override void Revisualize(bool partial = false)
     {
         if (partial)

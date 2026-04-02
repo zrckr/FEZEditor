@@ -9,11 +9,6 @@ internal class ArtObjectContext : EddyContext
 {
     private readonly Dictionary<int, Actor> _artObjectActors = new();
 
-    public override bool Pick(Ray ray)
-    {
-        return false;
-    }
-
     public override void Update()
     {
     }

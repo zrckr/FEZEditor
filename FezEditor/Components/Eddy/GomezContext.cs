@@ -8,15 +8,6 @@ internal class GomezContext : EddyContext
 {
     private Actor? _gomezActor;
 
-    public override bool Pick(Ray ray)
-    {
-        return false;
-    }
-
-    public override void Update()
-    {
-    }
-
     public override void Revisualize(bool partial = false)
     {
         if (partial)
