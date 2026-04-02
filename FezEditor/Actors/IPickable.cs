@@ -10,3 +10,5 @@ public interface IPickable : IComponent
 }
 
 public record struct PickHit(float Distance, int Index);
+
+public record struct RaycastHit(Actor Actor, float Distance, int Index);

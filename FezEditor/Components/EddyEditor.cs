@@ -26,7 +26,7 @@ public class EddyEditor : EditorComponent
 
     private readonly EddyContexts _contexts = new();
 
-    private (Actor Actor, PickHit Hit)? _raycastResult;
+    private RaycastHit? _raycastHit;
 
     private bool _showProperties;
 
@@ -72,7 +72,6 @@ public class EddyEditor : EditorComponent
         {
             _contexts.AddOrdered(MakeContext<DefaultEddyContext>());
             _contexts.AddOrdered(MakeContext<TrileContext>());
-            _contexts.AddOrdered(MakeContext<TrileGroupContext>());
             _contexts.AddOrdered(MakeContext<ArtObjectContext>());
             _contexts.AddOrdered(MakeContext<BackgroundPlaneContext>());
             _contexts.AddOrdered(MakeContext<NpcContext>());
@@ -123,13 +122,13 @@ public class EddyEditor : EditorComponent
                 InputService.CaptureScroll(ImGui.IsItemHovered());
 
                 var viewportMin = ImGuiX.GetItemRectMin();
-                _raycastResult = null;
+                _raycastHit = null;
 
                 if (ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right))
                 {
                     var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
-                    _raycastResult = _scene.Raycast(ray);
-                    _contexts.TestConditions(ray, viewportMin);
+                    _raycastHit = _scene.Raycast(ray);
+                    _contexts.TestConditions(ray, _raycastHit, viewportMin);
                 }
 
                 var gizmo = _cameraActor.GetComponent<OrientationGizmo>();
@@ -297,19 +296,18 @@ public class EddyEditor : EditorComponent
             ["Context"] = _contexts.Current.GetType().Name
         };
 
-        if (_raycastResult.HasValue)
+        if (_raycastHit.HasValue)
         {
-            var (actor, hit) = _raycastResult.Value;
+            var actor = _raycastHit.Value.Actor;
+            var index = _raycastHit.Value.Index;
             stats["Hit"] = actor.Name;
-            stats["Distance"] = $"{hit.Distance:F2}";
-            stats["Triangle"] = $"{hit.Index}";
+            stats["Distance"] = $"{_raycastHit.Value.Distance:F2}";
+            stats["Triangle"] = $"{index}";
             if (actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
             {
-                var emp = mesh.GetEmplacement(hit.Index);
+                var emp = mesh.GetEmplacement(index);
                 stats["Emplacement"] = $"{emp.X}, {emp.Y}, {emp.Z}";
             }
-
-            _contexts.DrawDebug(stats);
         }
         else
         {

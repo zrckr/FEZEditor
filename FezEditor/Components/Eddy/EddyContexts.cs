@@ -42,11 +42,12 @@ internal class EddyContexts : IDisposable
         }
     }
 
-    public void TransitionTo<T>(params object[] args) where T : EddyContext
+    public void TransitionTo<T>(params object?[] args) where T : EddyContext
     {
         var next = _contexts.OfType<T>().First();
         if (Current != next)
         {
+            Console.WriteLine($"{Current} -> {next}");
             Current.End();
             Previous = Current;
             Current = next;
@@ -59,11 +60,11 @@ internal class EddyContexts : IDisposable
         }
     }
 
-    public void TestConditions(Ray ray, Vector2 viewport)
+    public void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
         foreach (var context in _contexts)
         {
-            context.TestConditions(ray, viewport);
+            context.TestConditions(ray, hit, viewport);
         }
     }
 
@@ -83,11 +84,6 @@ internal class EddyContexts : IDisposable
 
         Get<DefaultEddyContext>().UpdateLighting();
         Current.Update();
-    }
-
-    public void DrawDebug(Dictionary<string, string> stats)
-    {
-        Get<TrileContext>().DrawDebug(stats);
     }
 
     public void ProvideCursor(CursorMesh cursor)

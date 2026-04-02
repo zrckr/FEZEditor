@@ -10,25 +10,17 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace FezEditor.Components.Eddy;
 
-internal class TrileContext : EddyContext
+internal sealed class TrileContext : EddyContext
 {
-    private static readonly Color HoverColor = Color.Blue with { A = 85 }; // 33%
-
-    private static readonly Color SelectionColor = Color.Red with { A = 85 }; // 33%
-
     private readonly Dictionary<int, Actor> _trileActors = new();
 
     private Actor? _collisionMapActor;
 
     private TrileSet? _set;
 
-    private TrileEmplacement? _hoveredEmplacement;
+    private CursorState _hovered = new();
 
-    private FaceOrientation? _hoveredFace;
-
-    private readonly HashSet<TrileEmplacement> _selectedEmplacements = new();
-
-    private FaceOrientation? _selectedFace;
+    private CursorState _selected = new();
 
     private SelectState _select;
 
@@ -40,87 +32,9 @@ internal class TrileContext : EddyContext
 
     private Vector2 _viewport;
 
-    public override void TestConditions(Ray ray, Vector2 viewport)
-    {
-        Actor? actor = null;
-        TrilesMesh? mesh = null;
-        PickHit hit = default;
-        _viewport = viewport;
+    private readonly Dictionary<TrileEmplacement, int> _emplacementGroups = new();
 
-        foreach (var (a, h) in Scene.RaycastAll(ray))
-        {
-            if (a.TryGetComponent<TrilesMesh>(out var m) && m != null)
-            {
-                actor = a;
-                mesh = m;
-                hit = h;
-                break;
-            }
-        }
-
-        var toolNeedsHover = Tool.Value is EddyTool.Select or EddyTool.Pick;
-
-        if (actor == null || mesh == null)
-        {
-            ClearHover();
-            if (toolNeedsHover)
-            {
-                Contexts.TransitionTo<DefaultEddyContext>();
-            }
-            return;
-        }
-
-        var emplacement = mesh.GetEmplacement(hit.Index);
-        if (!Level.Triles.ContainsKey(emplacement) || !toolNeedsHover)
-        {
-            ClearHover();
-            if (toolNeedsHover)
-            {
-                Contexts.TransitionTo<DefaultEddyContext>();
-            }
-            return;
-        }
-
-        #region Determine Face
-
-        FaceOrientation face;
-        {
-            var box = mesh.GetBounds().ElementAt(hit.Index);
-            var hitPoint = ray.Position + ray.Direction * hit.Distance;
-            var center = (box.Min + box.Max) / 2f;
-            var halfSize = (box.Max - box.Min) / 2f;
-
-            var local = hitPoint - center;
-            var abs = new Vector3
-            {
-                X = MathF.Abs(local.X / halfSize.X),
-                Y = MathF.Abs(local.Y / halfSize.Y),
-                Z = MathF.Abs(local.Z / halfSize.Z)
-            };
-
-            Vector3 normal;
-            if (abs.X > abs.Y && abs.X > abs.Z)
-            {
-                normal = new Vector3(MathF.Sign(local.X), 0, 0);
-            }
-            else if (abs.Y > abs.Z)
-            {
-                normal = new Vector3(0, MathF.Sign(local.Y), 0);
-            }
-            else
-            {
-                normal = new Vector3(0, 0, MathF.Sign(local.Z));
-            }
-
-            face = FaceExtensions.OrientationFromDirection(normal);
-        }
-
-        #endregion
-
-        _hoveredEmplacement = emplacement;
-        _hoveredFace = face;
-        Contexts.TransitionTo<TrileContext>();
-    }
+    private readonly Dictionary<int, HashSet<TrileEmplacement>> _groupEmplacements = new();
 
     public void ShowCollisionMap(bool visible)
     {
@@ -130,6 +44,37 @@ internal class TrileContext : EddyContext
             mesh.Visible = visible;
         }
     }
+
+    public override void TestConditions(Ray ray, RaycastHit? raycastHit, Vector2 viewport)
+    {
+        _viewport = viewport;
+        if (!raycastHit.HasValue)
+        {
+            ClearHover();
+            if (_selected.Emplacements.Count == 0)
+            {
+                Contexts.TransitionTo<DefaultEddyContext>();
+            }
+            return;
+        }
+
+        var index = raycastHit.Value.Index;
+        if (raycastHit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh))
+        {
+            var emplacement = mesh?.GetEmplacement(index);
+            if (emplacement != null && Level.Triles.ContainsKey(emplacement) && mesh != null)
+            {
+                var box = mesh.GetBounds().ElementAt(index);
+                _hovered.Emplacements.Clear();
+                _hovered.Emplacements.Add(emplacement);
+                _hovered.Face = Mathz.DetermineFace(box, ray, raycastHit.Value.Distance);
+                _hovered.GroupId = _emplacementGroups.TryGetValue(emplacement, out var gid) ? gid : null;
+                Contexts.TransitionTo<TrileContext>();
+            }
+        }
+    }
+
+    public override void Enter(params object?[] args) { }
 
     public override void Update()
     {
@@ -145,10 +90,13 @@ internal class TrileContext : EddyContext
 
         if (ImGui.IsKeyPressed(ImGuiKey.Escape))
         {
-            _selectedEmplacements.Clear();
-            _selectedFace = null;
+            _selected.Reset();
             Tool = EddyTool.Select;
-            return;
+        }
+
+        if (Tool.Value is not (EddyTool.Select or EddyTool.Pick))
+        {
+            ClearHover();
         }
 
         var nextTool = Tool.Value;
@@ -182,69 +130,87 @@ internal class TrileContext : EddyContext
             ("LMB Drag", "Select Multiple")
         );
 
-        if (_selectedEmplacements.Count > 0)
+        if (_selected.Emplacements.Count > 0)
         {
             StatusService.AddHints(
                 ("Delete", "Erase"),
                 ("Ctrl+C", "Copy"),
                 ("Ctrl+X", "Cut")
             );
+
+            if (_selected.GroupId != null)
+            {
+                StatusService.AddHints(("Ctrl+Shift+G", "Ungroup"));
+            }
+            else if (_selected.Emplacements.Count > 1)
+            {
+                StatusService.AddHints(("Ctrl+Shift+G", "Group"));
+            }
         }
 
-        if (_select.Clipboard != null && _hoveredEmplacement != null)
+        if (_select.Clipboard != null && _hovered.Emplacement != null)
         {
             StatusService.AddHints(("Ctrl+V", "Paste"));
         }
 
-        if (_selectedEmplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
+        if (_selected.Emplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
             using (History.BeginScope("Delete Triles"))
             {
                 RemoveSelected();
             }
-            _selectedEmplacements.Clear();
-            _selectedFace = null;
+            _selected.Reset();
+        }
+
+        if (ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift && ImGui.IsKeyPressed(ImGuiKey.G) && _selected.GroupId != null)
+        {
+            using (History.BeginScope("Remove Trile Group"))
+            {
+                Level.Groups.Remove(_selected.GroupId.Value);
+            }
+            _selected.GroupId = null;
         }
 
         if (ImGui.GetIO().KeyCtrl)
         {
-            if (_selectedEmplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.C))
+            if (_selected.Emplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.C))
             {
                 _select.Clipboard = BuildClipboard();
             }
 
-            if (_selectedEmplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
+            if (_selected.Emplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 _select.Clipboard = BuildClipboard();
                 using (History.BeginScope("Cut Triles"))
                 {
                     RemoveSelected();
                 }
-                _selectedEmplacements.Clear();
-                _selectedFace = null;
+                _selected.Emplacements.Clear();
+                _selected.Face = null;
             }
 
-            if (_select.Clipboard != null && _hoveredEmplacement != null && ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
+            if (_select.Clipboard != null && _hovered.Emplacement != null && ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
                 using (History.BeginScope("Paste Triles"))
                 {
-                    PasteClipboard(_select.Clipboard, _hoveredEmplacement);
+                    PasteClipboard(_select.Clipboard, _hovered.Emplacement);
                 }
             }
         }
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
-            _select.RectOrigin = _hoveredEmplacement;
+            _select.RectOrigin = _hovered.Emplacement;
             _select.WasDrag = false;
         }
 
-        if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) && _select.RectOrigin != null && _hoveredEmplacement != null)
+        if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) && _select.RectOrigin != null && _hovered.Emplacement != null)
         {
-            var min = _select.RectOrigin.Min(_hoveredEmplacement);
-            var max = _select.RectOrigin.Max(_hoveredEmplacement);
+            var min = _select.RectOrigin.Min(_hovered.Emplacement);
+            var max = _select.RectOrigin.Max(_hovered.Emplacement);
 
-            _selectedEmplacements.Clear();
+            _selected.Emplacements.Clear();
+            _selected.GroupId = null;
             for (var x = min.X; x <= max.X; x++)
             {
                 for (var y = min.Y; y <= max.Y; y++)
@@ -252,15 +218,25 @@ internal class TrileContext : EddyContext
                     for (var z = min.Z; z <= max.Z; z++)
                     {
                         var emplacement = new TrileEmplacement(x, y, z);
-                        if (Level.Triles.ContainsKey(emplacement))
+                        if (!Level.Triles.ContainsKey(emplacement))
                         {
-                            _selectedEmplacements.Add(emplacement);
+                            continue;
+                        }
+
+                        // Expand grouped triles to their full group
+                        if (_emplacementGroups.TryGetValue(emplacement, out var gid) && _groupEmplacements.TryGetValue(gid, out var gset))
+                        {
+                            _selected.Emplacements.UnionWith(gset);
+                        }
+                        else
+                        {
+                            _selected.Emplacements.Add(emplacement);
                         }
                     }
                 }
             }
 
-            _selectedFace = _hoveredFace;
+            _selected.Face = _hovered.Face;
             _select.WasDrag = true;
         }
 
@@ -273,19 +249,25 @@ internal class TrileContext : EddyContext
 
             if (!wasDrag)
             {
-                // Single click: select or deselect hovered emplacement
-                if (_hoveredEmplacement == null)
+                _selected.Emplacements.Clear();
+                _selected.GroupId = null;
+
+                if (_hovered.Emplacement != null)
                 {
-                    _selectedEmplacements.Clear();
-                }
-                else
-                {
-                    _selectedEmplacements.Clear();
-                    _selectedEmplacements.Add(_hoveredEmplacement);
+                    // If hovering a grouped trile, select the whole group
+                    if (_hovered.GroupId != null && _groupEmplacements.TryGetValue(_hovered.GroupId.Value, out var groupSet))
+                    {
+                        _selected.Emplacements.UnionWith(groupSet);
+                        _selected.GroupId = _hovered.GroupId;
+                    }
+                    else
+                    {
+                        _selected.Emplacements.Add(_hovered.Emplacement);
+                    }
                 }
             }
 
-            _selectedFace = _hoveredFace;
+            _selected.Face = _hovered.Face;
         }
 
         return null;
@@ -296,6 +278,7 @@ internal class TrileContext : EddyContext
         StatusService.AddHints(
             ("LMB Drag", "Move X or Z"),
             ("Alt+LMB Drag", "Move Y"),
+            ("Shift", "Trixel Snap"),
             ("R", "Reset")
         );
 
@@ -353,11 +336,12 @@ internal class TrileContext : EddyContext
                 snappedDelta = axis * Vector3.Dot(rawDelta, axis);
             }
 
-            snappedDelta.X = MathF.Round(snappedDelta.X / Mathz.TrixelSize) * Mathz.TrixelSize;
-            snappedDelta.Y = MathF.Round(snappedDelta.Y / Mathz.TrixelSize) * Mathz.TrixelSize;
-            snappedDelta.Z = MathF.Round(snappedDelta.Z / Mathz.TrixelSize) * Mathz.TrixelSize;
+            var snapSize = ImGui.GetIO().KeyShift ? Mathz.TrixelSize : 1f;
+            snappedDelta.X = MathF.Round(snappedDelta.X / snapSize) * snapSize;
+            snappedDelta.Y = MathF.Round(snappedDelta.Y / snapSize) * snapSize;
+            snappedDelta.Z = MathF.Round(snappedDelta.Z / snapSize) * snapSize;
 
-            foreach (var emp in _selectedEmplacements)
+            foreach (var emp in _selected.Emplacements)
             {
                 if (!Level.Triles.TryGetValue(emp, out var instance))
                 {
@@ -384,11 +368,11 @@ internal class TrileContext : EddyContext
             _translate.Reset();
         }
 
-        if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedEmplacements.Count > 0 && !_translate.Active)
+        if (ImGui.IsKeyPressed(ImGuiKey.R) && _selected.Emplacements.Count > 0 && !_translate.Active)
         {
             using (History.BeginScope("Reset Translate"))
             {
-                foreach (var emp in _selectedEmplacements)
+                foreach (var emp in _selected.Emplacements)
                 {
                     if (!Level.Triles.TryGetValue(emp, out var instance))
                     {
@@ -419,7 +403,7 @@ internal class TrileContext : EddyContext
 
     private void InitTranslateDragState()
     {
-        if (_selectedEmplacements.Count == 0)
+        if (_selected.Emplacements.Count == 0)
         {
             return;
         }
@@ -427,7 +411,7 @@ internal class TrileContext : EddyContext
         var avgPos = Vector3.Zero;
         var count = 0;
 
-        foreach (var emp in _selectedEmplacements)
+        foreach (var emp in _selected.Emplacements)
         {
             if (!Level.Triles.TryGetValue(emp, out var inst))
             {
@@ -449,7 +433,7 @@ internal class TrileContext : EddyContext
         _translate.InitialHandlePosition = avgPos;
 
         _translate.InitialPositions = [];
-        foreach (var emplacement in _selectedEmplacements)
+        foreach (var emplacement in _selected.Emplacements)
         {
             if (Level.Triles.TryGetValue(emplacement, out var inst))
             {
@@ -467,11 +451,11 @@ internal class TrileContext : EddyContext
             ("LMB", "Rotate 90°")
         );
 
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _selectedEmplacements.Count > 0)
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _selected.Emplacements.Count > 0)
         {
             using (History.BeginScope("Rotate Triles"))
             {
-                foreach (var emp in _selectedEmplacements)
+                foreach (var emp in _selected.Emplacements)
                 {
                     if (!Level.Triles.TryGetValue(emp, out var instance))
                     {
@@ -505,14 +489,14 @@ internal class TrileContext : EddyContext
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
             _scale.Reset();
-            _scale.Face = _hoveredFace ?? _selectedFace;
+            _scale.Face = _hovered.Face ?? _selected.Face;
 
-            if (_scale.Face.HasValue && _selectedEmplacements.Count > 0)
+            if (_scale.Face.HasValue && _selected.Emplacements.Count > 0)
             {
-                var faceNormal = _selectedFace!.Value.AsVector();
-                var avgPos = _selectedEmplacements.Aggregate(Vector3.Zero,
+                var faceNormal = _selected.Face!.Value.AsVector();
+                var avgPos = _selected.Emplacements.Aggregate(Vector3.Zero,
                     (current, emp) => current + new Vector3(emp.X, emp.Y, emp.Z))
-                             / _selectedEmplacements.Count;
+                             / _selected.Emplacements.Count;
 
                 var planeNormal = Vector3.Normalize(Camera.InverseView.Backward);
                 _scale.FaceNormal = faceNormal;
@@ -520,7 +504,7 @@ internal class TrileContext : EddyContext
                 _scale.DragPlane = new Plane(planeNormal, -Vector3.Dot(planeNormal, avgPos));
 
                 _scale.InitialSnapshot = [];
-                foreach (var emplacement in _selectedEmplacements)
+                foreach (var emplacement in _selected.Emplacements)
                 {
                     if (Level.Triles.TryGetValue(emplacement, out var inst))
                     {
@@ -528,7 +512,7 @@ internal class TrileContext : EddyContext
                     }
                 }
 
-                _scale.InitialEmplacements = _selectedEmplacements.ToHashSet();
+                _scale.InitialEmplacements = _selected.Emplacements.ToHashSet();
                 _scale.CommittedSteps = 0;
                 _scale.Active = true;
                 _scale.Scope = History.BeginScope("Scale Triles");
@@ -537,7 +521,7 @@ internal class TrileContext : EddyContext
 
         if (ImGui.IsMouseDown(ImGuiMouseButton.Left) && _scale.Active)
         {
-            _selectedFace = _scale.Face;
+            _selected.Face = _scale.Face;
 
             var ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), _viewport);
             var t = ray.Intersects(_scale.DragPlane);
@@ -556,18 +540,22 @@ internal class TrileContext : EddyContext
             }
 
             // Rollback: remove anything outside InitialEmplacements, restore InitialSnapshot
-            foreach (var emp in _selectedEmplacements.ToList())
+            foreach (var emp in _selected.Emplacements.ToList())
             {
                 if (_scale.InitialEmplacements.Contains(emp))
                 {
                     continue;
                 }
 
-                if (Level.Triles.Remove(emp, out var removed) && _trileActors.TryGetValue(removed.TrileId, out var a))
+                if (Level.Triles.Remove(emp, out var removed))
                 {
-                    var m = a.GetComponent<TrilesMesh>();
-                    m.RemoveInstance(emp);
-                    CleanupEmptyActor(removed.TrileId, m);
+                    RemoveFromGroup(emp, removed);
+                    if (_trileActors.TryGetValue(removed.TrileId, out var a))
+                    {
+                        var m = a.GetComponent<TrilesMesh>();
+                        m.RemoveInstance(emp);
+                        CleanupEmptyActor(removed.TrileId, m);
+                    }
                 }
             }
 
@@ -586,14 +574,19 @@ internal class TrileContext : EddyContext
                     PhiLight = phi
                 };
                 Level.Triles[emp] = instance;
+                if (_selected.GroupId != null)
+                {
+                    AddToGroup(_selected.GroupId.Value, emp, instance);
+                }
+
                 EnsureTrileActor(trileId).GetComponent<TrilesMesh>()
                     .SetInstanceData(emp, instance.Position.ToXna(), phi);
             }
 
-            _selectedEmplacements.Clear();
+            _selected.Emplacements.Clear();
             foreach (var emp in _scale.InitialEmplacements)
             {
-                _selectedEmplacements.Add(emp);
+                _selected.Emplacements.Add(emp);
             }
 
             var ndx = (int)_scale.FaceNormal.X;
@@ -619,18 +612,23 @@ internal class TrileContext : EddyContext
                             PhiLight = phi
                         };
                         Level.Triles[target] = instance;
+                        if (_selected.GroupId != null)
+                        {
+                            AddToGroup(_selected.GroupId.Value, target, instance);
+                        }
+
                         EnsureTrileActor(trileId).GetComponent<TrilesMesh>()
                             .SetInstanceData(target, instance.Position.ToXna(), phi);
                     }
                 }
 
-                _selectedEmplacements.Clear();
+                _selected.Emplacements.Clear();
                 foreach (var (emp, _, _) in _scale.InitialSnapshot)
                 {
                     var target = new TrileEmplacement(emp.X + ndx * snappedSteps, emp.Y + ndy * snappedSteps, emp.Z + ndz * snappedSteps);
                     if (Level.Triles.ContainsKey(target))
                     {
-                        _selectedEmplacements.Add(target);
+                        _selected.Emplacements.Add(target);
                     }
                 }
 
@@ -648,6 +646,7 @@ internal class TrileContext : EddyContext
                             continue;
                         }
 
+                        RemoveFromGroup(target, removed);
                         if (_trileActors.TryGetValue(removed.TrileId, out var actor))
                         {
                             var mesh = actor.GetComponent<TrilesMesh>();
@@ -657,13 +656,13 @@ internal class TrileContext : EddyContext
                     }
                 }
 
-                _selectedEmplacements.Clear();
+                _selected.Emplacements.Clear();
                 foreach (var (emp, _, _) in _scale.InitialSnapshot)
                 {
                     var target = new TrileEmplacement(emp.X + ndx * snappedSteps, emp.Y + ndy * snappedSteps, emp.Z + ndz * snappedSteps);
                     if (Level.Triles.ContainsKey(target))
                     {
-                        _selectedEmplacements.Add(target);
+                        _selected.Emplacements.Add(target);
                     }
                 }
 
@@ -705,9 +704,9 @@ internal class TrileContext : EddyContext
             var entry = AssetBrowser.SelectedEntry;
             var trileId = entry.Type == AssetType.Trile ? _set!.FindByName(entry.Name).Id : InvalidId;
 
-            if (_selectedEmplacements.Count > 0 && trileId != InvalidId)
+            if (_selected.Emplacements.Count > 0 && trileId != InvalidId)
             {
-                foreach (var emp in _selectedEmplacements)
+                foreach (var emp in _selected.Emplacements)
                 {
                     if (!Level.Triles.TryGetValue(emp, out var instance))
                     {
@@ -750,7 +749,7 @@ internal class TrileContext : EddyContext
             return null;
         }
 
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _hoveredEmplacement != null)
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _hovered.Emplacement != null)
         {
             var pickedName = GetHoveredName();
             if (!string.IsNullOrEmpty(pickedName))
@@ -768,6 +767,30 @@ internal class TrileContext : EddyContext
     {
         if (partial)
         {
+            _emplacementGroups.Clear();
+            _groupEmplacements.Clear();
+            foreach (var (id, group) in Level.Groups.Where(kv => kv.Key != InvalidId))
+            {
+                foreach (var instance in group.Triles)
+                {
+                    var emp = new TrileEmplacement(instance.Position);
+                    _emplacementGroups[emp] = id;
+
+                    if (!_groupEmplacements.TryGetValue(id, out var set))
+                    {
+                        set = new HashSet<TrileEmplacement>();
+                        _groupEmplacements[id] = set;
+                    }
+
+                    set.Add(emp);
+                }
+            }
+
+            if (_selected.GroupId != null && !Level.Groups.ContainsKey(_selected.GroupId.Value))
+            {
+                _selected.GroupId = null;
+            }
+
             var presentIds = Level.Triles.Values
                 .Where(ti => ti.TrileId != InvalidId)
                 .Select(ti => ti.TrileId)
@@ -792,11 +815,10 @@ internal class TrileContext : EddyContext
                 actor.GetComponent<TrilesMesh>().ClearInstances();
             }
 
-            _selectedEmplacements.RemoveWhere(e => !Level.Triles.ContainsKey(e));
-            if (!Level.Triles.ContainsKey(_hoveredEmplacement ?? new TrileEmplacement()))
+            _selected.Emplacements.RemoveWhere(e => !Level.Triles.ContainsKey(e));
+            if (_hovered.Emplacement != null && !Level.Triles.ContainsKey(_hovered.Emplacement))
             {
-                _hoveredEmplacement = null;
-                _hoveredFace = null;
+                ClearHover();
             }
         }
         else
@@ -830,11 +852,36 @@ internal class TrileContext : EddyContext
 
             #endregion
 
-            _selectedEmplacements.Clear();
-            _hoveredEmplacement = null;
-            _hoveredFace = null;
-            _selectedFace = null;
+            #region Trile Groups
 
+            _emplacementGroups.Clear();
+            _groupEmplacements.Clear();
+            foreach (var (id, group) in Level.Groups.Where(kv => kv.Key != InvalidId))
+            {
+                foreach (var instance in group.Triles)
+                {
+                    // Grouped emplacements are stored in TrileInstance objects.
+                    // Check FEZRepacker.Core.Definitions.Json.TrileGroupJsonModel
+
+                    var emp = new TrileEmplacement(instance.Position);
+                    _emplacementGroups[emp] = id;
+
+                    if (!_groupEmplacements.TryGetValue(id, out var set))
+                    {
+                        set = new HashSet<TrileEmplacement>();
+                        _groupEmplacements[id] = set;
+                    }
+
+                    set.Add(emp);
+                }
+            }
+
+            _selected.GroupId = null;
+
+            #endregion
+
+            _selected.Reset();
+            ClearHover();
         }
 
         foreach (var (emplacement, instance) in Level.Triles.Where(kv => kv.Value.TrileId != InvalidId))
@@ -852,13 +899,19 @@ internal class TrileContext : EddyContext
 
     public override void DrawProperties()
     {
-        if (_selectedEmplacements.Count == 0)
+        if (_selected.Emplacements.Count == 0)
         {
             base.DrawProperties();
             return;
         }
 
-        var emplacement = _selectedEmplacements.First();
+        if (_selected.GroupId != null && Level.Groups.TryGetValue(_selected.GroupId.Value, out var group))
+        {
+            DrawGroupProperties(_selected.GroupId.Value, group);
+            return;
+        }
+
+        var emplacement = _selected.Emplacements.First();
         if (!Level.Triles.TryGetValue(emplacement, out var instance) || instance.TrileId == InvalidId)
         {
             base.DrawProperties();
@@ -979,54 +1032,227 @@ internal class TrileContext : EddyContext
         return ImGui.Checkbox($"{index + 1}", ref item);
     }
 
-    public virtual void DrawDebug(Dictionary<string, string> stats)
+    private void DrawGroupProperties(int id, TrileGroup group)
     {
-        stats["Face"] = _hoveredFace.HasValue ? _hoveredFace.Value.ToString() : "none";
+        ImGui.TextDisabled($"Trile Group: {group.Triles.Count} trile(s) (ID={id})");
+
+        var actor = (int)group.ActorType;
+        var actors = Enum.GetNames<ActorType>();
+        if (ImGui.Combo("Actor Type", ref actor, actors, actors.Length))
+        {
+            using (History.BeginScope("Edit Group ActorType"))
+            {
+                group.ActorType = (ActorType)actor;
+            }
+        }
+
+        var heavy = group.Heavy;
+        if (ImGui.Checkbox("Heavy", ref heavy))
+        {
+            using (History.BeginScope("Edit Group Heavy"))
+            {
+                group.Heavy = heavy;
+            }
+        }
+
+        var sound = group.AssociatedSound;
+        if (ImGui.InputText("Sound", ref sound, 255))
+        {
+            using (History.BeginScope("Edit Group Sound"))
+            {
+                group.AssociatedSound = sound;
+            }
+        }
+
+        ImGui.SeparatorText("Geyser");
+        {
+            var geyserOffset = group.GeyserOffset;
+            if (ImGui.DragFloat("Offset", ref geyserOffset, 0.1f))
+            {
+                using (History.BeginScope("Edit Geyser Offset"))
+                {
+                    group.GeyserOffset = geyserOffset;
+                }
+            }
+
+            var geyserPause = group.GeyserPauseFor;
+            if (ImGui.DragFloat("Pause For", ref geyserPause, 0.1f))
+            {
+                using (History.BeginScope("Edit Geyser Pause"))
+                {
+                    group.GeyserPauseFor = geyserPause;
+                }
+            }
+
+            var geyserLift = group.GeyserLiftFor;
+            if (ImGui.DragFloat("Lift For", ref geyserLift, 0.1f))
+            {
+                using (History.BeginScope("Edit Geyser Lift"))
+                {
+                    group.GeyserLiftFor = geyserLift;
+                }
+            }
+
+            var geyserApex = group.GeyserApexHeight;
+            if (ImGui.DragFloat("Apex Height", ref geyserApex, 0.1f))
+            {
+                using (History.BeginScope("Edit Geyser Apex"))
+                {
+                    group.GeyserApexHeight = geyserApex;
+                }
+            }
+        }
+
+        ImGui.SeparatorText("Spin");
+        {
+            var spinCenter = group.SpinCenter.ToXna();
+            if (ImGuiX.DragFloat3("Center", ref spinCenter, 0.1f))
+            {
+                using (History.BeginScope("Edit Spin Center"))
+                {
+                    group.SpinCenter = spinCenter.ToRepacker();
+                }
+            }
+
+            var spinClockwise = group.SpinClockwise;
+            if (ImGui.Checkbox("Clockwise", ref spinClockwise))
+            {
+                using (History.BeginScope("Edit Spin Clockwise"))
+                {
+                    group.SpinClockwise = spinClockwise;
+                }
+            }
+
+            var spinFreq = group.SpinFrequency;
+            if (ImGui.DragFloat("Frequency", ref spinFreq, 0.1f))
+            {
+                using (History.BeginScope("Edit Spin Frequency"))
+                {
+                    group.SpinFrequency = spinFreq;
+                }
+            }
+
+            var spinNeedsTrigger = group.SpinNeedsTriggering;
+            if (ImGui.Checkbox("Needs Triggering", ref spinNeedsTrigger))
+            {
+                using (History.BeginScope("Edit Spin NeedsTriggering"))
+                {
+                    group.SpinNeedsTriggering = spinNeedsTrigger;
+                }
+            }
+
+            var spin180 = group.Spin180Degrees;
+            if (ImGui.Checkbox("180 Degrees", ref spin180))
+            {
+                using (History.BeginScope("Edit Spin 180"))
+                {
+                    group.Spin180Degrees = spin180;
+                }
+            }
+
+            var fallOnRotate = group.FallOnRotate;
+            if (ImGui.Checkbox("Fall On Rotate", ref fallOnRotate))
+            {
+                using (History.BeginScope("Edit Spin FallOnRotate"))
+                {
+                    group.FallOnRotate = fallOnRotate;
+                }
+            }
+
+            var spinOffset = group.SpinOffset;
+            if (ImGui.DragFloat("Offset", ref spinOffset, 0.1f))
+            {
+                using (History.BeginScope("Edit Spin Offset"))
+                {
+                    group.SpinOffset = spinOffset;
+                }
+            }
+        }
+
+        if (group.Path != null)
+        {
+            ImGui.TextDisabled($"Path: {group.Path.Segments.Count} segments");
+        }
     }
 
     private void UpdateCursor()
     {
-        if (Tool.Value == EddyTool.Select
-            && _hoveredEmplacement != null
-            && Level.Triles.TryGetValue(_hoveredEmplacement, out var hoveredInstance))
+        if (Tool.Value is EddyTool.Select or EddyTool.Pick && _hovered.Emplacement != null)
         {
-            var face = _hoveredFace ?? FaceOrientation.Front;
-            var center = hoveredInstance.Position.ToXna() + new Vector3(0.5f);
-            var origin = center + face.AsVector() * (0.5f + CursorMesh.OverlayOffset);
-            var surface = MeshSurface.CreateFaceQuad(Vector3.One, origin, face);
-            Cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
+            // When hovering a grouped trile with no current selection, highlight the whole group as boxes
+            if (_hovered.GroupId != null && _selected.Emplacements.Count == 0
+                && _groupEmplacements.TryGetValue(_hovered.GroupId.Value, out var groupSet))
+            {
+                Cursor.SetHoverSurfaces(BuildBoxSurfaces(groupSet, HoverColor), HoverColor);
+            }
+            else if (Level.Triles.TryGetValue(_hovered.Emplacement, out var hoveredInstance))
+            {
+                var face = _hovered.Face ?? FaceOrientation.Front;
+                var center = hoveredInstance.Position.ToXna() + new Vector3(0.5f);
+                var origin = center + face.AsVector() * (0.5f + CursorMesh.OverlayOffset);
+                var surface = MeshSurface.CreateFaceQuad(Vector3.One, origin, face);
+                Cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
+            }
         }
         else
         {
             Cursor.ClearHover();
         }
 
-        var validPositions = _selectedEmplacements
+        UpdateCursorSurfaces(_selected);
+    }
+
+    private void UpdateCursorSurfaces(CursorState cursor)
+    {
+        var validEmplacements = cursor.Emplacements
             .Where(e => Level.Triles.TryGetValue(e, out _))
-            .Select(e => Level.Triles[e].Position.ToXna())
             .ToList();
 
-        if (validPositions.Count == 0)
+        if (validEmplacements.Count == 0)
         {
             Cursor.ClearSelection();
             return;
         }
 
-        if (!_selectedFace.HasValue)
+        // Group selection: show boxes around each trile in the group
+        if (cursor.GroupId != null)
+        {
+            Cursor.SetSelectionSurfaces(BuildBoxSurfaces(validEmplacements, SelectionColor), SelectionColor);
+            return;
+        }
+
+        if (!cursor.Face.HasValue)
         {
             return;
         }
 
-        var normal = _selectedFace.Value.AsVector();
-        var surfaces = validPositions.Select(pos =>
+        var normal = cursor.Face.Value.AsVector();
+        var faceSurfaces = validEmplacements.Select(e =>
         {
-            var trileCenter = pos + new Vector3(0.5f);
+            var trileCenter = Level.Triles[e].Position.ToXna() + new Vector3(0.5f);
             var origin = trileCenter + normal * (0.5f + CursorMesh.OverlayOffset);
-            var s = MeshSurface.CreateFaceQuad(Vector3.One, origin, _selectedFace.Value);
+            var s = MeshSurface.CreateFaceQuad(Vector3.One, origin, cursor.Face.Value);
             return (s, PrimitiveType.TriangleList);
         });
 
-        Cursor.SetSelectionSurfaces(surfaces, SelectionColor);
+        Cursor.SetSelectionSurfaces(faceSurfaces, SelectionColor);
+    }
+
+    private IEnumerable<(MeshSurface, PrimitiveType)> BuildBoxSurfaces(IEnumerable<TrileEmplacement> emplacements, Color color)
+    {
+        return emplacements
+            .Where(e => Level.Triles.TryGetValue(e, out _))
+            .Select(e =>
+            {
+                var center = Level.Triles[e].Position.ToXna() + new Vector3(0.5f);
+                var surface = MeshSurface.CreateColoredBox(Vector3.One, color);
+                for (var i = 0; i < surface.Vertices.Length; i++)
+                {
+                    surface.Vertices[i] += center;
+                }
+
+                return (surface, PrimitiveType.TriangleList);
+            });
     }
 
     public override void Dispose()
@@ -1055,13 +1281,12 @@ internal class TrileContext : EddyContext
 
     private void ClearHover()
     {
-        _hoveredEmplacement = null;
-        _hoveredFace = null;
+        _hovered.Reset();
     }
 
     private string GetHoveredName()
     {
-        if (_hoveredEmplacement == null || !Level.Triles.TryGetValue(_hoveredEmplacement, out var instance))
+        if (_hovered.Emplacement == null || !Level.Triles.TryGetValue(_hovered.Emplacement, out var instance))
         {
             return string.Empty;
         }
@@ -1076,7 +1301,7 @@ internal class TrileContext : EddyContext
 
     private List<ClipboardEntry> BuildClipboard()
     {
-        var validEntries = _selectedEmplacements
+        var validEntries = _selected.Emplacements
             .Where(e => Level.Triles.TryGetValue(e, out var inst) && inst.TrileId != InvalidId)
             .Select(e => (Emp: e, Inst: Level.Triles[e]))
             .ToList();
@@ -1097,12 +1322,12 @@ internal class TrileContext : EddyContext
 
     private void PasteClipboard(List<ClipboardEntry> clipboard, TrileEmplacement origin)
     {
-        _selectedEmplacements.Clear();
-        _selectedFace = null;
+        _selected.Emplacements.Clear();
+        _selected.Face = null;
 
-        if (_hoveredFace.HasValue)
+        if (_hovered.Face.HasValue)
         {
-            var step = _hoveredFace.Value.AsVector();
+            var step = _hovered.Face.Value.AsVector();
             origin = new TrileEmplacement(
                 origin.X + (int)step.X,
                 origin.Y + (int)step.Y,
@@ -1127,7 +1352,7 @@ internal class TrileContext : EddyContext
             EnsureTrileActor(entry.TrileId).GetComponent<TrilesMesh>()
                 .SetInstanceData(emp, instance.Position.ToXna(), instance.PhiLight);
 
-            _selectedEmplacements.Add(emp);
+            _selected.Emplacements.Add(emp);
         }
 
         UpdateCollisionMesh();
@@ -1136,19 +1361,19 @@ internal class TrileContext : EddyContext
 
     private void RemoveSelected()
     {
-        if (_selectedEmplacements.Count == 0)
+        if (_selected.Emplacements.Count == 0)
         {
             return;
         }
 
-        foreach (var emplacement in _selectedEmplacements.ToList())
+        foreach (var emplacement in _selected.Emplacements.ToList())
         {
             if (!Level.Triles.Remove(emplacement, out var instance))
             {
                 continue;
             }
 
-            _selectedEmplacements.Remove(emplacement);
+            _selected.Emplacements.Remove(emplacement);
             if (_trileActors.TryGetValue(instance.TrileId, out var actor))
             {
                 var mesh = actor.GetComponent<TrilesMesh>();
@@ -1159,6 +1384,40 @@ internal class TrileContext : EddyContext
 
         UpdateCollisionMesh();
         EnsurePlaceholder();
+    }
+
+    private void AddToGroup(int groupId, TrileEmplacement emp, TrileInstance instance)
+    {
+        if (!Level.Groups.TryGetValue(groupId, out var group))
+        {
+            return;
+        }
+
+        group.Triles.Add(instance);
+        _emplacementGroups[emp] = groupId;
+        if (_groupEmplacements.TryGetValue(groupId, out var set))
+        {
+            set.Add(emp);
+        }
+    }
+
+    private void RemoveFromGroup(TrileEmplacement emp, TrileInstance instance)
+    {
+        if (!_emplacementGroups.TryGetValue(emp, out var groupId))
+        {
+            return;
+        }
+
+        if (Level.Groups.TryGetValue(groupId, out var group))
+        {
+            group.Triles.Remove(instance);
+        }
+
+        _emplacementGroups.Remove(emp);
+        if (_groupEmplacements.TryGetValue(groupId, out var set))
+        {
+            set.Remove(emp);
+        }
     }
 
     private void CleanupEmptyActor(int trileId, TrilesMesh mesh)
@@ -1262,6 +1521,25 @@ internal class TrileContext : EddyContext
     }
 
     private record struct ClipboardEntry(TrileEmplacement Offset, int TrileId, byte PhiLight);
+
+    private struct CursorState
+    {
+        public readonly HashSet<TrileEmplacement> Emplacements = [];
+        public FaceOrientation? Face = null;
+        public int? GroupId = null;
+
+        public CursorState() { }
+
+        public readonly TrileEmplacement? Emplacement =>
+            Emplacements.Count == 1 ? Emplacements.First() : null;
+
+        public void Reset()
+        {
+            Emplacements.Clear();
+            Face = null;
+            GroupId = null;
+        }
+    }
 
     private struct SelectState
     {

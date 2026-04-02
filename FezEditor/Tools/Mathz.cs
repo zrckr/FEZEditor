@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using FEZRepacker.Core.Definitions.Game.Common;
+using Microsoft.Xna.Framework;
 
 namespace FezEditor.Tools;
 
@@ -76,6 +77,37 @@ public static class Mathz
         }
 
         return new BoundingBox(min, max);
+    }
+
+    public static FaceOrientation DetermineFace(BoundingBox box, Ray ray, float distance)
+    {
+        var point = ray.Position + ray.Direction * distance;
+        var center = (box.Min + box.Max) / 2f;
+        var bounds = (box.Max - box.Min) / 2f;
+
+        var local = point - center;
+        var abs = new Vector3
+        {
+            X = MathF.Abs(local.X / bounds.X),
+            Y = MathF.Abs(local.Y / bounds.Y),
+            Z = MathF.Abs(local.Z / bounds.Z)
+        };
+
+        Vector3 normal;
+        if (abs.X > abs.Y && abs.X > abs.Z)
+        {
+            normal = new Vector3(MathF.Sign(local.X), 0, 0);
+        }
+        else if (abs.Y > abs.Z)
+        {
+            normal = new Vector3(0, MathF.Sign(local.Y), 0);
+        }
+        else
+        {
+            normal = new Vector3(0, 0, MathF.Sign(local.Z));
+        }
+
+        return FaceExtensions.OrientationFromDirection(normal);
     }
 
     public static Vector3 Abs(this Vector3 vector)

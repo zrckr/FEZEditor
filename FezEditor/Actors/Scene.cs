@@ -82,9 +82,9 @@ public class Scene : IDisposable
         }
     }
 
-    public (Actor Actor, PickHit Hit)? Raycast(Ray ray)
+    public RaycastHit? Raycast(Ray ray)
     {
-        (Actor Actor, PickHit Hit)? nearest = null;
+        RaycastHit? nearest = null;
         var nearestDist = float.MaxValue;
 
         foreach (var actor in _actors)
@@ -95,32 +95,12 @@ public class Scene : IDisposable
                 if (hit?.Distance < nearestDist)
                 {
                     nearestDist = hit.Value.Distance;
-                    nearest = (actor, hit.Value);
+                    nearest = new RaycastHit(actor, hit.Value.Distance, hit.Value.Index);
                 }
             }
         }
 
         return nearest;
-    }
-
-    public IEnumerable<(Actor Actor, PickHit Hit)> RaycastAll(Ray ray)
-    {
-        var results = new List<(Actor Actor, PickHit Hit)>();
-
-        foreach (var actor in _actors)
-        {
-            if (actor.TryGetComponent<IPickable>(out var pickable))
-            {
-                var hit = pickable?.Pick(ray);
-                if (hit.HasValue)
-                {
-                    results.Add((actor, hit.Value));
-                }
-            }
-        }
-
-        results.Sort((a, b) => a.Hit.Distance.CompareTo(b.Hit.Distance));
-        return results;
     }
 
     public Actor? GetParent(Actor actor)

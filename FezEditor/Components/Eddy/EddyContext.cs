@@ -10,6 +10,10 @@ namespace FezEditor.Components.Eddy;
 
 internal abstract class EddyContext : IDisposable
 {
+    protected static readonly Color HoverColor = Color.Blue with { A = 85 }; // 33%
+
+    protected static readonly Color SelectionColor = Color.Red with { A = 85 }; // 33%
+
     protected const int InvalidId = -1;
 
     public Scene Scene { get; init; } = null!;
@@ -38,11 +42,11 @@ internal abstract class EddyContext : IDisposable
 
     public Dirty<EddyTool> Tool { get; set; }
 
-    public virtual void TestConditions(Ray ray, Vector2 viewport)
+    public virtual void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
     }
 
-    public virtual void Enter(params object[] args)
+    public virtual void Enter(params object?[] args)
     {
     }
 
