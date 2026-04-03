@@ -22,6 +22,10 @@ public class TrilesMesh : ActorComponent, IPickable
 
     public int InstanceCount => _instances.Count;
 
+    public bool HasGeometry { get; private set; }
+
+    public bool Pickable { get; set; } = true;
+
     private readonly OrderedDictionary<TrileEmplacement, InstanceData> _instances = new();
 
     private readonly RenderingService _rendering;
@@ -73,6 +77,7 @@ public class TrilesMesh : ActorComponent, IPickable
             _rendering.MaterialAssignBaseTexture(_material, _texture);
 
             _size = Vector3.One;
+            HasGeometry = true;
 
             var surface = MeshSurface.CreateTexturedBox(Vector3.One);
             _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
@@ -84,6 +89,7 @@ public class TrilesMesh : ActorComponent, IPickable
 
             var trile = trileSet.Triles[id];
             _size = trile.Size.ToXna();
+            HasGeometry = trile.Geometry.Indices.Length > 0;
 
             var surface = RepackerExtensions.ConvertToMesh(trile.Geometry.Vertices, trile.Geometry.Indices);
             _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
@@ -114,6 +120,11 @@ public class TrilesMesh : ActorComponent, IPickable
 
     public PickHit? Pick(Ray ray)
     {
+        if (!Pickable)
+        {
+            return null;
+        }
+
         float? nearestDist = null;
         var nearestIndex = -1;
         var index = 0;

@@ -12,6 +12,8 @@ namespace FezEditor.Components.Eddy;
 
 internal sealed class TrileContext : EddyContext
 {
+    public override bool IsSelected => _selected.Emplacements.Count > 0;
+
     private readonly Dictionary<int, Actor> _trileActors = new();
 
     private Actor? _collisionMapActor;
@@ -43,38 +45,36 @@ internal sealed class TrileContext : EddyContext
             var mesh = _collisionMapActor.GetComponent<TrileCollisionMesh>();
             mesh.Visible = visible;
         }
+
+        foreach (var actor in _trileActors.Values)
+        {
+            var trilesMesh = actor.GetComponent<TrilesMesh>();
+            if (trilesMesh is { HasGeometry: false })
+            {
+                trilesMesh.Pickable = visible;
+            }
+        }
     }
 
-    public override void TestConditions(Ray ray, RaycastHit? raycastHit, Vector2 viewport)
+    public override void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
         _viewport = viewport;
-        if (!raycastHit.HasValue)
+        if (hit.HasValue && hit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
         {
-            ClearHover();
-            if (_selected.Emplacements.Count == 0)
-            {
-                Contexts.TransitionTo<DefaultEddyContext>();
-            }
-            return;
-        }
-
-        var index = raycastHit.Value.Index;
-        if (raycastHit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh))
-        {
-            var emplacement = mesh?.GetEmplacement(index);
-            if (emplacement != null && Level.Triles.ContainsKey(emplacement) && mesh != null)
+            var index = hit.Value.Index;
+            var emplacement = mesh.GetEmplacement(index);
+            if (Level.Triles.ContainsKey(emplacement))
             {
                 var box = mesh.GetBounds().ElementAt(index);
+                var distance = hit.Value.Distance;
                 _hovered.Emplacements.Clear();
                 _hovered.Emplacements.Add(emplacement);
-                _hovered.Face = Mathz.DetermineFace(box, ray, raycastHit.Value.Distance);
+                _hovered.Face = Mathz.DetermineFace(box, ray, distance);
                 _hovered.GroupId = _emplacementGroups.TryGetValue(emplacement, out var gid) ? gid : null;
                 Contexts.TransitionTo<TrileContext>();
             }
         }
     }
-
-    public override void Enter(params object?[] args) { }
 
     public override void Update()
     {
@@ -96,7 +96,7 @@ internal sealed class TrileContext : EddyContext
 
         if (Tool.Value is not (EddyTool.Select or EddyTool.Pick))
         {
-            ClearHover();
+            _hovered.Reset();
         }
 
         var nextTool = Tool.Value;
@@ -818,7 +818,7 @@ internal sealed class TrileContext : EddyContext
             _selected.Emplacements.RemoveWhere(e => !Level.Triles.ContainsKey(e));
             if (_hovered.Emplacement != null && !Level.Triles.ContainsKey(_hovered.Emplacement))
             {
-                ClearHover();
+                _hovered.Reset();
             }
         }
         else
@@ -848,6 +848,10 @@ internal sealed class TrileContext : EddyContext
 
                 var mesh = actor.AddComponent<TrilesMesh>();
                 mesh.Visualize(_set, id);
+                if (!mesh.HasGeometry)
+                {
+                    mesh.Pickable = Contexts.ShowCollisionMap.Value;
+                }
             }
 
             #endregion
@@ -881,7 +885,7 @@ internal sealed class TrileContext : EddyContext
             #endregion
 
             _selected.Reset();
-            ClearHover();
+            _hovered.Reset();
         }
 
         foreach (var (emplacement, instance) in Level.Triles.Where(kv => kv.Value.TrileId != InvalidId))
@@ -1277,11 +1281,6 @@ internal sealed class TrileContext : EddyContext
         }
 
         _trileActors.Clear();
-    }
-
-    private void ClearHover()
-    {
-        _hovered.Reset();
     }
 
     private string GetHoveredName()

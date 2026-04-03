@@ -42,6 +42,8 @@ internal abstract class EddyContext : IDisposable
 
     public Dirty<EddyTool> Tool { get; set; }
 
+    public virtual bool IsSelected => false;
+
     public virtual void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
     }
