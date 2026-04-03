@@ -28,19 +28,6 @@ internal class DefaultEddyContext : EddyContext
         bounds?.Visualize(actors);
     }
 
-    public override void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
-    {
-        if (!hit.HasValue && !Contexts.Current.IsSelected)
-        {
-            Contexts.TransitionTo<DefaultEddyContext>();
-        }
-    }
-
-    public override void Update()
-    {
-        Cursor.ClearHover();
-    }
-
     public override void Revisualize(bool partial = false)
     {
         if (partial)

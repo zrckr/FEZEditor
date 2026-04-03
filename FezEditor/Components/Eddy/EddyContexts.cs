@@ -1,5 +1,6 @@
-﻿using FezEditor.Actors;
+using FezEditor.Actors;
 using FezEditor.Structure;
+using ImGuiNET;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Eddy;
@@ -8,15 +9,15 @@ internal class EddyContexts : IDisposable
 {
     public EddyContext Current { get; private set; } = null!;
 
-    public EddyContext Previous { get; private set; } = null!;
-
-    public EddyContext Selected { get; private set; } = null!;
+    public CursorMesh Cursor { get; set; } = null!;
 
     public Dirty<bool> ShowCollisionMap { get; set; }
 
     public Dirty<bool> ShowPickableBounds { get; set; }
 
     private readonly List<EddyContext> _contexts = new();
+
+    private EddyContext? _hoveredContext;
 
     public void AddOrdered<T>(T context) where T : EddyContext
     {
@@ -31,7 +32,6 @@ internal class EddyContexts : IDisposable
     public void Init<T>() where T : EddyContext
     {
         Current = Get<T>();
-        Selected = Previous = Current;
     }
 
     public void Dispose()
@@ -42,30 +42,21 @@ internal class EddyContexts : IDisposable
         }
     }
 
-    public void TransitionTo<T>(params object?[] args) where T : EddyContext
+    public void CheckHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
-        var next = _contexts.OfType<T>().First();
-        if (Current != next)
+        _hoveredContext = null;
+        foreach (var context in _contexts)
         {
-            Console.WriteLine($"{Current} -> {next}");
-            Current.End();
-            Previous = Current;
-            Current = next;
-            if (next is not DefaultEddyContext)
+            if (context.IsHovered(ray, hit, viewport))
             {
-                Selected = Current;
+                _hoveredContext = context;
             }
-
-            Current.Enter(args);
         }
     }
 
-    public void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public void ClearHover()
     {
-        foreach (var context in _contexts)
-        {
-            context.TestConditions(ray, hit, viewport);
-        }
+        _hoveredContext = null;
     }
 
     public void Update()
@@ -82,15 +73,34 @@ internal class EddyContexts : IDisposable
             ShowPickableBounds = ShowPickableBounds.Clean();
         }
 
+        var selected = _contexts.FirstOrDefault(c => c.IsSelected);
+        EddyContext next;
+        if (selected != null && !ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        {
+            next = selected;
+        }
+        else
+        {
+            next = _hoveredContext ?? Get<DefaultEddyContext>();
+        }
+
+        if (Current != next)
+        {
+            Console.WriteLine($"{Current} -> {next}");
+            Current.End();
+            Current = next;
+            Current.Enter();
+            return;
+        }
+
         Get<DefaultEddyContext>().UpdateLighting();
         Current.Update();
-    }
 
-    public void ProvideCursor(CursorMesh cursor)
-    {
+        Cursor.ClearHover();
+        Cursor.ClearSelection();
         foreach (var context in _contexts)
         {
-            context.Cursor = cursor;
+            context.DrawCursor(Cursor);
         }
     }
 

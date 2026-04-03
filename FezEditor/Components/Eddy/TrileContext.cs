@@ -56,7 +56,7 @@ internal sealed class TrileContext : EddyContext
         }
     }
 
-    public override void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public override bool IsHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
         _viewport = viewport;
         if (hit.HasValue && hit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
@@ -71,9 +71,17 @@ internal sealed class TrileContext : EddyContext
                 _hovered.Emplacements.Add(emplacement);
                 _hovered.Face = Mathz.DetermineFace(box, ray, distance);
                 _hovered.GroupId = _emplacementGroups.TryGetValue(emplacement, out var gid) ? gid : null;
-                Contexts.TransitionTo<TrileContext>();
+                return true;
             }
         }
+
+        return false;
+    }
+
+    public override void End()
+    {
+        _selected.Reset();
+        _hovered.Reset();
     }
 
     public override void Update()
@@ -120,7 +128,29 @@ internal sealed class TrileContext : EddyContext
             Tool = nextTool;
         }
 
-        UpdateCursor();
+    }
+
+    public override void DrawCursor(CursorMesh cursor)
+    {
+        if (Tool.Value is EddyTool.Select or EddyTool.Pick && _hovered.Emplacement != null)
+        {
+            // When hovering a grouped trile with no current selection, highlight the whole group as boxes
+            if (_hovered.GroupId != null && _selected.Emplacements.Count == 0
+                                         && _groupEmplacements.TryGetValue(_hovered.GroupId.Value, out var groupSet))
+            {
+                cursor.SetHoverSurfaces(BuildBoxSurfaces(groupSet, HoverColor), HoverColor);
+            }
+            else if (Level.Triles.TryGetValue(_hovered.Emplacement, out var hoveredInstance))
+            {
+                var face = _hovered.Face ?? FaceOrientation.Front;
+                var center = hoveredInstance.Position.ToXna() + new Vector3(0.5f);
+                var origin = center + face.AsVector() * (0.5f + CursorMesh.OverlayOffset);
+                var surface = MeshSurface.CreateFaceQuad(Vector3.One, origin, face);
+                cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
+            }
+        }
+
+        UpdateCursorSurfaces(cursor, _selected);
     }
 
     private EddyTool? UpdateSelect()
@@ -1179,34 +1209,7 @@ internal sealed class TrileContext : EddyContext
         }
     }
 
-    private void UpdateCursor()
-    {
-        if (Tool.Value is EddyTool.Select or EddyTool.Pick && _hovered.Emplacement != null)
-        {
-            // When hovering a grouped trile with no current selection, highlight the whole group as boxes
-            if (_hovered.GroupId != null && _selected.Emplacements.Count == 0
-                && _groupEmplacements.TryGetValue(_hovered.GroupId.Value, out var groupSet))
-            {
-                Cursor.SetHoverSurfaces(BuildBoxSurfaces(groupSet, HoverColor), HoverColor);
-            }
-            else if (Level.Triles.TryGetValue(_hovered.Emplacement, out var hoveredInstance))
-            {
-                var face = _hovered.Face ?? FaceOrientation.Front;
-                var center = hoveredInstance.Position.ToXna() + new Vector3(0.5f);
-                var origin = center + face.AsVector() * (0.5f + CursorMesh.OverlayOffset);
-                var surface = MeshSurface.CreateFaceQuad(Vector3.One, origin, face);
-                Cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
-            }
-        }
-        else
-        {
-            Cursor.ClearHover();
-        }
-
-        UpdateCursorSurfaces(_selected);
-    }
-
-    private void UpdateCursorSurfaces(CursorState cursor)
+    private void UpdateCursorSurfaces(CursorMesh mesh, CursorState cursor)
     {
         var validEmplacements = cursor.Emplacements
             .Where(e => Level.Triles.TryGetValue(e, out _))
@@ -1214,14 +1217,13 @@ internal sealed class TrileContext : EddyContext
 
         if (validEmplacements.Count == 0)
         {
-            Cursor.ClearSelection();
             return;
         }
 
         // Group selection: show boxes around each trile in the group
         if (cursor.GroupId != null)
         {
-            Cursor.SetSelectionSurfaces(BuildBoxSurfaces(validEmplacements, SelectionColor), SelectionColor);
+            mesh.SetSelectionSurfaces(BuildBoxSurfaces(validEmplacements, SelectionColor), SelectionColor);
             return;
         }
 
@@ -1239,7 +1241,7 @@ internal sealed class TrileContext : EddyContext
             return (s, PrimitiveType.TriangleList);
         });
 
-        Cursor.SetSelectionSurfaces(faceSurfaces, SelectionColor);
+        mesh.SetSelectionSurfaces(faceSurfaces, SelectionColor);
     }
 
     private IEnumerable<(MeshSurface, PrimitiveType)> BuildBoxSurfaces(IEnumerable<TrileEmplacement> emplacements, Color color)

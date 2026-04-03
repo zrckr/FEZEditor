@@ -33,9 +33,10 @@ internal class ArtObjectContext : EddyContext
 
     private List<ArtObjectInstance>? _clipboard;
 
-    public override void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public override bool IsHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
     {
         _viewport = viewport;
+        _hoveredId = null;
         if (hit.HasValue && hit.Value.Actor.HasComponent<ArtObjectMesh>())
         {
             var foundId = _artObjectActors
@@ -44,16 +45,17 @@ internal class ArtObjectContext : EddyContext
             if (_artObjectActors.ContainsKey(foundId))
             {
                 _hoveredId = foundId;
-                Contexts.TransitionTo<ArtObjectContext>();
+                return true;
             }
         }
+
+        return false;
     }
 
     public override void End()
     {
+        _selectedIds.Clear();
         _hoveredId = null;
-        Cursor.ClearHover();
-        Cursor.ClearSelection();
         DestroyGhost();
     }
 
@@ -106,7 +108,29 @@ internal class ArtObjectContext : EddyContext
             DestroyGhost();
         }
 
-        UpdateCursor();
+    }
+
+    public override void DrawCursor(CursorMesh cursor)
+    {
+        if (Tool.Value is EddyTool.Select or EddyTool.Pick && _hoveredId.HasValue)
+        {
+            var hoverSurfaces = BuildWireframeForAo(_hoveredId.Value, HoverColor);
+            if (hoverSurfaces.HasValue)
+            {
+                cursor.SetHoverSurfaces([hoverSurfaces.Value], HoverColor);
+            }
+        }
+
+        var selectionSurfaces = _selectedIds
+            .Select(id => BuildWireframeForAo(id, SelectionColor))
+            .Where(s => s.HasValue)
+            .Select(s => s!.Value)
+            .ToList();
+
+        if (selectionSurfaces.Count > 0)
+        {
+            cursor.SetSelectionSurfaces(selectionSurfaces, SelectionColor);
+        }
     }
 
     private EddyTool? UpdateSelect()
@@ -205,6 +229,7 @@ internal class ArtObjectContext : EddyContext
             {
                 _selectedIds.Clear();
             }
+
         }
 
         return null;
@@ -628,38 +653,6 @@ internal class ArtObjectContext : EddyContext
         }
 
         return null;
-    }
-
-
-    private void UpdateCursor()
-    {
-        if (Tool.Value is EddyTool.Select or EddyTool.Pick && _hoveredId.HasValue)
-        {
-            var hoverSurfaces = BuildWireframeForAo(_hoveredId.Value, HoverColor);
-            if (hoverSurfaces.HasValue)
-            {
-                Cursor.SetHoverSurfaces([hoverSurfaces.Value], HoverColor);
-            }
-        }
-        else
-        {
-            Cursor.ClearHover();
-        }
-
-        var selectionSurfaces = _selectedIds
-            .Select(id => BuildWireframeForAo(id, SelectionColor))
-            .Where(s => s.HasValue)
-            .Select(s => s!.Value)
-            .ToList();
-
-        if (selectionSurfaces.Count > 0)
-        {
-            Cursor.SetSelectionSurfaces(selectionSurfaces, SelectionColor);
-        }
-        else
-        {
-            Cursor.ClearSelection();
-        }
     }
 
     private (MeshSurface, PrimitiveType)? BuildWireframeForAo(int id, Color color)

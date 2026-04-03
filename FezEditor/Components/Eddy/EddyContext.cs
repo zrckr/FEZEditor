@@ -26,8 +26,6 @@ internal abstract class EddyContext : IDisposable
 
     public Camera Camera { get; init; } = null!;
 
-    public CursorMesh Cursor { get; set; } = null!;
-
     public EddyContexts Contexts { get; set; } = null!;
 
     public AssetBrowser AssetBrowser { get; init; } = null!;
@@ -44,7 +42,12 @@ internal abstract class EddyContext : IDisposable
 
     public virtual bool IsSelected => false;
 
-    public virtual void TestConditions(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public virtual bool IsHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
+    {
+        return false;
+    }
+
+    public virtual void DrawCursor(CursorMesh cursor)
     {
     }
 

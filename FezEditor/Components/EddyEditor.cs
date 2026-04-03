@@ -85,8 +85,7 @@ public class EddyEditor : EditorComponent
         {
             var actor = _scene.CreateActor();
             actor.Name = "Cursor";
-            var cursor = actor.AddComponent<CursorMesh>();
-            _contexts.ProvideCursor(cursor);
+            _contexts.Cursor = actor.AddComponent<CursorMesh>();
         }
 
         var position = _level.StartingFace.Id.ToXna().ToVector3();
@@ -124,11 +123,12 @@ public class EddyEditor : EditorComponent
                 var viewportMin = ImGuiX.GetItemRectMin();
                 _raycastHit = null;
 
+                _contexts.ClearHover();
                 if (ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right))
                 {
                     var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
                     _raycastHit = _scene.Raycast(ray);
-                    _contexts.TestConditions(ray, _raycastHit, viewportMin);
+                    _contexts.CheckHovered(ray, _raycastHit, viewportMin);
                 }
 
                 var gizmo = _cameraActor.GetComponent<OrientationGizmo>();
@@ -150,7 +150,7 @@ public class EddyEditor : EditorComponent
                                            ImGuiWindowFlags.NoCollapse;
             if (ImGui.Begin("Properties", ref _showProperties, flags))
             {
-                _contexts.Selected.DrawProperties();
+                _contexts.Current.DrawProperties();
                 ImGui.End();
             }
         }
