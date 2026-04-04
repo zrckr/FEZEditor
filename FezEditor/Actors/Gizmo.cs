@@ -320,7 +320,7 @@ public class Gizmo : ActorComponent
         var changed = false;
 
         var faceNormal = face.AsVector();
-        var tipPos = origin + faceNormal * gizmoScale;
+        var tipPos = origin + faceNormal * (ArrowShaftLength + ArrowTipLength * 0.5f) * gizmoScale;
 
         var leftDown = ImGui.IsMouseDown(ImGuiMouseButton.Left);
         var leftClicked = leftDown && !_wasLeftPressed;

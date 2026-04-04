@@ -26,6 +26,8 @@ internal sealed class TrileContext : EddyContext
 
     private SelectState _select = new();
 
+    private ScaleState _scale = new();
+
     private IDisposable? _translateScope;
 
     private IDisposable? _scaleScope;
@@ -35,8 +37,6 @@ internal sealed class TrileContext : EddyContext
     private readonly Dictionary<TrileEmplacement, int> _emplacementGroups = new();
 
     private readonly Dictionary<int, HashSet<TrileEmplacement>> _groupEmplacements = new();
-
-    private readonly List<(TrileEmplacement Emp, int TrileId, byte PhiLight)> _scaleSnapshot = new();
 
     public void ShowCollisionMap(bool visible)
     {
@@ -436,101 +436,115 @@ internal sealed class TrileContext : EddyContext
         if (Gizmo.ScaleFace(centroid, _selectedCursor.Face.Value, out var delta))
         {
             var steps = (int)MathF.Round(delta);
-            if (steps > 0)
+            if (steps != _scale.PreviousSteps)
             {
-                for (var s = 1; s <= steps; s++)
+                var dir = steps > _scale.PreviousSteps ? 1 : -1;
+                for (var s = _scale.PreviousSteps; s != steps; s += dir)
                 {
-                    foreach (var (emp, trileId, phi) in _scaleSnapshot)
-                    {
-                        var target = new TrileEmplacement(emp.X + s, emp.Y + s, emp.Z + s);
-                        if (Level.Triles.ContainsKey(target))
-                        {
-                            continue;
-                        }
-
-                        var instance = new TrileInstance
-                        {
-                            Position = new Vector3(target.X, target.Y, target.Z).ToRepacker(),
-                            TrileId = trileId,
-                            PhiLight = phi
-                        };
-                        Level.Triles[target] = instance;
-                        if (_selectedCursor.GroupId != null)
-                        {
-                            AddToGroup(_selectedCursor.GroupId.Value, target, instance);
-                        }
-
-                        EnsureTrileActor(trileId).GetComponent<TrilesMesh>()
-                            .SetInstanceData(target, instance.Position.ToXna(), phi);
-                    }
+                    _scale.Ops.Enqueue(new ScaleOp(dir > 0 ? s + dir : s, dir > 0));
                 }
 
-                _selectedCursor.Emplacements.Clear();
-                foreach (var (emp, _, _) in _scaleSnapshot)
+                _scale.PreviousSteps = steps;
+            }
+        }
+
+        while (_scale.Ops.Count > 0)
+        {
+            var op = _scale.Ops.Dequeue();
+            if (op.Add)
+            {
+                foreach (var entry in _scale.Snapshot)
                 {
-                    var target = new TrileEmplacement(emp.X + steps, emp.Y + steps, emp.Z + steps);
+                    var target = new TrileEmplacement(
+                        entry.Emp.X + _scale.Dx * op.Step,
+                        entry.Emp.Y + _scale.Dy * op.Step,
+                        entry.Emp.Z + _scale.Dz * op.Step);
                     if (Level.Triles.ContainsKey(target))
                     {
-                        _selectedCursor.Emplacements.Add(target);
+                        continue;
                     }
+
+                    var instance = new TrileInstance
+                    {
+                        Position = new Vector3(target.X, target.Y, target.Z).ToRepacker(),
+                        TrileId = entry.TrileId,
+                        PhiLight = entry.PhiLight
+                    };
+                    Level.Triles[target] = instance;
+                    if (_selectedCursor.GroupId != null)
+                    {
+                        AddToGroup(_selectedCursor.GroupId.Value, target, instance);
+                    }
+
+                    EnsureTrileActor(entry.TrileId).GetComponent<TrilesMesh>()
+                        .SetInstanceData(target, instance.Position.ToXna(), entry.PhiLight);
                 }
 
-                UpdateCollisionMesh();
+
             }
-            else if (steps < 0)
+            else
             {
-                for (var s = 0; s >= steps; s--)
+                foreach (var entry in _scale.Snapshot)
                 {
-                    foreach (var (emp, _, _) in _scaleSnapshot)
+                    var target = new TrileEmplacement(
+                        entry.Emp.X + _scale.Dx * op.Step,
+                        entry.Emp.Y + _scale.Dy * op.Step,
+                        entry.Emp.Z + _scale.Dz * op.Step);
+                    if (!Level.Triles.Remove(target, out var removedInst))
                     {
-                        var target = new TrileEmplacement(emp.X + s, emp.Y + s, emp.Z + s);
-                        if (!Level.Triles.Remove(target, out var removed))
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        RemoveFromGroup(target, removed);
-                        if (_trileActors.TryGetValue(removed.TrileId, out var actor))
-                        {
-                            var mesh = actor.GetComponent<TrilesMesh>();
-                            mesh.RemoveInstance(target);
-                            CleanupEmptyActor(removed.TrileId, mesh);
-                        }
+                    RemoveFromGroup(target, removedInst);
+                    if (_trileActors.TryGetValue(removedInst.TrileId, out var actor))
+                    {
+                        var mesh = actor.GetComponent<TrilesMesh>();
+                        mesh.RemoveInstance(target);
+                        CleanupEmptyActor(removedInst.TrileId, mesh);
                     }
                 }
-
-                _selectedCursor.Emplacements.Clear();
-                foreach (var (emp, _, _) in _scaleSnapshot)
-                {
-                    var target = new TrileEmplacement(emp.X + steps, emp.Y + steps, emp.Z + steps);
-                    if (Level.Triles.ContainsKey(target))
-                    {
-                        _selectedCursor.Emplacements.Add(target);
-                    }
-                }
-
-                UpdateCollisionMesh();
-                EnsurePlaceholder();
             }
+
+            _selectedCursor.Emplacements.Clear();
+            foreach (var entry in _scale.Snapshot)
+            {
+                var target = new TrileEmplacement(
+                    entry.Emp.X + _scale.Dx * _scale.PreviousSteps,
+                    entry.Emp.Y + _scale.Dy * _scale.PreviousSteps,
+                    entry.Emp.Z + _scale.Dz * _scale.PreviousSteps);
+                if (Level.Triles.ContainsKey(target))
+                {
+                    _selectedCursor.Emplacements.Add(target);
+                }
+            }
+
+            UpdateCollisionMesh();
+            EnsurePlaceholder();
         }
 
         if (Gizmo.DragStarted)
         {
             _scaleScope?.Dispose();
             _scaleScope = History.BeginScope("Scale Triles");
-            _scaleSnapshot.Clear();
+            _scale = new ScaleState();
+
+            var faceVec = _selectedCursor.Face.Value.AsVector();
+            _scale.Dx = (int)faceVec.X;
+            _scale.Dy = (int)faceVec.Y;
+            _scale.Dz = (int)faceVec.Z;
+
             foreach (var emplacement in _selectedCursor.Emplacements)
             {
                 if (Level.Triles.TryGetValue(emplacement, out var inst))
                 {
-                    _scaleSnapshot.Add((emplacement, inst.TrileId, inst.PhiLight));
+                    _scale.Snapshot.Add(new TrileEntry(emplacement, inst.TrileId, inst.PhiLight));
                 }
             }
         }
 
         if (Gizmo.DragEnded)
         {
-            _scaleSnapshot.Clear();
+            _scale = new ScaleState();
             _scaleScope?.Dispose();
             _scaleScope = null;
         }
@@ -1336,5 +1350,17 @@ internal sealed class TrileContext : EddyContext
         public TrileEmplacement? SelectionAnchor;
         public bool WasDrag;
         public readonly List<ClipboardEntry> Clipboard = new();
+    }
+
+    private record struct TrileEntry(TrileEmplacement Emp, int TrileId, byte PhiLight);
+
+    private record struct ScaleOp(int Step, bool Add);
+
+    private struct ScaleState()
+    {
+        public readonly List<TrileEntry> Snapshot = new();
+        public readonly Queue<ScaleOp> Ops = new();
+        public int PreviousSteps;
+        public int Dx, Dy, Dz;
     }
 }
