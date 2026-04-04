@@ -28,8 +28,6 @@ internal sealed class TrileContext : EddyContext
 
     private IDisposable? _translateScope;
 
-    private IDisposable? _rotateScope;
-
     private IDisposable? _scaleScope;
 
     private IDisposable? _paintScope;
@@ -63,9 +61,10 @@ internal sealed class TrileContext : EddyContext
         _hoveredCursor.Reset();
         if (!hit.HasValue || !hit.Value.Actor.HasComponent<TrilesMesh>())
         {
-            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !Gizmo.IsActive)
             {
                 _selectedCursor.Reset();
+                Tool = EddyTool.Select;
             }
 
             return false;
@@ -108,18 +107,15 @@ internal sealed class TrileContext : EddyContext
             _hoveredCursor.Reset();
         }
 
-        if (!ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+        switch (Tool)
         {
-            switch (Tool)
-            {
-                case EddyTool.Select: UpdateSelect(); break;
-                case EddyTool.Translate: UpdateTranslate(); break;
-                case EddyTool.Rotate: UpdateRotate(); break;
-                case EddyTool.Paint: UpdatePaint(); break;
-                case EddyTool.Pick: UpdatePick(); break;
-                case EddyTool.Scale: UpdateScale(); break;
-                default: throw new InvalidOperationException();
-            }
+            case EddyTool.Select: UpdateSelect(); break;
+            case EddyTool.Translate: UpdateTranslate(); break;
+            case EddyTool.Rotate: UpdateRotate(); break;
+            case EddyTool.Paint: UpdatePaint(); break;
+            case EddyTool.Pick: UpdatePick(); break;
+            case EddyTool.Scale: UpdateScale(); break;
+            default: throw new InvalidOperationException();
         }
     }
 
@@ -330,6 +326,11 @@ internal sealed class TrileContext : EddyContext
             ("R", "Reset")
         );
 
+        if (_selectedCursor.Emplacements.Count == 0)
+        {
+            return;
+        }
+
         var centroid = ComputeSelectionCentroid();
         if (Gizmo.Translate(ref centroid))
         {
@@ -399,32 +400,28 @@ internal sealed class TrileContext : EddyContext
 
     private void UpdateRotate()
     {
-        var centroid = ComputeSelectionCentroid();
-        foreach (var emplacement in _selectedCursor.Emplacements)
+        if (_selectedCursor.Emplacements.Count == 0)
         {
-            var instance = Level.Triles[emplacement];
-            var rotation = Quaternion.Identity;
-            if (Gizmo.Rotate(centroid, ref rotation))
+            return;
+        }
+
+        var centroid = ComputeSelectionCentroid();
+
+        if (Gizmo.Rotate(centroid))
+        {
+            using (History.BeginScope("Rotate Trile(s)"))
             {
-                instance.PhiLight = (byte)((instance.PhiLight + 1) % 4);
-                if (_trileActors.TryGetValue(instance.TrileId, out var actor))
+                foreach (var emplacement in _selectedCursor.Emplacements)
                 {
-                    var mesh = actor.GetComponent<TrilesMesh>();
-                    mesh.SetInstanceData(emplacement, instance.Position.ToXna(), instance.PhiLight);
+                    var instance = Level.Triles[emplacement];
+                    instance.PhiLight = (byte)((instance.PhiLight + 1) % 4);
+                    if (_trileActors.TryGetValue(instance.TrileId, out var actor))
+                    {
+                        var mesh = actor.GetComponent<TrilesMesh>();
+                        mesh.SetInstanceData(emplacement, instance.Position.ToXna(), instance.PhiLight);
+                    }
                 }
             }
-        }
-
-        if (Gizmo.DragStarted)
-        {
-            _rotateScope?.Dispose();
-            _rotateScope = History.BeginScope("Rotate Trile");
-        }
-
-        if (Gizmo.DragEnded)
-        {
-            _rotateScope?.Dispose();
-            _rotateScope = null;
         }
     }
 
@@ -1048,7 +1045,6 @@ internal sealed class TrileContext : EddyContext
     public override void Dispose()
     {
         _translateScope?.Dispose();
-        _rotateScope?.Dispose();
         _scaleScope?.Dispose();
         _paintScope?.Dispose();
         TeardownVisualization(force: true);

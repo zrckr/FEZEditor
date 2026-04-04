@@ -58,6 +58,8 @@ internal class EddyContexts : IDisposable
 
     public void Update()
     {
+        Gizmo.Hide();
+
         if (ShowCollisionMap.IsDirty)
         {
             Get<TrileContext>().ShowCollisionMap(ShowCollisionMap.Value);

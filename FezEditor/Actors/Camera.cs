@@ -124,6 +124,36 @@ public class Camera : ActorComponent
         return new Vector3(screenX, screenY, clip.Z);
     }
 
+    public Ray Unproject(Vector2 mousePos, Vector2 viewport)
+    {
+        var (width, height) = _rendering.RenderTargetGetSize(_rt);
+        var local = mousePos - viewport;
+        var invViewProj = Matrix.Invert(ViewProjection);
+
+        var ndcX = (local.X / width) * 2f - 1f;
+        var ndcY = 1f - (local.Y / height) * 2f;
+
+        var nearVec = new Vector4(ndcX, ndcY, 0f, 1f);
+        var farVec = new Vector4(ndcX, ndcY, 1f, 1f);
+
+        var nearWorld = Vector4.Transform(nearVec, invViewProj);
+        var farWorld = Vector4.Transform(farVec, invViewProj);
+
+        if (MathF.Abs(nearWorld.W) > float.Epsilon)
+        {
+            nearWorld /= nearWorld.W;
+        }
+
+        if (MathF.Abs(farWorld.W) > float.Epsilon)
+        {
+            farWorld /= farWorld.W;
+        }
+
+        var nearPt = new Vector3(nearWorld.X, nearWorld.Y, nearWorld.Z);
+        var farPt = new Vector3(farWorld.X, farWorld.Y, farWorld.Z);
+        return new Ray(nearPt, Vector3.Normalize(farPt - nearPt));
+    }
+
     public override void Dispose()
     {
         GC.SuppressFinalize(this);

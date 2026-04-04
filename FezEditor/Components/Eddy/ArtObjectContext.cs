@@ -24,8 +24,6 @@ internal class ArtObjectContext : EddyContext
 
     private IDisposable? _translateScope;
 
-    private IDisposable? _rotateScope;
-
     private IDisposable? _scaleScope;
 
     private readonly List<ArtObjectInstance> _clipboard = new();
@@ -35,9 +33,10 @@ internal class ArtObjectContext : EddyContext
         _hoveredId = null;
         if (!hit.HasValue || !hit.Value.Actor.HasComponent<ArtObjectMesh>())
         {
-            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !Gizmo.IsActive)
             {
                 _selectedIds.Clear();
+                Tool = EddyTool.Select;
             }
 
             return false;
@@ -75,18 +74,15 @@ internal class ArtObjectContext : EddyContext
             _ghostActor!.Visible = false;
         }
 
-        if (!ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+        switch (Tool)
         {
-            switch (Tool)
-            {
-                case EddyTool.Select: UpdateSelect(); break;
-                case EddyTool.Translate: UpdateTranslate(); break;
-                case EddyTool.Rotate: UpdateRotate(); break;
-                case EddyTool.Scale: UpdateScale(); break;
-                case EddyTool.Paint: UpdatePaint(); break;
-                case EddyTool.Pick: UpdatePick(); break;
-                default: throw new ArgumentOutOfRangeException();
-            }
+            case EddyTool.Select: UpdateSelect(); break;
+            case EddyTool.Translate: UpdateTranslate(); break;
+            case EddyTool.Rotate: UpdateRotate(); break;
+            case EddyTool.Scale: UpdateScale(); break;
+            case EddyTool.Paint: UpdatePaint(); break;
+            case EddyTool.Pick: UpdatePick(); break;
+            default: throw new ArgumentOutOfRangeException();
         }
     }
 
@@ -180,6 +176,11 @@ internal class ArtObjectContext : EddyContext
 
     private void UpdateTranslate()
     {
+        if (_selectedIds.Count == 0)
+        {
+            return;
+        }
+
         var centroid = ComputeSelectionCentroid();
         if (Gizmo.Translate(ref centroid))
         {
@@ -228,32 +229,29 @@ internal class ArtObjectContext : EddyContext
 
     private void UpdateRotate()
     {
-        var centroid = ComputeSelectionCentroid();
-        foreach (var id in _selectedIds)
+        if (_selectedIds.Count == 0)
         {
-            var instance = Level.ArtObjects[id];
-            var rotation = instance.Rotation.ToXna();
+            return;
+        }
 
-            if (Gizmo.Rotate(centroid, ref rotation))
+        var centroid = ComputeSelectionCentroid();
+
+        if (Gizmo.Rotate(centroid))
+        {
+            using (History.BeginScope("Rotate Art Object(s)"))
             {
-                instance.Rotation = rotation.ToRepacker();
-                if (_artObjectActors.TryGetValue(id, out var actor))
+                var step = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathHelper.PiOver2);
+                foreach (var id in _selectedIds)
                 {
-                    actor.Transform.Rotation = rotation;
+                    var instance = Level.ArtObjects[id];
+                    var newRotation = step * instance.Rotation.ToXna();
+                    instance.Rotation = newRotation.ToRepacker();
+                    if (_artObjectActors.TryGetValue(id, out var actor))
+                    {
+                        actor.Transform.Rotation = newRotation;
+                    }
                 }
             }
-        }
-
-        if (Gizmo.DragStarted)
-        {
-            _rotateScope?.Dispose();
-            _rotateScope = History.BeginScope("Rotate Art Object");
-        }
-
-        if (Gizmo.DragEnded)
-        {
-            _rotateScope?.Dispose();
-            _rotateScope = null;
         }
     }
 
@@ -263,18 +261,27 @@ internal class ArtObjectContext : EddyContext
             ("R", "Reset")
         );
 
-        var centroid = ComputeSelectionCentroid();
-        foreach (var id in _selectedIds)
+        if (_selectedIds.Count == 0)
         {
-            var instance = Level.ArtObjects[id];
-            var scale = instance.Scale.ToXna();
+            return;
+        }
 
-            if (Gizmo.Scale(centroid, ref scale))
+        var centroid = ComputeSelectionCentroid();
+        var firstInstance = Level.ArtObjects[_selectedIds.First()];
+        var primaryScale = firstInstance.Scale.ToXna();
+        var previousScale = primaryScale;
+
+        if (Gizmo.Scale(centroid, ref primaryScale))
+        {
+            var delta = primaryScale - previousScale;
+            foreach (var id in _selectedIds)
             {
-                instance.Scale = scale.ToRepacker();
+                var instance = Level.ArtObjects[id];
+                var newScale = instance.Scale.ToXna() + delta;
+                instance.Scale = newScale.ToRepacker();
                 if (_artObjectActors.TryGetValue(id, out var actor))
                 {
-                    actor.Transform.Scale = scale;
+                    actor.Transform.Scale = newScale;
                 }
             }
         }
@@ -289,6 +296,24 @@ internal class ArtObjectContext : EddyContext
         {
             _scaleScope?.Dispose();
             _scaleScope = null;
+        }
+
+        if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedIds.Count > 0 && _scaleScope == null)
+        {
+            using (History.BeginScope("Reset Art Object Scale"))
+            {
+                foreach (var id in _selectedIds)
+                {
+                    if (Level.ArtObjects.TryGetValue(id, out var instance))
+                    {
+                        instance.Scale = RVector3.One;
+                        if (_artObjectActors.TryGetValue(id, out var actor))
+                        {
+                            actor.Transform.Scale = Vector3.One;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -693,7 +718,6 @@ internal class ArtObjectContext : EddyContext
     public override void Dispose()
     {
         _translateScope?.Dispose();
-        _rotateScope?.Dispose();
         _scaleScope?.Dispose();
         TeardownVisualization();
     }
