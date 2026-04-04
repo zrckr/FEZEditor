@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FezEditor.Actors;
 using FezEditor.Structure;
 using FezEditor.Tools;
@@ -15,61 +16,48 @@ internal class ArtObjectContext : EddyContext
 
     private readonly Dictionary<int, Actor> _artObjectActors = new();
 
+    private Actor? _ghostActor;
+
     private int? _hoveredId;
 
     private readonly HashSet<int> _selectedIds = new();
 
-    private TranslateState _translate;
+    private IDisposable? _translateScope;
 
-    private ScaleState _scale;
+    private IDisposable? _rotateScope;
 
-    private Vector2 _viewport;
+    private IDisposable? _scaleScope;
 
-    private IDisposable? _paintScope;
+    private readonly List<ArtObjectInstance> _clipboard = new();
 
-    private Actor? _ghostActor;
-
-    private string? _ghostName;
-
-    private List<ArtObjectInstance>? _clipboard;
-
-    public override bool IsHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public override bool IsHovered(Ray ray, RaycastHit? hit)
     {
-        _viewport = viewport;
         _hoveredId = null;
-        if (hit.HasValue && hit.Value.Actor.HasComponent<ArtObjectMesh>())
+        if (!hit.HasValue || !hit.Value.Actor.HasComponent<ArtObjectMesh>())
         {
-            var foundId = _artObjectActors
-                .FirstOrDefault(kv => kv.Value == hit.Value.Actor).Key;
-
-            if (_artObjectActors.ContainsKey(foundId))
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
             {
-                _hoveredId = foundId;
-                return true;
+                _selectedIds.Clear();
             }
+
+            return false;
         }
 
-        return false;
-    }
+        var foundId = _artObjectActors
+            .FirstOrDefault(kv => kv.Value == hit.Value.Actor).Key;
 
-    public override void End()
-    {
-        _selectedIds.Clear();
-        _hoveredId = null;
-        DestroyGhost();
+        if (!_artObjectActors.ContainsKey(foundId))
+        {
+            return false;
+        }
+
+        _hoveredId = foundId;
+        return true;
     }
 
     public override void Update()
     {
         StatusService.ClearHints();
-
-        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
-        {
-            _translate.Reset();
-            _scale.Reset();
-            _paintScope?.Dispose();
-            _paintScope = null;
-        }
 
         if (ImGui.IsKeyPressed(ImGuiKey.Escape))
         {
@@ -77,47 +65,39 @@ internal class ArtObjectContext : EddyContext
             Tool = EddyTool.Select;
         }
 
-        if (Tool.Value is not (EddyTool.Select or EddyTool.Pick))
+        if (Tool is not (EddyTool.Select or EddyTool.Pick))
         {
             _hoveredId = null;
         }
 
-        var nextTool = Tool.Value;
+        if (Tool is EddyTool.Paint)
+        {
+            _ghostActor!.Visible = false;
+        }
+
         if (!ImGui.IsMouseDragging(ImGuiMouseButton.Right))
         {
-            nextTool = Tool.Value switch
+            switch (Tool)
             {
-                EddyTool.Select => UpdateSelect(),
-                EddyTool.Translate => UpdateTranslate(Tool.IsDirty),
-                EddyTool.Rotate => UpdateRotate(),
-                EddyTool.Scale => UpdateScale(Tool.IsDirty),
-                EddyTool.Paint => UpdatePaint(),
-                EddyTool.Pick => UpdatePick(),
-                _ => throw new ArgumentOutOfRangeException()
-            } ?? Tool.Value;
+                case EddyTool.Select: UpdateSelect(); break;
+                case EddyTool.Translate: UpdateTranslate(); break;
+                case EddyTool.Rotate: UpdateRotate(); break;
+                case EddyTool.Scale: UpdateScale(); break;
+                case EddyTool.Paint: UpdatePaint(); break;
+                case EddyTool.Pick: UpdatePick(); break;
+                default: throw new ArgumentOutOfRangeException();
+            }
         }
-
-        Tool = Tool.Clean();
-        if (nextTool != Tool.Value)
-        {
-            Tool = nextTool;
-        }
-
-        if (Tool.Value != EddyTool.Paint)
-        {
-            DestroyGhost();
-        }
-
     }
 
-    public override void DrawCursor(CursorMesh cursor)
+    public override void DrawCursor()
     {
-        if (Tool.Value is EddyTool.Select or EddyTool.Pick && _hoveredId.HasValue)
+        if (Tool is EddyTool.Select or EddyTool.Pick && _hoveredId.HasValue)
         {
             var hoverSurfaces = BuildWireframeForAo(_hoveredId.Value, HoverColor);
             if (hoverSurfaces.HasValue)
             {
-                cursor.SetHoverSurfaces([hoverSurfaces.Value], HoverColor);
+                CursorMesh.SetHoverSurfaces([hoverSurfaces.Value], HoverColor);
             }
         }
 
@@ -129,11 +109,11 @@ internal class ArtObjectContext : EddyContext
 
         if (selectionSurfaces.Count > 0)
         {
-            cursor.SetSelectionSurfaces(selectionSurfaces, SelectionColor);
+            CursorMesh.SetSelectionSurfaces(selectionSurfaces, SelectionColor);
         }
     }
 
-    private EddyTool? UpdateSelect()
+    private void UpdateSelect()
     {
         StatusService.AddHints(
             ("LMB", "Select"),
@@ -149,7 +129,7 @@ internal class ArtObjectContext : EddyContext
             );
         }
 
-        if (_clipboard != null)
+        if (_clipboard.Count > 0)
         {
             StatusService.AddHints(("Ctrl+V", "Paste"));
         }
@@ -158,398 +138,191 @@ internal class ArtObjectContext : EddyContext
         {
             using (History.BeginScope("Delete Art Objects"))
             {
-                foreach (var id in _selectedIds.ToList())
-                {
-                    Level.ArtObjects.Remove(id);
-                    if (_artObjectActors.TryGetValue(id, out var actor))
-                    {
-                        Scene.DestroyActor(actor);
-                        _artObjectActors.Remove(id);
-                    }
-                }
+                RemoveSelected();
             }
-
-            _selectedIds.Clear();
         }
 
         if (ImGui.GetIO().KeyCtrl)
         {
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.C))
             {
-                _clipboard = BuildClipboard();
+                BuildClipboard();
             }
 
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
-                _clipboard = BuildClipboard();
+                BuildClipboard();
                 using (History.BeginScope("Cut Art Objects"))
                 {
-                    foreach (var id in _selectedIds.ToList())
-                    {
-                        Level.ArtObjects.Remove(id);
-                        if (_artObjectActors.TryGetValue(id, out var actor))
-                        {
-                            Scene.DestroyActor(actor);
-                            _artObjectActors.Remove(id);
-                        }
-                    }
+                    RemoveSelected();
                 }
-
-                _selectedIds.Clear();
             }
 
-            if (_clipboard != null && ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
+            if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
                 using (History.BeginScope("Paste Art Objects"))
                 {
-                    PasteClipboard(_clipboard);
+                    PasteClipboard();
                 }
             }
         }
 
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _hoveredId.HasValue)
         {
-            var shift = ImGui.GetIO().KeyShift;
-            if (_hoveredId.HasValue)
-            {
-                if (shift)
-                {
-                    if (!_selectedIds.Add(_hoveredId.Value))
-                    {
-                        _selectedIds.Remove(_hoveredId.Value);
-                    }
-                }
-                else
-                {
-                    _selectedIds.Clear();
-                    _selectedIds.Add(_hoveredId.Value);
-                }
-            }
-            else if (!shift)
+            if (!ImGui.GetIO().KeyShift)
             {
                 _selectedIds.Clear();
             }
 
+            _selectedIds.Add(_hoveredId.Value);
         }
-
-        return null;
     }
 
-    private EddyTool? UpdateTranslate(bool entered)
+    private void UpdateTranslate()
     {
-        StatusService.AddHints(
-            ("LMB Drag", "Move X or Z"),
-            ("Alt+LMB Drag", "Move Y"),
-            ("Shift", "Trixel Snap"),
-            ("R", "Reset")
-        );
-
-        if (entered)
+        var centroid = ComputeSelectionCentroid();
+        if (Gizmo.Translate(ref centroid))
         {
-            _translate = new TranslateState();
-            InitTranslateDragState();
-        }
-
-        if (!entered && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-        {
-            _translate = new TranslateState();
-            InitTranslateDragState();
-        }
-
-        if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) && _translate.Active)
-        {
-            var ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), _viewport);
-            var t = ray.Intersects(_translate.DragPlane);
-            if (t == null)
-            {
-                return null;
-            }
-
-            var rawWorldPoint = ray.Position + ray.Direction * t.Value;
-            var rawDelta = rawWorldPoint - _translate.InitialHandlePosition;
-
-            Vector3 snappedDelta;
-            if (ImGui.GetIO().KeyAlt)
-            {
-                snappedDelta = new Vector3(0f, rawDelta.Y, 0f);
-            }
-            else
-            {
-                if (!_translate.AxisLocked)
-                {
-                    _translate.LockAccum += InputService.GetMouseDelta();
-                    const float lockThreshold = 4f;
-                    if (_translate.LockAccum.Length() < lockThreshold)
-                    {
-                        return EddyTool.Translate;
-                    }
-
-                    var screenX = ScreenDir(Vector3.UnitX);
-                    var screenZ = ScreenDir(Vector3.UnitZ);
-                    var drag = Vector2.Normalize(_translate.LockAccum);
-                    _translate.LockedAxis =
-                        MathF.Abs(Vector2.Dot(drag, screenX)) >= MathF.Abs(Vector2.Dot(drag, screenZ))
-                            ? Vector3.UnitX
-                            : Vector3.UnitZ;
-                    _translate.AxisLocked = true;
-                }
-
-                var axis = _translate.LockedAxis!.Value;
-                snappedDelta = axis * Vector3.Dot(rawDelta, axis);
-            }
-
-            var snapSize = ImGui.GetIO().KeyShift ? Mathz.TrixelSize : 1f;
-            snappedDelta.X = MathF.Round(snappedDelta.X / snapSize) * snapSize;
-            snappedDelta.Y = MathF.Round(snappedDelta.Y / snapSize) * snapSize;
-            snappedDelta.Z = MathF.Round(snappedDelta.Z / snapSize) * snapSize;
-
+            var delta = centroid - ComputeSelectionCentroid();
             foreach (var id in _selectedIds)
             {
-                if (!Level.ArtObjects.TryGetValue(id, out var instance))
+                if (Level.ArtObjects.TryGetValue(id, out var instance))
                 {
-                    continue;
-                }
-
-                if (!_translate.InitialPositions.TryGetValue(id, out var initialPos))
-                {
-                    continue;
-                }
-
-                var newPos = initialPos + snappedDelta;
-                instance.Position = newPos.ToRepacker();
-
-                if (_artObjectActors.TryGetValue(id, out var actor))
-                {
-                    actor.Transform.Position = newPos;
-                }
-            }
-        }
-
-        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
-        {
-            _translate.Reset();
-        }
-
-        if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedIds.Count > 0 && !_translate.Active)
-        {
-            using (History.BeginScope("Reset Translate"))
-            {
-                foreach (var id in _selectedIds)
-                {
-                    if (!Level.ArtObjects.TryGetValue(id, out var instance))
-                    {
-                        continue;
-                    }
-
-                    var pos = Vector3.Zero;
-                    instance.Position = pos.ToRepacker();
-
+                    var position = instance.Position.ToXna() + delta;
+                    instance.Position = position.ToRepacker();
                     if (_artObjectActors.TryGetValue(id, out var actor))
                     {
-                        actor.Transform.Position = pos;
+                        actor.Transform.Position = position;
                     }
                 }
             }
         }
 
-        return null;
+        if (Gizmo.DragStarted)
+        {
+            _translateScope?.Dispose();
+            _translateScope = History.BeginScope("Translate Art Object");
+        }
+
+        if (Gizmo.DragEnded)
+        {
+            _translateScope?.Dispose();
+            _translateScope = null;
+        }
     }
 
-    private void InitTranslateDragState()
+    private Vector3 ComputeSelectionCentroid()
     {
         if (_selectedIds.Count == 0)
         {
-            return;
+            return Vector3.Zero;
         }
 
-        var avgPos = Vector3.Zero;
-        var count = 0;
+        var sum = _selectedIds
+            .Select(id => Level.ArtObjects[id])
+            .Select(instance => instance.Position.ToXna())
+            .Aggregate(Vector3.Zero, (current, position) => current + position);
 
-        foreach (var id in _selectedIds)
-        {
-            if (!Level.ArtObjects.TryGetValue(id, out var inst))
-            {
-                continue;
-            }
-
-            avgPos += inst.Position.ToXna();
-            count++;
-        }
-
-        if (count == 0)
-        {
-            return;
-        }
-
-        avgPos /= count;
-        var planeNormal = Vector3.Normalize(Camera.InverseView.Backward);
-        _translate.DragPlane = new Plane(planeNormal, -Vector3.Dot(planeNormal, avgPos));
-        _translate.InitialHandlePosition = avgPos;
-
-        _translate.InitialPositions = [];
-        foreach (var id in _selectedIds)
-        {
-            if (Level.ArtObjects.TryGetValue(id, out var inst))
-            {
-                _translate.InitialPositions[id] = inst.Position.ToXna();
-            }
-        }
-
-        _translate.Active = true;
-        _translate.Scope = History.BeginScope("Translate Art Objects");
+        return sum / _selectedIds.Count;
     }
 
-    private Vector2 ScreenDir(Vector3 worldDir)
+    private void UpdateRotate()
     {
-        var origin = Camera.Project(Vector3.Zero, Vector2.Zero);
-        var projected = Camera.Project(worldDir, Vector2.Zero);
-        var screen = new Vector2(projected.X - origin.X, projected.Y - origin.Y);
-        return screen.LengthSquared() > float.Epsilon ? Vector2.Normalize(screen) : screen;
-    }
-
-    private EddyTool? UpdateRotate()
-    {
-        StatusService.AddHints(
-            ("LMB", "Rotate 90°")
-        );
-
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _selectedIds.Count > 0)
+        var centroid = ComputeSelectionCentroid();
+        foreach (var id in _selectedIds)
         {
-            using (History.BeginScope("Rotate Art Objects"))
+            var instance = Level.ArtObjects[id];
+            var rotation = instance.Rotation.ToXna();
+
+            if (Gizmo.Rotate(centroid, ref rotation))
             {
-                foreach (var id in _selectedIds)
+                instance.Rotation = rotation.ToRepacker();
+                if (_artObjectActors.TryGetValue(id, out var actor))
                 {
-                    if (!Level.ArtObjects.TryGetValue(id, out var instance))
-                    {
-                        continue;
-                    }
-
-                    var rotation = instance.Rotation.ToXna() * Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathHelper.PiOver2);
-                    instance.Rotation = rotation.ToRepacker();
-
-                    if (_artObjectActors.TryGetValue(id, out var actor))
-                    {
-                        actor.Transform.Rotation = rotation;
-                    }
+                    actor.Transform.Rotation = rotation;
                 }
             }
         }
 
-        return null;
+        if (Gizmo.DragStarted)
+        {
+            _rotateScope?.Dispose();
+            _rotateScope = History.BeginScope("Rotate Art Object");
+        }
+
+        if (Gizmo.DragEnded)
+        {
+            _rotateScope?.Dispose();
+            _rotateScope = null;
+        }
     }
 
-    private EddyTool? UpdateScale(bool entered)
+    private void UpdateScale()
     {
         StatusService.AddHints(
-            ("LMB Drag", "Scale Uniformly"),
             ("R", "Reset")
         );
 
-        if (entered)
+        var centroid = ComputeSelectionCentroid();
+        foreach (var id in _selectedIds)
         {
-            _scale = new ScaleState();
-        }
+            var instance = Level.ArtObjects[id];
+            var scale = instance.Scale.ToXna();
 
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _selectedIds.Count > 0)
-        {
-            _scale = new ScaleState();
-
-            _scale.InitialScales = [];
-            foreach (var id in _selectedIds)
+            if (Gizmo.Scale(centroid, ref scale))
             {
-                if (Level.ArtObjects.TryGetValue(id, out var inst))
+                instance.Scale = scale.ToRepacker();
+                if (_artObjectActors.TryGetValue(id, out var actor))
                 {
-                    _scale.InitialScales[id] = inst.Scale.ToXna();
-                }
-            }
-
-            _scale.Active = true;
-            _scale.Scope = History.BeginScope("Scale Art Objects");
-        }
-
-        if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) && _scale.Active)
-        {
-            // Use screen-space drag delta: right = grow, left = shrink
-            var dragDelta = ImGui.GetMouseDragDelta(ImGuiMouseButton.Left);
-            var rawScalar = dragDelta.X;
-
-            var scaleFactor = 1f + rawScalar * 0.005f;
-            scaleFactor = MathF.Max(scaleFactor, 0.01f);
-            {
-
-                foreach (var id in _selectedIds)
-                {
-                    if (!Level.ArtObjects.TryGetValue(id, out var instance))
-                    {
-                        continue;
-                    }
-
-                    if (!_scale.InitialScales.TryGetValue(id, out var initialScale))
-                    {
-                        continue;
-                    }
-
-                    var newScale = initialScale * scaleFactor;
-                    instance.Scale = newScale.ToRepacker();
-
-                    if (_artObjectActors.TryGetValue(id, out var actor))
-                    {
-                        actor.Transform.Scale = newScale;
-                    }
+                    actor.Transform.Scale = scale;
                 }
             }
         }
 
-        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        if (Gizmo.DragStarted)
         {
-            _scale.Reset();
+            _scaleScope?.Dispose();
+            _scaleScope = History.BeginScope("Scale Art Object");
         }
 
-        if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedIds.Count > 0 && !_scale.Active)
+        if (Gizmo.DragEnded)
         {
-            using (History.BeginScope("Reset Scale"))
-            {
-                foreach (var id in _selectedIds)
-                {
-                    if (!Level.ArtObjects.TryGetValue(id, out var instance))
-                    {
-                        continue;
-                    }
-
-                    instance.Scale = Vector3.One.ToRepacker();
-
-                    if (_artObjectActors.TryGetValue(id, out var actor))
-                    {
-                        actor.Transform.Scale = Vector3.One;
-                    }
-                }
-            }
+            _scaleScope?.Dispose();
+            _scaleScope = null;
         }
-
-        return null;
     }
 
-    private EddyTool? UpdatePaint()
+    private void UpdatePaint()
     {
         StatusService.AddHints(
             ("LMB", "Place")
         );
 
-        UpdateGhost();
+        var entry = AssetBrowser.SelectedEntry;
+        if (entry.Type != AssetType.ArtObject)
+        {
+            _ghostActor!.Visible = false;
+            return;
+        }
+
+        _ghostActor!.Visible = true;
+        if (_ghostActor.Name != entry.Name)
+        {
+            var mesh = _ghostActor.GetComponent<ArtObjectMesh>();
+            var ao = (ArtObject)ResourceService.Load($"Art Objects/{entry.Name}");
+            mesh.Visualize(ao);
+        }
+
+        if (_hoveredId.HasValue && Level.ArtObjects.TryGetValue(_hoveredId.Value, out var hovered))
+        {
+            var snapped = hovered.Position.ToXna();
+            snapped = new Vector3(MathF.Round(snapped.X), MathF.Round(snapped.Y), MathF.Round(snapped.Z));
+            _ghostActor.Transform.Position = snapped;
+            _ghostActor.Visible = true;
+        }
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
-            var entry = AssetBrowser.SelectedEntry;
-            if (entry.Type != AssetType.ArtObject)
-            {
-                return null;
-            }
-
-            if (_ghostActor == null)
-            {
-                return null;
-            }
-
             var position = _ghostActor.Transform.Position;
 
             using (History.BeginScope("Place Art Object"))
@@ -579,65 +352,9 @@ internal class ArtObjectContext : EddyContext
                 _selectedIds.Add(id);
             }
         }
-
-        return null;
     }
 
-    private void UpdateGhost()
-    {
-        var entry = AssetBrowser.SelectedEntry;
-        if (entry.Type != AssetType.ArtObject)
-        {
-            DestroyGhost();
-            return;
-        }
-
-        if (_ghostName != entry.Name)
-        {
-            DestroyGhost();
-            _ghostName = entry.Name;
-
-            _ghostActor = Scene.CreateActor();
-            _ghostActor.Name = $"Ghost: {entry.Name}";
-            _ghostActor.Transform.Scale = Vector3.One;
-            _ghostActor.Transform.Rotation = Quaternion.Identity;
-
-            var mesh = _ghostActor.AddComponent<ArtObjectMesh>();
-            var ao = (ArtObject)ResourceService.Load($"Art Objects/{entry.Name}");
-            mesh.Visualize(ao);
-        }
-
-        if (_ghostActor != null && _hoveredId.HasValue && Level.ArtObjects.TryGetValue(_hoveredId.Value, out var hovered))
-        {
-            var snapped = SnapToGrid(hovered.Position.ToXna());
-            _ghostActor.Transform.Position = snapped;
-        }
-        else if (_ghostActor != null)
-        {
-            // Position ghost at world origin if no hovered AO
-            _ghostActor.Transform.Position = Vector3.Zero;
-        }
-    }
-
-    private static Vector3 SnapToGrid(Vector3 pos)
-    {
-        return new Vector3(
-            MathF.Round(pos.X),
-            MathF.Round(pos.Y),
-            MathF.Round(pos.Z));
-    }
-
-    private void DestroyGhost()
-    {
-        if (_ghostActor != null)
-        {
-            Scene.DestroyActor(_ghostActor);
-            _ghostActor = null;
-            _ghostName = null;
-        }
-    }
-
-    private EddyTool? UpdatePick()
+    private void UpdatePick()
     {
         StatusService.AddHints(
             ("LMB", "Pick Art Object")
@@ -648,11 +365,9 @@ internal class ArtObjectContext : EddyContext
             if (Level.ArtObjects.TryGetValue(_hoveredId.Value, out var instance))
             {
                 AssetBrowser.Pick(instance.Name, AssetType.ArtObject);
-                return EddyTool.Paint;
+                Tool = EddyTool.Paint;
             }
         }
-
-        return null;
     }
 
     private (MeshSurface, PrimitiveType)? BuildWireframeForAo(int id, Color color)
@@ -898,40 +613,61 @@ internal class ArtObjectContext : EddyContext
         }
 
         #endregion
+
+        #region ArtObject Ghost
+
+        {
+            _ghostActor = Scene.CreateActor();
+            _ghostActor.Name = string.Empty;
+            _ghostActor.Visible = false;
+        }
+
+        #endregion
     }
 
-    private List<ArtObjectInstance> BuildClipboard()
+    private void RemoveSelected()
     {
-        return _selectedIds
-            .Where(id => Level.ArtObjects.ContainsKey(id))
-            .Select(id =>
+        foreach (var id in _selectedIds)
+        {
+            Level.ArtObjects.Remove(id);
+            if (_artObjectActors.TryGetValue(id, out var actor))
             {
-                var src = Level.ArtObjects[id];
-                return new ArtObjectInstance
-                {
-                    Name = src.Name,
-                    Position = src.Position,
-                    Rotation = src.Rotation,
-                    Scale = src.Scale
-                };
-            })
-            .ToList();
+                Scene.DestroyActor(actor);
+                _artObjectActors.Remove(id);
+            }
+        }
+
+        _selectedIds.Clear();
     }
 
-    private void PasteClipboard(List<ArtObjectInstance> clipboard)
+    private void BuildClipboard()
+    {
+        _clipboard.Clear();
+        foreach (var id in _selectedIds)
+        {
+            var instance = Level.ArtObjects[id];
+
+            // Deep copy
+            var settingsJson = JsonSerializer.Serialize(instance.ActorSettings);
+            var settings = JsonSerializer.Deserialize<ArtObjectActorSettings>(settingsJson)!;
+
+            _clipboard.Add(new ArtObjectInstance
+            {
+                Name = instance.Name,
+                Position = instance.Position,
+                Rotation = instance.Rotation,
+                Scale = instance.Scale,
+                ActorSettings = settings
+            });
+        }
+    }
+
+    private void PasteClipboard()
     {
         _selectedIds.Clear();
-
-        foreach (var src in clipboard)
+        foreach (var instance in _clipboard)
         {
             var id = NextAvailableId();
-            var instance = new ArtObjectInstance
-            {
-                Name = src.Name,
-                Position = src.Position,
-                Rotation = src.Rotation,
-                Scale = src.Scale
-            };
             Level.ArtObjects[id] = instance;
 
             var actor = Scene.CreateActor();
@@ -956,55 +692,24 @@ internal class ArtObjectContext : EddyContext
 
     public override void Dispose()
     {
-        _paintScope?.Dispose();
-        _translate.Scope?.Dispose();
-        _scale.Scope?.Dispose();
-        DestroyGhost();
+        _translateScope?.Dispose();
+        _rotateScope?.Dispose();
+        _scaleScope?.Dispose();
         TeardownVisualization();
     }
 
     private void TeardownVisualization()
     {
+        if (_ghostActor != null)
+        {
+            Scene.DestroyActor(_ghostActor);
+        }
+
         foreach (var actor in _artObjectActors.Values)
         {
             Scene.DestroyActor(actor);
         }
 
         _artObjectActors.Clear();
-    }
-
-    private struct TranslateState
-    {
-        public bool Active;
-        public Plane DragPlane;
-        public Vector3 InitialHandlePosition;
-        public Dictionary<int, Vector3> InitialPositions = [];
-        public Vector2 LockAccum;
-        public Vector3? LockedAxis;
-        public bool AxisLocked;
-        public IDisposable? Scope;
-
-        public TranslateState() { }
-
-        public void Reset()
-        {
-            Scope?.Dispose();
-            this = new TranslateState();
-        }
-    }
-
-    private struct ScaleState
-    {
-        public bool Active;
-        public Dictionary<int, Vector3> InitialScales = [];
-        public IDisposable? Scope;
-
-        public ScaleState() { }
-
-        public void Reset()
-        {
-            Scope?.Dispose();
-            this = new ScaleState();
-        }
     }
 }
