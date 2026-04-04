@@ -1,6 +1,5 @@
 using FezEditor.Actors;
 using FezEditor.Structure;
-using ImGuiNET;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Eddy;
@@ -9,15 +8,17 @@ internal class EddyContexts : IDisposable
 {
     public EddyContext Current { get; private set; } = null!;
 
+    public EddyContext? Hovered { get; private set; }
+
     public CursorMesh Cursor { get; set; } = null!;
+
+    public Gizmo Gizmo { get; set; } = null!;
 
     public Dirty<bool> ShowCollisionMap { get; set; }
 
     public Dirty<bool> ShowPickableBounds { get; set; }
 
     private readonly List<EddyContext> _contexts = new();
-
-    private EddyContext? _hoveredContext;
 
     public void AddOrdered<T>(T context) where T : EddyContext
     {
@@ -27,11 +28,10 @@ internal class EddyContexts : IDisposable
         }
 
         _contexts.Add(context);
-    }
-
-    public void Init<T>() where T : EddyContext
-    {
-        Current = Get<T>();
+        if (context is DefaultEddyContext)
+        {
+            Current = context;
+        }
     }
 
     public void Dispose()
@@ -42,25 +42,24 @@ internal class EddyContexts : IDisposable
         }
     }
 
-    public void CheckHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public void CheckHovered(Ray ray, RaycastHit? hit)
     {
-        _hoveredContext = null;
+        Hovered = null;
         foreach (var context in _contexts)
         {
-            if (context.IsHovered(ray, hit, viewport))
+            context.Gizmo = Gizmo;
+            context.CursorMesh = Cursor;
+            if (context.IsHovered(ray, hit))
             {
-                _hoveredContext = context;
+                Hovered = context;
             }
         }
     }
 
-    public void ClearHover()
-    {
-        _hoveredContext = null;
-    }
-
     public void Update()
     {
+        Gizmo.Hide();
+
         if (ShowCollisionMap.IsDirty)
         {
             Get<TrileContext>().ShowCollisionMap(ShowCollisionMap.Value);
@@ -73,35 +72,24 @@ internal class EddyContexts : IDisposable
             ShowPickableBounds = ShowPickableBounds.Clean();
         }
 
-        var selected = _contexts.FirstOrDefault(c => c.IsSelected);
-        EddyContext next;
-        if (selected != null && !ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        Get<DefaultEddyContext>().UpdateLighting();
+
+        var next = Current;
+        if (!_contexts.Any(c => c.IsSelected))
         {
-            next = selected;
-        }
-        else
-        {
-            next = _hoveredContext ?? Get<DefaultEddyContext>();
+            next = Hovered ?? Get<DefaultEddyContext>();
         }
 
         if (Current != next)
         {
-            Console.WriteLine($"{Current} -> {next}");
-            Current.End();
             Current = next;
-            Current.Enter();
-            return;
         }
 
-        Get<DefaultEddyContext>().UpdateLighting();
         Current.Update();
-
         Cursor.ClearHover();
         Cursor.ClearSelection();
-        foreach (var context in _contexts)
-        {
-            context.DrawCursor(Cursor);
-        }
+        Hovered?.DrawCursor();
+        Current.DrawCursor();
     }
 
     public void SyncTool(EddyTool tool)

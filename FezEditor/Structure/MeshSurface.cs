@@ -280,6 +280,157 @@ public class MeshSurface
         };
     }
 
+    // Arrow: shaft (cylinder) + cone tip along +Y, rotated to point along axis.
+    // sides = number of lathe segments (use 8 for translate, 4 for scale).
+    public static MeshSurface CreateArrow(Vector3 axis, int sides, float shaftLength, float shaftRadius, float tipLength, float tipRadius)
+    {
+        axis = Vector3.Normalize(axis);
+
+        var vertices = new List<Vector3>();
+        var normals = new List<Vector3>();
+        var indices = new List<int>();
+
+        // Build rotation from +Y to axis
+        var up = Vector3.UnitY;
+        Quaternion rotation;
+        var dot = Vector3.Dot(up, axis);
+        if (dot > 0.9999f)
+        {
+            rotation = Quaternion.Identity;
+        }
+        else if (dot < -0.9999f)
+        {
+            rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI);
+        }
+        else
+        {
+            var cross = Vector3.Cross(up, axis);
+            rotation = Quaternion.CreateFromAxisAngle(Vector3.Normalize(cross), MathF.Acos(dot));
+        }
+
+        // Shaft (cylinder) - no caps, open at both ends
+        for (var i = 0; i < sides; i++)
+        {
+            var angle = 2f * MathF.PI * i / sides;
+            var cos = MathF.Cos(angle);
+            var sin = MathF.Sin(angle);
+            var normal = Vector3.Transform(new Vector3(cos, 0, sin), rotation);
+            vertices.Add(Vector3.Transform(new Vector3(cos * shaftRadius, 0f, sin * shaftRadius), rotation));
+            normals.Add(normal);
+            vertices.Add(Vector3.Transform(new Vector3(cos * shaftRadius, shaftLength, sin * shaftRadius), rotation));
+            normals.Add(normal);
+        }
+
+        for (var i = 0; i < sides; i++)
+        {
+            var a = i * 2;
+            var b = i * 2 + 1;
+            var c = ((i + 1) % sides) * 2;
+            var d = ((i + 1) % sides) * 2 + 1;
+            indices.Add(a); indices.Add(b); indices.Add(c);
+            indices.Add(b); indices.Add(d); indices.Add(c);
+        }
+
+        // Cone base disc (fill the opening between shaft and cone)
+        var coneBaseStart = vertices.Count;
+        var coneBaseCenter = Vector3.Transform(new Vector3(0, shaftLength, 0), rotation);
+        var downNormal = Vector3.Transform(-Vector3.UnitY, rotation);
+        vertices.Add(coneBaseCenter);
+        normals.Add(downNormal);
+        for (var i = 0; i < sides; i++)
+        {
+            var angle = 2f * MathF.PI * i / sides;
+            vertices.Add(Vector3.Transform(new Vector3(MathF.Cos(angle) * tipRadius, shaftLength, MathF.Sin(angle) * tipRadius), rotation));
+            normals.Add(downNormal);
+        }
+        for (var i = 0; i < sides; i++)
+        {
+            var a = coneBaseStart + 1 + i;
+            var b = coneBaseStart + 1 + (i + 1) % sides;
+            indices.Add(coneBaseStart); indices.Add(b); indices.Add(a);
+        }
+
+        // Cone surface
+        var coneTip = Vector3.Transform(new Vector3(0, shaftLength + tipLength, 0), rotation);
+        for (var i = 0; i < sides; i++)
+        {
+            var a0 = 2f * MathF.PI * i / sides;
+            var a1 = 2f * MathF.PI * (i + 1) / sides;
+            var v0 = Vector3.Transform(new Vector3(MathF.Cos(a0) * tipRadius, shaftLength, MathF.Sin(a0) * tipRadius), rotation);
+            var v1 = Vector3.Transform(new Vector3(MathF.Cos(a1) * tipRadius, shaftLength, MathF.Sin(a1) * tipRadius), rotation);
+
+            // Cone normal: perpendicular to slant edge
+            var slant0 = Vector3.Normalize(Vector3.Transform(new Vector3(MathF.Cos(a0), tipRadius / tipLength, MathF.Sin(a0)), rotation));
+            var slant1 = Vector3.Normalize(Vector3.Transform(new Vector3(MathF.Cos(a1), tipRadius / tipLength, MathF.Sin(a1)), rotation));
+            var tipNormal = Vector3.Normalize((slant0 + slant1) / 2f);
+
+            var baseIdx = vertices.Count;
+            vertices.Add(v0); normals.Add(slant0);
+            vertices.Add(v1); normals.Add(slant1);
+            vertices.Add(coneTip); normals.Add(tipNormal);
+            indices.Add(baseIdx); indices.Add(baseIdx + 1); indices.Add(baseIdx + 2);
+        }
+
+        return new MeshSurface
+        {
+            Vertices = vertices.ToArray(),
+            Normals = normals.ToArray(),
+            Indices = indices.ToArray()
+        };
+    }
+
+    // Ring (torus) around axis. segments = number of circle steps, crossSections = tube cross-section verts.
+    public static MeshSurface CreateRing(Vector3 axis, float radius, int segments, int crossSections, float tubeRadius)
+    {
+        axis = Vector3.Normalize(axis);
+
+        // Build two perpendicular vectors to axis for the ring plane
+        var tangent = MathF.Abs(Vector3.Dot(axis, Vector3.UnitX)) < 0.9f ? Vector3.UnitX : Vector3.UnitZ;
+        var right = Vector3.Normalize(Vector3.Cross(tangent, axis));
+        var forward = Vector3.Cross(axis, right);
+
+        var vertices = new List<Vector3>();
+        var normals = new List<Vector3>();
+        var indices = new List<int>();
+
+        for (var i = 0; i < segments; i++)
+        {
+            var angle = 2f * MathF.PI * i / segments;
+            var ringCenter = right * MathF.Cos(angle) * radius + forward * MathF.Sin(angle) * radius;
+            var outward = Vector3.Normalize(ringCenter);
+
+            for (var j = 0; j < crossSections; j++)
+            {
+                var tubeAngle = 2f * MathF.PI * j / crossSections;
+                var tubeNormal = outward * MathF.Cos(tubeAngle) + axis * MathF.Sin(tubeAngle);
+                vertices.Add(ringCenter + tubeNormal * tubeRadius);
+                normals.Add(tubeNormal);
+            }
+        }
+
+        for (var i = 0; i < segments; i++)
+        {
+            var nextI = (i + 1) % segments;
+            for (var j = 0; j < crossSections; j++)
+            {
+                var nextJ = (j + 1) % crossSections;
+                var a = i * crossSections + j;
+                var b = i * crossSections + nextJ;
+                var c = nextI * crossSections + j;
+                var d = nextI * crossSections + nextJ;
+                indices.Add(a); indices.Add(b); indices.Add(c);
+                indices.Add(b); indices.Add(d); indices.Add(c);
+            }
+        }
+
+        return new MeshSurface
+        {
+            Vertices = vertices.ToArray(),
+            Normals = normals.ToArray(),
+            Indices = indices.ToArray()
+        };
+    }
+
     public static MeshSurface CreateWireframeBox(Vector3 size, Color color)
     {
         size /= 2f;

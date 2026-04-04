@@ -1,7 +1,6 @@
 ﻿using FezEditor.Actors;
 using FezEditor.Services;
 using FezEditor.Structure;
-using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Level;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -26,36 +25,32 @@ internal abstract class EddyContext : IDisposable
 
     public Camera Camera { get; init; } = null!;
 
-    public EddyContexts Contexts { get; set; } = null!;
+    public CursorMesh CursorMesh { get; internal set; } = null!;
+
+    public Gizmo Gizmo { get; internal set; } = null!;
+
+    public EddyContexts Contexts { get; init; } = null!;
 
     public AssetBrowser AssetBrowser { get; init; } = null!;
 
     public ResourceService ResourceService { get; init; } = null!;
 
-    public InputService InputService { get; init; } = null!;
-
     public StatusService StatusService { get; init; } = null!;
 
-    public IContentManager ContentManager { get; init; } = null!;
-
-    public Dirty<EddyTool> Tool { get; set; }
+    public EddyTool Tool { get; set; }
 
     public virtual bool IsSelected => false;
 
-    public virtual bool IsHovered(Ray ray, RaycastHit? hit, Vector2 viewport)
+    public virtual bool IsHovered(Ray ray, RaycastHit? hit)
     {
         return false;
     }
 
-    public virtual void DrawCursor(CursorMesh cursor)
-    {
-    }
-
-    public virtual void Enter(params object?[] args)
-    {
-    }
-
     public virtual void Update()
+    {
+    }
+
+    public virtual void DrawCursor()
     {
     }
 
@@ -66,10 +61,6 @@ internal abstract class EddyContext : IDisposable
     public virtual void DrawProperties()
     {
         ImGui.Text("Select any object\nto view its properties");
-    }
-
-    public virtual void End()
-    {
     }
 
     public virtual void Dispose()

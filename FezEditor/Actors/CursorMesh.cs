@@ -14,17 +14,9 @@ public sealed class CursorMesh : ActorComponent
 
     private readonly Rid _mesh;
 
-    private readonly Rid _hoverMaterial;
+    private MeshInstance _selection = new();
 
-    private readonly Rid _selectionMaterial;
-
-    private List<(MeshSurface Surface, PrimitiveType Primitive)>? _hoverSurfaces;
-
-    private Color _hoverColor;
-
-    private List<(MeshSurface Surface, PrimitiveType Primitive)>? _selectionSurfaces;
-
-    private Color _selectionColor;
+    private MeshInstance _hover = new();
 
     private bool _dirty;
 
@@ -32,56 +24,52 @@ public sealed class CursorMesh : ActorComponent
     {
         _rendering = game.GetService<RenderingService>();
         _mesh = _rendering.MeshCreate();
-        _hoverMaterial = _rendering.MaterialCreate();
-        _selectionMaterial = _rendering.MaterialCreate();
         _rendering.InstanceSetMesh(actor.InstanceRid, _mesh);
     }
 
     public override void LoadContent(IContentManager content)
     {
-        _rendering.MaterialAssignEffect(_hoverMaterial, _rendering.BasicEffect);
-        _rendering.MaterialSetCullMode(_hoverMaterial, CullMode.None);
-        _rendering.MaterialSetBlendMode(_hoverMaterial, BlendMode.AlphaBlend);
+        _hover.Material = _rendering.MaterialCreate();
+        _rendering.MaterialAssignEffect(_hover.Material, _rendering.BasicEffect);
+        _rendering.MaterialSetCullMode(_hover.Material, CullMode.None);
+        _rendering.MaterialSetBlendMode(_hover.Material, BlendMode.AlphaBlend);
 
-        _rendering.MaterialAssignEffect(_selectionMaterial, _rendering.BasicEffect);
-        _rendering.MaterialSetCullMode(_selectionMaterial, CullMode.None);
-        _rendering.MaterialSetBlendMode(_selectionMaterial, BlendMode.AlphaBlend);
+        _selection.Material = _rendering.MaterialCreate();
+        _rendering.MaterialAssignEffect(_selection.Material, _rendering.BasicEffect);
+        _rendering.MaterialSetCullMode(_selection.Material, CullMode.None);
+        _rendering.MaterialSetBlendMode(_selection.Material, BlendMode.AlphaBlend);
     }
 
     public void SetHoverSurfaces(IEnumerable<(MeshSurface, PrimitiveType)> surfaces, Color color)
     {
-        _hoverSurfaces = surfaces.ToList();
-        _hoverColor = color;
+        _hover.Surfaces.AddRange(surfaces);
+        _hover.Color = color;
         _dirty = true;
     }
 
     public void ClearHover()
     {
-        if (_hoverSurfaces is not { Count: > 0 })
+        if (_hover.Surfaces.Count > 0)
         {
-            return;
+            _hover.Surfaces.Clear();
+            _dirty = true;
         }
-
-        _hoverSurfaces = null;
-        _dirty = true;
     }
 
     public void SetSelectionSurfaces(IEnumerable<(MeshSurface, PrimitiveType)> surfaces, Color color)
     {
-        _selectionSurfaces = surfaces.ToList();
-        _selectionColor = color;
+        _selection.Surfaces.AddRange(surfaces);
+        _selection.Color = color;
         _dirty = true;
     }
 
     public void ClearSelection()
     {
-        if (_selectionSurfaces is not { Count: > 0 })
+        if (_selection.Surfaces.Count > 0)
         {
-            return;
+            _selection.Surfaces.Clear();
+            _dirty = true;
         }
-
-        _selectionSurfaces = null;
-        _dirty = true;
     }
 
     public override void Update(GameTime gameTime)
@@ -94,32 +82,39 @@ public sealed class CursorMesh : ActorComponent
         _dirty = false;
         _rendering.MeshClear(_mesh);
 
-        if (_hoverSurfaces is { Count: > 0 })
+        if (_hover.Surfaces.Count > 0)
         {
-            _rendering.MaterialSetAlbedo(_hoverMaterial, _hoverColor);
-            foreach (var (surface, primitive) in _hoverSurfaces)
+            _rendering.MaterialSetAlbedo(_hover.Material, _hover.Color);
+            foreach (var (surface, primitive) in _hover.Surfaces)
             {
-                _rendering.MeshAddSurface(_mesh, primitive, surface, _hoverMaterial);
+                _rendering.MeshAddSurface(_mesh, primitive, surface, _hover.Material);
             }
         }
 
-        if (_selectionSurfaces is { Count: > 0 })
+        if (_selection.Surfaces.Count > 0)
         {
-            _rendering.MaterialSetAlbedo(_selectionMaterial, _selectionColor);
-            foreach (var (surface, primitive) in _selectionSurfaces)
+            _rendering.MaterialSetAlbedo(_selection.Material, _selection.Color);
+            foreach (var (surface, primitive) in _selection.Surfaces)
             {
-                _rendering.MeshAddSurface(_mesh, primitive, surface, _selectionMaterial);
+                _rendering.MeshAddSurface(_mesh, primitive, surface, _selection.Material);
             }
         }
 
-        var isVisible = (_hoverSurfaces is { Count: > 0 }) || (_selectionSurfaces is { Count: > 0 });
+        var isVisible = (_hover.Surfaces is { Count: > 0 }) || (_selection.Surfaces is { Count: > 0 });
         _rendering.InstanceSetVisibility(Actor.InstanceRid, isVisible);
     }
 
     public override void Dispose()
     {
-        _rendering.FreeRid(_selectionMaterial);
-        _rendering.FreeRid(_hoverMaterial);
+        _rendering.FreeRid(_selection.Material);
+        _rendering.FreeRid(_hover.Material);
         _rendering.FreeRid(_mesh);
+    }
+
+    private struct MeshInstance()
+    {
+        public Rid Material = Rid.Invalid;
+        public Color Color = Color.Transparent;
+        public readonly List<(MeshSurface Surface, PrimitiveType Primitive)> Surfaces = new();
     }
 }
