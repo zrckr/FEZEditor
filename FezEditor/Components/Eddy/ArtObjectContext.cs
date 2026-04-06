@@ -10,13 +10,9 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace FezEditor.Components.Eddy;
 
-internal class ArtObjectContext : EddyContext
+internal class ArtObjectContext : BaseContext
 {
-    public override bool IsSelected => _selectedIds.Count > 0;
-
     private readonly Dictionary<int, Actor> _artObjectActors = new();
-
-    private Actor? _ghostActor;
 
     private int? _hoveredId;
 
@@ -28,53 +24,47 @@ internal class ArtObjectContext : EddyContext
 
     private readonly List<ArtObjectInstance> _clipboard = new();
 
-    public override bool IsHovered(Ray ray, RaycastHit? hit)
+    public ArtObjectContext(Game game, Level level, IEddyEditor eddy) : base(game, level, eddy)
     {
-        _hoveredId = null;
-        if (!hit.HasValue || !hit.Value.Actor.HasComponent<ArtObjectMesh>())
-        {
-            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !Gizmo.IsActive)
-            {
-                _selectedIds.Clear();
-                Tool = EddyTool.Select;
-            }
-
-            return false;
-        }
-
-        var foundId = _artObjectActors
-            .FirstOrDefault(kv => kv.Value == hit.Value.Actor).Key;
-
-        if (!_artObjectActors.ContainsKey(foundId))
-        {
-            return false;
-        }
-
-        _hoveredId = foundId;
-        return true;
     }
 
-    public override void Update()
+    protected override void TestConditions()
     {
-        StatusService.ClearHints();
+        _hoveredId = null;
+        if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<ArtObjectMesh>())
+        {
+            var actor = Eddy.Hit.Value.Actor;
+            var foundId = _artObjectActors.FirstOrDefault(kv => kv.Value == actor).Key;
+            if (_artObjectActors.ContainsKey(foundId) && Eddy.Tool is EddyTool.Select or EddyTool.Pick)
+            {
+                _hoveredId = foundId;
+                Eddy.Context = EddyContext.ArtObject;
+                return;
+            }
+        }
 
+        if (!_hoveredId.HasValue && !Eddy.Gizmo.IsActive &&
+            ImGui.IsMouseClicked(ImGuiMouseButton.Left) && Eddy.IsViewportHovered)
+        {
+            _selectedIds.Clear();
+            Eddy.Tool = EddyTool.Select;
+        }
+
+        if (_selectedIds.Count > 0)
+        {
+            Eddy.Context = EddyContext.ArtObject;
+        }
+    }
+
+    protected override void Act()
+    {
         if (ImGui.IsKeyPressed(ImGuiKey.Escape))
         {
             _selectedIds.Clear();
-            Tool = EddyTool.Select;
+            Eddy.Tool = EddyTool.Select;
         }
 
-        if (Tool is not (EddyTool.Select or EddyTool.Pick))
-        {
-            _hoveredId = null;
-        }
-
-        if (Tool is EddyTool.Paint)
-        {
-            _ghostActor!.Visible = false;
-        }
-
-        switch (Tool)
+        switch (Eddy.Tool)
         {
             case EddyTool.Select: UpdateSelect(); break;
             case EddyTool.Translate: UpdateTranslate(); break;
@@ -84,16 +74,13 @@ internal class ArtObjectContext : EddyContext
             case EddyTool.Pick: UpdatePick(); break;
             default: throw new ArgumentOutOfRangeException();
         }
-    }
 
-    public override void DrawCursor()
-    {
-        if (Tool is EddyTool.Select or EddyTool.Pick && _hoveredId.HasValue)
+        if (_hoveredId.HasValue)
         {
             var hoverSurfaces = BuildWireframeForAo(_hoveredId.Value, HoverColor);
             if (hoverSurfaces.HasValue)
             {
-                CursorMesh.SetHoverSurfaces([hoverSurfaces.Value], HoverColor);
+                Eddy.Cursor.SetHoverSurfaces([hoverSurfaces.Value], HoverColor);
             }
         }
 
@@ -105,7 +92,7 @@ internal class ArtObjectContext : EddyContext
 
         if (selectionSurfaces.Count > 0)
         {
-            CursorMesh.SetSelectionSurfaces(selectionSurfaces, SelectionColor);
+            Eddy.Cursor.SetSelectionSurfaces(selectionSurfaces, SelectionColor);
         }
     }
 
@@ -132,7 +119,7 @@ internal class ArtObjectContext : EddyContext
 
         if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
-            using (History.BeginScope("Delete Art Objects"))
+            using (Eddy.History.BeginScope("Delete Art Objects"))
             {
                 RemoveSelected();
             }
@@ -148,7 +135,7 @@ internal class ArtObjectContext : EddyContext
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 BuildClipboard();
-                using (History.BeginScope("Cut Art Objects"))
+                using (Eddy.History.BeginScope("Cut Art Objects"))
                 {
                     RemoveSelected();
                 }
@@ -156,7 +143,7 @@ internal class ArtObjectContext : EddyContext
 
             if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
-                using (History.BeginScope("Paste Art Objects"))
+                using (Eddy.History.BeginScope("Paste Art Objects"))
                 {
                     PasteClipboard();
                 }
@@ -182,7 +169,7 @@ internal class ArtObjectContext : EddyContext
         }
 
         var centroid = ComputeSelectionCentroid();
-        if (Gizmo.Translate(ref centroid))
+        if (Eddy.Gizmo.Translate(ref centroid))
         {
             var delta = centroid - ComputeSelectionCentroid();
             foreach (var id in _selectedIds)
@@ -199,13 +186,13 @@ internal class ArtObjectContext : EddyContext
             }
         }
 
-        if (Gizmo.DragStarted)
+        if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = History.BeginScope("Translate Art Object");
+            _translateScope = Eddy.History.BeginScope("Translate Art Object");
         }
 
-        if (Gizmo.DragEnded)
+        if (Eddy.Gizmo.DragEnded)
         {
             _translateScope?.Dispose();
             _translateScope = null;
@@ -236,9 +223,9 @@ internal class ArtObjectContext : EddyContext
 
         var centroid = ComputeSelectionCentroid();
 
-        if (Gizmo.Rotate(centroid))
+        if (Eddy.Gizmo.Rotate(centroid))
         {
-            using (History.BeginScope("Rotate Art Object(s)"))
+            using (Eddy.History.BeginScope("Rotate Art Object(s)"))
             {
                 var step = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathHelper.PiOver2);
                 foreach (var id in _selectedIds)
@@ -271,7 +258,7 @@ internal class ArtObjectContext : EddyContext
         var primaryScale = firstInstance.Scale.ToXna();
         var previousScale = primaryScale;
 
-        if (Gizmo.Scale(centroid, ref primaryScale))
+        if (Eddy.Gizmo.Scale(centroid, ref primaryScale))
         {
             var delta = primaryScale - previousScale;
             foreach (var id in _selectedIds)
@@ -286,13 +273,13 @@ internal class ArtObjectContext : EddyContext
             }
         }
 
-        if (Gizmo.DragStarted)
+        if (Eddy.Gizmo.DragStarted)
         {
             _scaleScope?.Dispose();
-            _scaleScope = History.BeginScope("Scale Art Object");
+            _scaleScope = Eddy.History.BeginScope("Scale Art Object");
         }
 
-        if (Gizmo.DragEnded)
+        if (Eddy.Gizmo.DragEnded)
         {
             _scaleScope?.Dispose();
             _scaleScope = null;
@@ -300,7 +287,7 @@ internal class ArtObjectContext : EddyContext
 
         if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedIds.Count > 0 && _scaleScope == null)
         {
-            using (History.BeginScope("Reset Art Object Scale"))
+            using (Eddy.History.BeginScope("Reset Art Object Scale"))
             {
                 foreach (var id in _selectedIds)
                 {
@@ -323,59 +310,9 @@ internal class ArtObjectContext : EddyContext
             ("LMB", "Place")
         );
 
-        var entry = AssetBrowser.SelectedEntry;
-        if (entry.Type != AssetType.ArtObject)
-        {
-            _ghostActor!.Visible = false;
-            return;
-        }
-
-        _ghostActor!.Visible = true;
-        if (_ghostActor.Name != entry.Name)
-        {
-            var mesh = _ghostActor.GetComponent<ArtObjectMesh>();
-            var ao = (ArtObject)ResourceService.Load($"Art Objects/{entry.Name}");
-            mesh.Visualize(ao);
-        }
-
-        if (_hoveredId.HasValue && Level.ArtObjects.TryGetValue(_hoveredId.Value, out var hovered))
-        {
-            var snapped = hovered.Position.ToXna();
-            snapped = new Vector3(MathF.Round(snapped.X), MathF.Round(snapped.Y), MathF.Round(snapped.Z));
-            _ghostActor.Transform.Position = snapped;
-            _ghostActor.Visible = true;
-        }
-
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
-            var position = _ghostActor.Transform.Position;
-
-            using (History.BeginScope("Place Art Object"))
-            {
-                var id = NextAvailableId();
-                var instance = new ArtObjectInstance
-                {
-                    Name = entry.Name,
-                    Position = position.ToRepacker(),
-                    Rotation = Quaternion.Identity.ToRepacker(),
-                    Scale = Vector3.One.ToRepacker()
-                };
-                Level.ArtObjects[id] = instance;
-
-                var actor = Scene.CreateActor();
-                actor.Name = $"{id}: {instance.Name}";
-                actor.Transform.Position = position;
-                actor.Transform.Rotation = Quaternion.Identity;
-                actor.Transform.Scale = Vector3.One;
-                _artObjectActors[id] = actor;
-
-                var mesh = actor.AddComponent<ArtObjectMesh>();
-                var ao = (ArtObject)ResourceService.Load($"Art Objects/{instance.Name}");
-                mesh.Visualize(ao);
-
-                _selectedIds.Clear();
-                _selectedIds.Add(id);
-            }
+            // TODO: Implement this again =/
         }
     }
 
@@ -389,8 +326,8 @@ internal class ArtObjectContext : EddyContext
         {
             if (Level.ArtObjects.TryGetValue(_hoveredId.Value, out var instance))
             {
-                AssetBrowser.Pick(instance.Name, AssetType.ArtObject);
-                Tool = EddyTool.Paint;
+                Eddy.AssetBrowser.Pick(instance.Name, AssetType.ArtObject);
+                Eddy.Tool = EddyTool.Paint;
             }
         }
     }
@@ -427,16 +364,14 @@ internal class ArtObjectContext : EddyContext
 
     public override void DrawProperties()
     {
-        if (_selectedIds.Count == 0)
+        if (Eddy.Context != EddyContext.ArtObject || _selectedIds.Count == 0)
         {
-            base.DrawProperties();
             return;
         }
 
         var id = _selectedIds.First();
         if (!Level.ArtObjects.TryGetValue(id, out var instance))
         {
-            base.DrawProperties();
             return;
         }
 
@@ -445,7 +380,7 @@ internal class ArtObjectContext : EddyContext
         var position = instance.Position.ToXna();
         if (ImGuiX.InputFloat3("Position", ref position))
         {
-            using (History.BeginScope("Edit AO Position"))
+            using (Eddy.History.BeginScope("Edit AO Position"))
             {
                 instance.Position = position.ToRepacker();
                 if (_artObjectActors.TryGetValue(id, out var actor))
@@ -459,7 +394,7 @@ internal class ArtObjectContext : EddyContext
         var euler = QuaternionToEuler(rotation);
         if (ImGuiX.DragFloat3("Rotation (Euler)", ref euler, 1f))
         {
-            using (History.BeginScope("Edit AO Rotation"))
+            using (Eddy.History.BeginScope("Edit AO Rotation"))
             {
                 var newRotation = EulerToQuaternion(euler);
                 instance.Rotation = newRotation.ToRepacker();
@@ -473,7 +408,7 @@ internal class ArtObjectContext : EddyContext
         var scale = instance.Scale.ToXna();
         if (ImGuiX.DragFloat3("Scale", ref scale, 0.01f))
         {
-            using (History.BeginScope("Edit AO Scale"))
+            using (Eddy.History.BeginScope("Edit AO Scale"))
             {
                 instance.Scale = scale.ToRepacker();
                 if (_artObjectActors.TryGetValue(id, out var actor))
@@ -490,7 +425,7 @@ internal class ArtObjectContext : EddyContext
         var inactive = settings.Inactive;
         if (ImGui.Checkbox("Inactive", ref inactive))
         {
-            using (History.BeginScope("Edit AO Inactive"))
+            using (Eddy.History.BeginScope("Edit AO Inactive"))
             {
                 settings.Inactive = inactive;
             }
@@ -500,7 +435,7 @@ internal class ArtObjectContext : EddyContext
         var actorNames = Enum.GetNames<FEZRepacker.Core.Definitions.Game.Common.ActorType>();
         if (ImGui.Combo("Contained Trile", ref containedTrile, actorNames, actorNames.Length))
         {
-            using (History.BeginScope("Edit AO Contained Trile"))
+            using (Eddy.History.BeginScope("Edit AO Contained Trile"))
             {
                 settings.ContainedTrile = (FEZRepacker.Core.Definitions.Game.Common.ActorType)containedTrile;
             }
@@ -509,7 +444,7 @@ internal class ArtObjectContext : EddyContext
         var attachedGroup = settings.AttachedGroup ?? InvalidId;
         if (ImGui.InputInt("Attached Group", ref attachedGroup))
         {
-            using (History.BeginScope("Edit AO Attached Group"))
+            using (Eddy.History.BeginScope("Edit AO Attached Group"))
             {
                 settings.AttachedGroup = attachedGroup == InvalidId ? null : attachedGroup;
             }
@@ -518,7 +453,7 @@ internal class ArtObjectContext : EddyContext
         var spinEvery = settings.SpinEvery;
         if (ImGui.DragFloat("Spin Every", ref spinEvery, 0.1f))
         {
-            using (History.BeginScope("Edit AO Spin Every"))
+            using (Eddy.History.BeginScope("Edit AO Spin Every"))
             {
                 settings.SpinEvery = spinEvery;
             }
@@ -527,7 +462,7 @@ internal class ArtObjectContext : EddyContext
         var spinOffset = settings.SpinOffset;
         if (ImGui.DragFloat("Spin Offset", ref spinOffset, 0.1f))
         {
-            using (History.BeginScope("Edit AO Spin Offset"))
+            using (Eddy.History.BeginScope("Edit AO Spin Offset"))
             {
                 settings.SpinOffset = spinOffset;
             }
@@ -536,7 +471,7 @@ internal class ArtObjectContext : EddyContext
         var offCenter = settings.OffCenter;
         if (ImGui.Checkbox("Off Center", ref offCenter))
         {
-            using (History.BeginScope("Edit AO Off Center"))
+            using (Eddy.History.BeginScope("Edit AO Off Center"))
             {
                 settings.OffCenter = offCenter;
             }
@@ -574,13 +509,18 @@ internal class ArtObjectContext : EddyContext
     {
         if (partial)
         {
+            if (Eddy.Context != EddyContext.ArtObject)
+            {
+                return;
+            }
+
             var presentIds = Level.ArtObjects.Keys.Where(k => k != InvalidId).ToHashSet();
 
             foreach (var id in _artObjectActors.Keys.ToList())
             {
                 if (!presentIds.Contains(id))
                 {
-                    Scene.DestroyActor(_artObjectActors[id]);
+                    Eddy.Scene.DestroyActor(_artObjectActors[id]);
                     _artObjectActors.Remove(id);
                 }
             }
@@ -595,7 +535,7 @@ internal class ArtObjectContext : EddyContext
                 }
                 else
                 {
-                    actor = Scene.CreateActor();
+                    actor = Eddy.Scene.CreateActor();
                     actor.Name = $"{id}: {instance.Name}";
                     actor.Transform.Position = instance.Position.ToXna();
                     actor.Transform.Rotation = instance.Rotation.ToXna();
@@ -625,7 +565,7 @@ internal class ArtObjectContext : EddyContext
 
         foreach (var (id, instance) in Level.ArtObjects.Where(kv => kv.Key != InvalidId))
         {
-            var actor = Scene.CreateActor();
+            var actor = Eddy.Scene.CreateActor();
             actor.Name = $"{id}: {instance.Name}";
             actor.Transform.Position = instance.Position.ToXna();
             actor.Transform.Rotation = instance.Rotation.ToXna();
@@ -638,16 +578,6 @@ internal class ArtObjectContext : EddyContext
         }
 
         #endregion
-
-        #region ArtObject Ghost
-
-        {
-            _ghostActor = Scene.CreateActor();
-            _ghostActor.Name = string.Empty;
-            _ghostActor.Visible = false;
-        }
-
-        #endregion
     }
 
     private void RemoveSelected()
@@ -657,7 +587,7 @@ internal class ArtObjectContext : EddyContext
             Level.ArtObjects.Remove(id);
             if (_artObjectActors.TryGetValue(id, out var actor))
             {
-                Scene.DestroyActor(actor);
+                Eddy.Scene.DestroyActor(actor);
                 _artObjectActors.Remove(id);
             }
         }
@@ -695,7 +625,7 @@ internal class ArtObjectContext : EddyContext
             var id = NextAvailableId();
             Level.ArtObjects[id] = instance;
 
-            var actor = Scene.CreateActor();
+            var actor = Eddy.Scene.CreateActor();
             actor.Name = $"{id}: {instance.Name}";
             actor.Transform.Position = instance.Position.ToXna();
             actor.Transform.Rotation = instance.Rotation.ToXna();
@@ -715,6 +645,11 @@ internal class ArtObjectContext : EddyContext
         return Level.ArtObjects.Keys.Where(k => k != InvalidId).DefaultIfEmpty(-1).Max() + 1;
     }
 
+    protected override bool IsContextAllowed(EddyContext context)
+    {
+        return context == EddyContext.ArtObject;
+    }
+
     public override void Dispose()
     {
         _translateScope?.Dispose();
@@ -724,14 +659,9 @@ internal class ArtObjectContext : EddyContext
 
     private void TeardownVisualization()
     {
-        if (_ghostActor != null)
-        {
-            Scene.DestroyActor(_ghostActor);
-        }
-
         foreach (var actor in _artObjectActors.Values)
         {
-            Scene.DestroyActor(actor);
+            Eddy.Scene.DestroyActor(actor);
         }
 
         _artObjectActors.Clear();

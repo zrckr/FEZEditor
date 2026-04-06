@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Eddy;
 
-internal class DefaultEddyContext : EddyContext
+internal class DefaultContext : BaseContext
 {
     private Sky? _sky;
 
@@ -18,19 +18,52 @@ internal class DefaultEddyContext : EddyContext
 
     private Actor? _pickablesActor;
 
-    public void ShowPickableBounds(bool visible)
+    public DefaultContext(Game game, Level level, IEddyEditor eddy) : base(game, level, eddy)
     {
-        var bounds = _pickablesActor?.GetComponent<PickableBounds>();
-        var actors = visible
-            ? Scene.GetChildren(Scene.Root)
-            : Enumerable.Empty<Actor>();
+    }
 
-        bounds?.Visualize(actors);
+    protected override void TestConditions()
+    {
+        if (Eddy.Context == EddyContext.Default)
+        {
+            // Nobody claimed it, stay default
+        }
+
+        if (Eddy.ShowPickableBounds.IsDirty)
+        {
+            var bounds = _pickablesActor?.GetComponent<PickableBounds>();
+            var actors = Eddy.ShowPickableBounds.Value
+                ? Eddy.Scene.GetChildren(Eddy.Scene.Root)
+                : Enumerable.Empty<Actor>();
+
+            bounds?.Visualize(actors);
+            Eddy.ShowPickableBounds = Eddy.ShowPickableBounds.Clean();
+        }
+
+        if (_skyActor != null)
+        {
+            var visualizer = _skyActor.GetComponent<SkyVisualizer>();
+            var actualAmbient = new Color(Level.BaseAmbient, Level.BaseAmbient, Level.BaseAmbient);
+            var actualDiffuse = new Color(Level.BaseDiffuse, Level.BaseDiffuse, Level.BaseDiffuse);
+
+            if (Eddy.Clock.NightContribution != 0f)
+            {
+                actualDiffuse = Color.Lerp(actualDiffuse, visualizer.FogColor, Eddy.Clock.NightContribution * 0.4f);
+                actualAmbient = Color.Lerp(actualAmbient, visualizer.FoliageShadows
+                    ? Color.Lerp(visualizer.FogColor, Color.White, 0.5f)
+                    : Color.White, Eddy.Clock.NightContribution * 0.5f);
+            }
+
+            actualAmbient = Color.Lerp(actualAmbient, visualizer.FogColor, 23f / 160f);
+
+            Eddy.Scene.Lighting.Ambient = actualAmbient;
+            Eddy.Scene.Lighting.Diffuse = actualDiffuse;
+        }
     }
 
     public override void Revisualize(bool partial = false)
     {
-        if (partial)
+        if (Eddy.Context != EddyContext.Default && partial)
         {
             return;
         }
@@ -40,14 +73,14 @@ internal class DefaultEddyContext : EddyContext
         #region Sky
 
         _sky = (Sky)ResourceService.Load($"Skies/{Level.SkyName}");
-        Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
-        Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
+        Eddy.Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
+        Eddy.Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
 
         {
-            _skyActor = Scene.CreateActor();
+            _skyActor = Eddy.Scene.CreateActor();
             _skyActor.Name = "Sky";
             var visualizer = _skyActor.AddComponent<SkyVisualizer>();
-            visualizer.Initialize(Scene, Camera, Clock);
+            visualizer.Initialize(Eddy.Scene, Eddy.Camera, Eddy.Clock);
             visualizer.LevelSize = Level.Size.ToXna();
             visualizer.Visualize(_sky);
             visualizer.VisualizeShadows(_sky.Name, _sky.Shadows);
@@ -58,7 +91,7 @@ internal class DefaultEddyContext : EddyContext
         #region Level bounds
 
         {
-            _boundsActor = Scene.CreateActor();
+            _boundsActor = Eddy.Scene.CreateActor();
             _boundsActor.Name = "Level Bounds";
 
             var mesh = _boundsActor.AddComponent<BoundsMesh>();
@@ -71,7 +104,7 @@ internal class DefaultEddyContext : EddyContext
 
         if (Level.WaterType != LiquidType.None)
         {
-            _liquidActor = Scene.CreateActor();
+            _liquidActor = Eddy.Scene.CreateActor();
             _liquidActor.Name = $"Water: {Level.WaterType}";
 
             var mesh = _liquidActor.AddComponent<LiquidMesh>();
@@ -82,7 +115,7 @@ internal class DefaultEddyContext : EddyContext
 
         #region Pickable Bounds
 
-        _pickablesActor = Scene.CreateActor();
+        _pickablesActor = Eddy.Scene.CreateActor();
         _pickablesActor.Name = "Debug";
 
         var bounds = _pickablesActor.AddComponent<PickableBounds>();
@@ -106,7 +139,7 @@ internal class DefaultEddyContext : EddyContext
 
         if (_pickablesActor?.HasComponent<PickableBounds>() ?? false)
         {
-            _pickablesActor = Scene.CreateActor();
+            _pickablesActor = Eddy.Scene.CreateActor();
             _pickablesActor.Name = "Debug";
 
             var bounds = _pickablesActor.AddComponent<PickableBounds>();
@@ -116,29 +149,9 @@ internal class DefaultEddyContext : EddyContext
         #endregion
     }
 
-    public void UpdateLighting()
+    protected override bool IsContextAllowed(EddyContext context)
     {
-        if (_skyActor == null)
-        {
-            return;
-        }
-
-        var visualizer = _skyActor.GetComponent<SkyVisualizer>();
-        var actualAmbient = new Color(Level.BaseAmbient, Level.BaseAmbient, Level.BaseAmbient);
-        var actualDiffuse = new Color(Level.BaseDiffuse, Level.BaseDiffuse, Level.BaseDiffuse);
-
-        if (Clock.NightContribution != 0f)
-        {
-            actualDiffuse = Color.Lerp(actualDiffuse, visualizer.FogColor, Clock.NightContribution * 0.4f);
-            actualAmbient = Color.Lerp(actualAmbient, visualizer.FoliageShadows
-                ? Color.Lerp(visualizer.FogColor, Color.White, 0.5f)
-                : Color.White, Clock.NightContribution * 0.5f);
-        }
-
-        actualAmbient = Color.Lerp(actualAmbient, visualizer.FogColor, 23f / 160f);
-
-        Scene.Lighting.Ambient = actualAmbient;
-        Scene.Lighting.Diffuse = actualDiffuse;
+        return context == EddyContext.Default;
     }
 
     public override void Dispose()
@@ -150,25 +163,25 @@ internal class DefaultEddyContext : EddyContext
     {
         if (_pickablesActor != null)
         {
-            Scene.DestroyActor(_pickablesActor);
+            Eddy.Scene.DestroyActor(_pickablesActor);
             _pickablesActor = null;
         }
 
         if (_liquidActor != null)
         {
-            Scene.DestroyActor(_liquidActor);
+            Eddy.Scene.DestroyActor(_liquidActor);
             _liquidActor = null;
         }
 
         if (_boundsActor != null)
         {
-            Scene.DestroyActor(_boundsActor);
+            Eddy.Scene.DestroyActor(_boundsActor);
             _boundsActor = null;
         }
 
         if (_skyActor != null)
         {
-            Scene.DestroyActor(_skyActor);
+            Eddy.Scene.DestroyActor(_skyActor);
             _skyActor = null;
         }
     }

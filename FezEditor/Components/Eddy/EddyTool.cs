@@ -1,6 +1,6 @@
 namespace FezEditor.Components.Eddy;
 
-internal enum EddyTool
+public enum EddyTool
 {
     Select,
     Translate,
@@ -10,7 +10,7 @@ internal enum EddyTool
     Pick
 }
 
-internal static class EddyToolExtensions
+public static class EddyToolExtensions
 {
     public static string GetLabel(this EddyTool tool)
     {

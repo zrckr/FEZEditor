@@ -8,13 +8,37 @@ using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components;
 
-public class EddyEditor : EditorComponent
+public class EddyEditor : EditorComponent, IEddyEditor
 {
     public override object Asset => _level;
 
-    private readonly Level _level;
+    public Scene Scene { get; private set; } = null!;
 
-    private Scene _scene = null!;
+    public Clock Clock { get; } = new();
+
+    public AssetBrowser AssetBrowser { get; }
+
+    public Camera Camera => _cameraActor.GetComponent<Camera>();
+
+    public CursorMesh Cursor => _cursorActor.GetComponent<CursorMesh>();
+
+    public Gizmo Gizmo => _gizmoActor.GetComponent<Gizmo>();
+
+    public bool IsViewportHovered { get; private set; }
+
+    public Ray Ray { get; private set; }
+
+    public RaycastHit? Hit { get; private set; }
+
+    public EddyTool Tool { get; set; } = EddyTool.Select;
+
+    public EddyContext Context { get; set; } = EddyContext.Default;
+
+    public Dirty<bool> ShowPickableBounds { get; set; } = new(false);
+
+    public Dirty<bool> ShowCollisionMap { get; set; } = new(false);
+
+    private readonly Level _level;
 
     private Actor _cameraActor = null!;
 
@@ -22,19 +46,9 @@ public class EddyEditor : EditorComponent
 
     private Actor _gizmoActor = null!;
 
-    private readonly Clock _clock = new();
-
-    private readonly AssetBrowser _assetBrowser;
-
-    private readonly EddyContexts _contexts = new();
-
-    private RaycastHit? _raycastHit;
+    private readonly List<BaseContext> _contexts = new();
 
     private bool _showProperties;
-
-    private bool _showCollisionMap;
-
-    private bool _showPickableBounds;
 
     private bool _showAssetBrowser;
 
@@ -43,7 +57,7 @@ public class EddyEditor : EditorComponent
     public EddyEditor(Game game, string title, Level level) : base(game, title)
     {
         _level = level;
-        _assetBrowser = new AssetBrowser(game);
+        AssetBrowser = new AssetBrowser(game);
         History.RegisterConverter(new TrileEmplacementConverter());
         History.Track(level);
         History.StateChanged += () => _queueRevisualization = true;
@@ -51,17 +65,28 @@ public class EddyEditor : EditorComponent
 
     public override void Update(GameTime gameTime)
     {
-        _clock.Tick(gameTime);
-        _contexts.Update();
-        _scene.Update(gameTime);
+        Gizmo.Hide();
+        Cursor.ClearHover();
+        Cursor.ClearSelection();
+        StatusService.ClearHints();
+        Context = EddyContext.Default;
+
+        Clock.Tick(gameTime);
+
+        foreach (var context in _contexts)
+        {
+            context.Update();
+        }
+
+        Scene.Update(gameTime);
     }
 
     public override void LoadContent()
     {
-        _assetBrowser.LoadContent(ContentManager);
-        _scene = new Scene(Game, ContentManager);
+        AssetBrowser.LoadContent(ContentManager);
+        Scene = new Scene(Game, ContentManager);
         {
-            _cameraActor = _scene.CreateActor();
+            _cameraActor = Scene.CreateActor();
             _cameraActor.Name = "Camera";
 
             var camera = _cameraActor.AddComponent<Camera>();
@@ -74,27 +99,34 @@ public class EddyEditor : EditorComponent
             orientation.UseFaceLabels = false;
         }
         {
-            _contexts.AddOrdered(MakeContext<DefaultEddyContext>());
-            _contexts.AddOrdered(MakeContext<TrileContext>());
-            _contexts.AddOrdered(MakeContext<ArtObjectContext>());
-            _contexts.AddOrdered(MakeContext<BackgroundPlaneContext>());
-            _contexts.AddOrdered(MakeContext<NpcContext>());
-            _contexts.AddOrdered(MakeContext<GomezContext>());
-            _contexts.AddOrdered(MakeContext<VolumeContext>());
-            _contexts.AddOrdered(MakeContext<PathContext>());
-            _contexts.AddOrdered(MakeContext<ScriptContext>());
-            _contexts.RevisualizeAll();
+            var defaultCtx = new DefaultContext(Game, _level, this);
+            _contexts.Add(defaultCtx);
+            _contexts.Add(new TrileContext(Game, _level, this));
+            _contexts.Add(new ArtObjectContext(Game, _level, this));
+            _contexts.Add(new BackgroundPlaneContext(Game, _level, this));
+            _contexts.Add(new NpcContext(Game, _level, this));
+            _contexts.Add(new GomezContext(Game, _level, this));
+            _contexts.Add(new VolumeContext(Game, _level, this));
+            _contexts.Add(new PathContext(Game, _level, this));
+            _contexts.Add(new ScriptContext(Game, _level, this));
+
+            foreach (var ctx in _contexts)
+            {
+                ctx.Revisualize();
+            }
+
+            defaultCtx.PostRevisualize();
         }
         {
-            _cursorActor = _scene.CreateActor();
+            _cursorActor = Scene.CreateActor();
             _cursorActor.Name = "Cursor";
-            _contexts.Cursor = _cursorActor.AddComponent<CursorMesh>();
+            _cursorActor.AddComponent<CursorMesh>();
         }
         {
-            _gizmoActor = _scene.CreateActor();
+            _gizmoActor = Scene.CreateActor();
             _gizmoActor.Name = "Gizmo";
-            _contexts.Gizmo = _gizmoActor.AddComponent<Gizmo>();
-            _contexts.Gizmo.Camera = _cameraActor.GetComponent<Camera>();
+            var gizmo = _gizmoActor.AddComponent<Gizmo>();
+            gizmo.Camera = _cameraActor.GetComponent<Camera>();
         }
 
         var position = _level.StartingFace.Id.ToXna().ToVector3();
@@ -107,7 +139,10 @@ public class EddyEditor : EditorComponent
         if (_queueRevisualization)
         {
             _queueRevisualization = false;
-            _contexts.Current.Revisualize(partial: true);
+            foreach (var ctx in _contexts)
+            {
+                ctx.Revisualize(partial: true);
+            }
         }
 
         DrawToolbar();
@@ -118,10 +153,10 @@ public class EddyEditor : EditorComponent
 
         if (w > 0 && h > 0)
         {
-            var texture = _scene.Viewport.GetTexture();
+            var texture = Scene.Viewport.GetTexture();
             if (texture == null || texture.Width != w || texture.Height != h)
             {
-                _scene.Viewport.SetSize(w, h);
+                Scene.Viewport.SetSize(w, h);
             }
 
             if (texture is { IsDisposed: false })
@@ -132,12 +167,12 @@ public class EddyEditor : EditorComponent
                 var viewportMin = ImGuiX.GetItemRectMin();
                 _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;
 
-                _raycastHit = null;
-                if (ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+                Hit = null;
+                IsViewportHovered = ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right);
+                if (IsViewportHovered)
                 {
-                    var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
-                    _raycastHit = _scene.Raycast(ray);
-                    _contexts.CheckHovered(ray, _raycastHit);
+                    Ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
+                    Hit = Scene.Raycast(Ray);
                 }
 
                 var orientation = _cameraActor.GetComponent<OrientationGizmo>();
@@ -149,7 +184,7 @@ public class EddyEditor : EditorComponent
                 DrawRaycastDebug(viewportMin + new Vector2(8, size.Y - 8f));
 
                 var topCenter = viewportMin + new Vector2(size.X / 2f, 8f);
-                ImGuiX.DrawClock(topCenter, _clock);
+                ImGuiX.DrawClock(topCenter, Clock);
             }
         }
 
@@ -159,7 +194,11 @@ public class EddyEditor : EditorComponent
                                            ImGuiWindowFlags.NoCollapse;
             if (ImGui.Begin("Properties", ref _showProperties, flags))
             {
-                _contexts.Current.DrawProperties();
+                foreach (var ctx in _contexts)
+                {
+                    ctx.DrawProperties();
+                }
+
                 ImGui.End();
             }
         }
@@ -170,7 +209,7 @@ public class EddyEditor : EditorComponent
             ImGuiX.SetNextWindowSize(new Vector2(700, 500), ImGuiCond.FirstUseEver);
             if (ImGui.Begin("Asset Browser", ref _showAssetBrowser, flags))
             {
-                _assetBrowser.Draw();
+                AssetBrowser.Draw();
                 ImGui.End();
             }
         }
@@ -178,9 +217,13 @@ public class EddyEditor : EditorComponent
 
     public override void Dispose()
     {
-        _contexts.Dispose();
-        _assetBrowser.Dispose();
-        _scene.Dispose();
+        foreach (var ctx in _contexts)
+        {
+            ctx.Dispose();
+        }
+
+        AssetBrowser.Dispose();
+        Scene.Dispose();
         base.Dispose();
     }
 
@@ -260,14 +303,16 @@ public class EddyEditor : EditorComponent
 
         if (ImGui.BeginPopup("ViewOptions"))
         {
-            if (ImGui.Checkbox("Collision Map", ref _showCollisionMap))
+            var showCollisionMap = ShowCollisionMap.Value;
+            if (ImGui.Checkbox("Collision Map", ref showCollisionMap))
             {
-                _contexts.ShowCollisionMap = _showCollisionMap;
+                ShowCollisionMap = showCollisionMap;
             }
 
-            if (ImGui.Checkbox("Pickable Bounds", ref _showPickableBounds))
+            var showPickableBounds = ShowPickableBounds.Value;
+            if (ImGui.Checkbox("Pickable Bounds", ref showPickableBounds))
             {
-                _contexts.ShowPickableBounds = _showPickableBounds;
+                ShowPickableBounds = showPickableBounds;
             }
 
             ImGui.EndPopup();
@@ -276,11 +321,12 @@ public class EddyEditor : EditorComponent
 
     private void DrawToolButton(string icon, EddyTool tool)
     {
-        ImGui.BeginDisabled(_contexts.Current.Tool == tool);
+        ImGui.BeginDisabled(Tool == tool);
         if (ImGui.Button($"{icon}##{tool}"))
         {
-            _contexts.SyncTool(tool);
+            Tool = tool;
         }
+
         ImGui.EndDisabled();
 
         if (ImGui.IsItemHovered())
@@ -291,18 +337,13 @@ public class EddyEditor : EditorComponent
 
     private void DrawRaycastDebug(Vector2 position)
     {
-        var stats = new Dictionary<string, string>
+        var stats = new Dictionary<string, string>();
+        if (Hit.HasValue)
         {
-            ["Hovered"] = _contexts.Hovered?.GetType().Name ?? "",
-            ["Current"] = _contexts.Current.GetType().Name
-        };
-
-        if (_raycastHit.HasValue)
-        {
-            var actor = _raycastHit.Value.Actor;
-            var index = _raycastHit.Value.Index;
+            var actor = Hit.Value.Actor;
+            var index = Hit.Value.Index;
             stats["Hit"] = actor.Name;
-            stats["Distance"] = $"{_raycastHit.Value.Distance:F2}";
+            stats["Distance"] = $"{Hit.Value.Distance:F2}";
             stats["Triangle"] = $"{index}";
             if (actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
             {
@@ -317,21 +358,5 @@ public class EddyEditor : EditorComponent
 
         var lineHeight = ImGui.GetTextLineHeight();
         ImGuiX.DrawStats(position - new Vector2(0, lineHeight * stats.Count + 8), stats);
-    }
-
-    private T MakeContext<T>() where T : EddyContext, new()
-    {
-        return new T
-        {
-            Scene = _scene,
-            Clock = _clock,
-            History = History,
-            Level = _level,
-            Camera = _cameraActor.GetComponent<Camera>(),
-            AssetBrowser = _assetBrowser,
-            ResourceService = ResourceService,
-            StatusService = StatusService,
-            Contexts = _contexts
-        };
     }
 }

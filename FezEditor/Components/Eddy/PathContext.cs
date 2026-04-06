@@ -1,16 +1,21 @@
 ﻿using FezEditor.Actors;
 using FezEditor.Tools;
+using FEZRepacker.Core.Definitions.Game.Level;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Eddy;
 
-internal class PathContext : EddyContext
+internal class PathContext : BaseContext
 {
     private readonly Dictionary<int, Actor> _pathActors = new();
 
+    public PathContext(Game game, Level level, IEddyEditor eddy) : base(game, level, eddy)
+    {
+    }
+
     public override void Revisualize(bool partial = false)
     {
-        if (partial)
+        if (Eddy.Context != EddyContext.Path && partial)
         {
             return;
         }
@@ -21,7 +26,7 @@ internal class PathContext : EddyContext
 
         foreach (var (id, path) in Level.Paths.Where(kv => kv.Key != InvalidId))
         {
-            var actor = Scene.CreateActor();
+            var actor = Eddy.Scene.CreateActor();
             actor.Name = $"{id}: Path";
             _pathActors[id] = actor;
 
@@ -33,6 +38,11 @@ internal class PathContext : EddyContext
         #endregion
     }
 
+    protected override bool IsContextAllowed(EddyContext context)
+    {
+        return context == EddyContext.Path;
+    }
+
     public override void Dispose()
     {
         TeardownVisualization();
@@ -42,7 +52,7 @@ internal class PathContext : EddyContext
     {
         foreach (var actor in _pathActors.Values)
         {
-            Scene.DestroyActor(actor);
+            Eddy.Scene.DestroyActor(actor);
         }
 
         _pathActors.Clear();
