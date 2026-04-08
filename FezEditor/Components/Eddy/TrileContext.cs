@@ -194,7 +194,7 @@ internal sealed class TrileContext : BaseContext
             }
             else if (_selectedCursor.Emplacements.Count > 1)
             {
-                StatusService.AddHints(("Ctrl+Shift+G", "Group"));
+                StatusService.AddHints(("Ctrl+G", "Group"));
             }
         }
 
@@ -222,6 +222,35 @@ internal sealed class TrileContext : BaseContext
             }
 
             _selectedCursor.GroupId = null;
+        }
+
+        if (ImGui.GetIO().KeyCtrl && !ImGui.GetIO().KeyShift && ImGui.IsKeyPressed(ImGuiKey.G) &&
+            _selectedCursor.Emplacements.Count > 1 && _selectedCursor.GroupId == null)
+        {
+            using (Eddy.History.BeginScope("Create Trile Group"))
+            {
+                var groupId = Level.Groups.Count > 0 ? Level.Groups.Keys.Max() + 1 : 0;
+                var group = new TrileGroup();
+
+                foreach (var emp in _selectedCursor.Emplacements)
+                {
+                    if (Level.Triles.TryGetValue(emp, out var instance))
+                    {
+                        group.Triles.Add(instance);
+                        _emplacementGroups[emp] = groupId;
+                    }
+                }
+
+                if (!_groupEmplacements.TryGetValue(groupId, out var set))
+                {
+                    set = new HashSet<TrileEmplacement>();
+                    _groupEmplacements[groupId] = set;
+                }
+
+                set.UnionWith(_selectedCursor.Emplacements);
+                Level.Groups[groupId] = group;
+                _selectedCursor.GroupId = groupId;
+            }
         }
 
         if (ImGui.GetIO().KeyCtrl)
