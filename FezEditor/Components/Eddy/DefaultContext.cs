@@ -24,15 +24,29 @@ internal class DefaultContext : BaseContext
 
     protected override void TestConditions()
     {
-        if (Eddy.ShowPickableBounds.IsDirty)
+        if (Eddy.Visuals.IsDirty)
         {
-            var bounds = _pickablesActor?.GetComponent<PickableBounds>();
-            var actors = Eddy.ShowPickableBounds.Value
-                ? Eddy.Scene.GetChildren(Eddy.Scene.Root)
-                : Enumerable.Empty<Actor>();
+            if (_pickablesActor?.TryGetComponent<PickableBounds>(out var bounds) ?? false)
+            {
+                var actors = Eddy.Visuals.Value.HasFlag(EddyVisuals.PickableBounds)
+                    ? Eddy.Scene.GetChildren(Eddy.Scene.Root)
+                    : Enumerable.Empty<Actor>();
 
-            bounds?.Visualize(actors);
-            Eddy.ShowPickableBounds = Eddy.ShowPickableBounds.Clean();
+                var children = actors
+                    .SelectMany(a => Eddy.Scene.GetChildren(a));
+
+                bounds?.Visualize(children);
+            }
+
+            if (_skyActor?.HasComponent<SkyVisualizer>() ?? false)
+            {
+                _skyActor.Visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Sky);
+            }
+
+            if (_liquidActor?.HasComponent<LiquidMesh>() ?? false)
+            {
+                _liquidActor.Visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Liquid);
+            }
         }
 
         if (_skyActor != null)

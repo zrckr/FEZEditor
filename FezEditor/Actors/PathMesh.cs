@@ -6,9 +6,11 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace FezEditor.Actors;
 
-public class PathMesh : ActorComponent
+public class PathMesh : ActorComponent, IPickable
 {
     private static readonly Color PathColor = new(1f, 0.5f, 0f, 0.8f);
+
+    public bool Pickable { get; set; } = true;
 
     private readonly RenderingService _rendering;
 
@@ -62,6 +64,16 @@ public class PathMesh : ActorComponent
 
         _rendering.MeshClear(_mesh);
         _rendering.MeshAddSurface(_mesh, PrimitiveType.LineList, surface, _material);
+    }
+
+    public IEnumerable<BoundingBox> GetBounds()
+    {
+        return Array.Empty<BoundingBox>();
+    }
+
+    public PickHit? Pick(Ray ray)
+    {
+        return null;
     }
 
     public override void Dispose()

@@ -28,6 +28,17 @@ internal class NpcContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredId = null;
+        if (Eddy.Visuals.IsDirty)
+        {
+            var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.NonPlayableCharacters);
+            foreach (var actor in _npcActors.Values)
+            {
+                actor.Visible = visible;
+                var mesh = actor.GetComponent<NpcMesh>();
+                mesh.Pickable = visible;
+            }
+        }
+
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<NpcMesh>())
         {
             var actor = Eddy.Hit.Value.Actor;

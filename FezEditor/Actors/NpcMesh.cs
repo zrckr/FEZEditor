@@ -11,6 +11,8 @@ public class NpcMesh : ActorComponent, IPickable
 {
     public Dirty<string> CurrentAnimation { get; set; } = new("");
 
+    public bool Pickable { get; set; } = true;
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;

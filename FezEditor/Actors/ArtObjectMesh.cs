@@ -55,11 +55,6 @@ public class ArtObjectMesh : ActorComponent, IPickable
 
     public PickHit? Pick(Ray ray)
     {
-        if (!Pickable)
-        {
-            return null;
-        }
-
         var box = GetBounds().First();
         var dist = ray.Intersects(box);
         return dist.HasValue ? new PickHit(dist.Value, 0) : null;

@@ -89,9 +89,9 @@ public class Scene : IDisposable
 
         foreach (var actor in _actors)
         {
-            if (actor.TryGetComponent<IPickable>(out var pickable))
+            if (actor.TryGetComponent<IPickable>(out var pickable) && (pickable?.Pickable ?? false))
             {
-                var hit = pickable?.Pick(ray);
+                var hit = pickable.Pick(ray);
                 if (hit?.Distance < nearestDist)
                 {
                     nearestDist = hit.Value.Distance;

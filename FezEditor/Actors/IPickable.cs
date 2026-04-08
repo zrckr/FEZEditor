@@ -4,6 +4,8 @@ namespace FezEditor.Actors;
 
 public interface IPickable : IComponent
 {
+    bool Pickable { get; set; }
+
     IEnumerable<BoundingBox> GetBounds();
 
     PickHit? Pick(Ray ray);

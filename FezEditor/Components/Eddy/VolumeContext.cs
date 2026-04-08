@@ -33,6 +33,23 @@ internal class VolumeContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredId = null;
+        foreach (var actor in _volumeActors.Values)
+        {
+            var mesh = actor.GetComponent<VolumeMesh>();
+            mesh.Color = DefaultColor;
+        }
+
+        if (Eddy.Visuals.IsDirty)
+        {
+            var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Volumes);
+            foreach (var actor in _volumeActors.Values)
+            {
+                actor.Visible = visible;
+                var mesh = actor.GetComponent<VolumeMesh>();
+                mesh.Pickable = visible;
+            }
+        }
+
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<VolumeMesh>())
         {
             var actor = Eddy.Hit.Value.Actor;
@@ -93,13 +110,10 @@ internal class VolumeContext : BaseContext
         foreach (var (id, actor) in _volumeActors)
         {
             var mesh = actor.GetComponent<VolumeMesh>();
-            mesh.Color = DefaultColor;
-
             if (id == _hoveredId)
             {
                 mesh.Color = HoverColor;
             }
-
             if (_selectedIds.Contains(id))
             {
                 mesh.Color = SelectionColor;

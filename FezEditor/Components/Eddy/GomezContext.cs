@@ -25,6 +25,17 @@ internal class GomezContext : BaseContext
     protected override void TestConditions()
     {
         _hovered = false;
+        if (Eddy.Visuals.IsDirty)
+        {
+            var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Gomez);
+            if (_gomezActor != null)
+            {
+                _gomezActor.Visible = visible;
+                var mesh = _gomezActor.GetComponent<NpcMesh>();
+                mesh.Pickable = visible;
+            }
+        }
+
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<NpcMesh>())
         {
             var actor = Eddy.Hit.Value.Actor;

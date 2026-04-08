@@ -34,9 +34,5 @@ internal interface IEddyEditor
 
     EddyContext SelectedContext { get; set; }
 
-    Dirty<bool> ShowPickableBounds { get; set; }
-
-    Dirty<bool> ShowCollisionMap { get; set; }
-
-    Dirty<bool> ShowArtObjects { get; set; }
+    Dirty<EddyVisuals> Visuals { get; set; }
 }

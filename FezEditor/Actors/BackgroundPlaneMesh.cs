@@ -24,6 +24,8 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
 
     public float Opacity { get; set; } = 1.0f;
 
+    public bool Pickable { get; set; } = true;
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;

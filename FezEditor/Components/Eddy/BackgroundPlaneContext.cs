@@ -30,6 +30,17 @@ internal class BackgroundPlaneContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredId = null;
+        if (Eddy.Visuals.IsDirty)
+        {
+            var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.BackgroundPlanes);
+            foreach (var actor in _bgPlaneActors.Values)
+            {
+                actor.Visible = visible;
+                var mesh = actor.GetComponent<BackgroundPlaneMesh>();
+                mesh.Pickable = visible;
+            }
+        }
+
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<BackgroundPlaneMesh>())
         {
             var actor = Eddy.Hit.Value.Actor;

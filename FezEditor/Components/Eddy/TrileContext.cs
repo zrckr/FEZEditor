@@ -43,22 +43,31 @@ internal sealed class TrileContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredCursor.Reset();
-        if (Eddy.ShowCollisionMap.IsDirty && _collisionMapActor != null)
+        if (Eddy.Visuals.IsDirty)
         {
-            var visible = Eddy.ShowCollisionMap.Value;
-            var collisionMesh = _collisionMapActor.GetComponent<TrileCollisionMesh>();
-            collisionMesh.Visible = visible;
-
-            foreach (var actor in _trileActors.Values)
+            if (_collisionMapActor != null)
             {
-                var trilesMesh = actor.GetComponent<TrilesMesh>();
-                if (trilesMesh is { HasGeometry: false })
+                var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.CollisionMap);
+                var collisionMesh = _collisionMapActor.GetComponent<TrileCollisionMesh>();
+                collisionMesh.Visible = visible;
+
+                foreach (var actor in _trileActors.Values)
                 {
-                    trilesMesh.Pickable = visible;
+                    var trilesMesh = actor.GetComponent<TrilesMesh>();
+                    if (trilesMesh is { HasGeometry: false })
+                    {
+                        trilesMesh.Pickable = visible;
+                    }
                 }
             }
 
-            Eddy.ShowCollisionMap = Eddy.ShowCollisionMap.Clean();
+            foreach (var actor in _trileActors.Values)
+            {
+                var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Triles);
+                actor.Visible = visible;
+                var trilesMesh = actor.GetComponent<TrilesMesh>();
+                trilesMesh.Pickable = visible;
+            }
         }
 
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
@@ -745,10 +754,6 @@ internal sealed class TrileContext : BaseContext
 
                 var mesh = actor.AddComponent<TrilesMesh>();
                 mesh.Visualize(_set, id);
-                if (!mesh.HasGeometry)
-                {
-                    mesh.Pickable = Eddy.ShowCollisionMap.Value;
-                }
             }
 
             #endregion

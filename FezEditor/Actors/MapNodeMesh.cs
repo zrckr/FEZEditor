@@ -24,6 +24,8 @@ public class MapNodeMesh : ActorComponent, IPickable
 
     public Camera? Camera { private get; set; }
 
+    public bool Pickable { get; set; } = true;
+
     private readonly RenderingService _rendering;
 
     private readonly ResourceService _resources;

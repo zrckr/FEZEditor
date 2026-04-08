@@ -32,17 +32,13 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     public EddyTool Tool { get; set; } = EddyTool.Select;
 
-    public HashSet<EddyTool> AllowedTools { get; } = new(Enum.GetValues<EddyTool>());
+    public HashSet<EddyTool> AllowedTools { get; } = new();
 
     public EddyContext HoveredContext { get; set; } = EddyContext.Default;
 
     public EddyContext SelectedContext { get; set; } = EddyContext.Default;
 
-    public Dirty<bool> ShowPickableBounds { get; set; } = new(false);
-
-    public Dirty<bool> ShowCollisionMap { get; set; } = new(false);
-
-    public Dirty<bool> ShowArtObjects { get; set; } = new(true);
+    public Dirty<EddyVisuals> Visuals { get; set; } = new(EddyVisuals.Default);
 
     private readonly Level _level;
 
@@ -86,6 +82,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
             context.Update();
         }
 
+        Visuals = Visuals.Clean();
         Scene.Update(gameTime);
     }
 
@@ -192,7 +189,6 @@ public class EddyEditor : EditorComponent, IEddyEditor
                 }
 
                 var orientation = _cameraActor.GetComponent<OrientationGizmo>();
-                orientation.UseFaceLabels = true;
                 orientation.Draw(viewportMin + new Vector2(size.X - 8f, 8f));
 
                 ImGuiX.DrawStats(viewportMin + new Vector2(8, 8), RenderingService.GetStats());
@@ -336,29 +332,57 @@ public class EddyEditor : EditorComponent, IEddyEditor
         ImGui.EndDisabled();
 
         ImGui.SameLine();
-        if (ImGui.Button($"{Icons.KebabVertical} Perspective"))
+        DrawViewOptions();
+    }
+
+    private void DrawViewOptions()
+    {
+        if (ImGui.Button($"{Icons.KebabVertical} {Camera.Projection}"))
         {
-            ImGui.OpenPopup("ViewOptions");
+            ImGui.OpenPopup("##ViewOptions");
         }
 
-        if (ImGui.BeginPopup("ViewOptions"))
+        if (ImGui.BeginPopup("##ViewOptions"))
         {
-            var showCollisionMap = ShowCollisionMap.Value;
-            if (ImGui.Checkbox("Collision Map", ref showCollisionMap))
+            ImGui.SeparatorText($"{Lucide.Camera} Projections");
             {
-                ShowCollisionMap = showCollisionMap;
+                if (ImGui.Button("Perspective View"))
+                {
+                }
+
+                if (ImGui.Button("Front View"))
+                {
+                }
+
+                if (ImGui.Button("Right View"))
+                {
+                }
+
+                if (ImGui.Button("Back View"))
+                {
+                }
+
+                if (ImGui.Button("Left View"))
+                {
+                }
             }
 
-            var showPickableBounds = ShowPickableBounds.Value;
-            if (ImGui.Checkbox("Pickable Bounds", ref showPickableBounds))
+            ImGui.SeparatorText($"{Lucide.Pyramid} Visuals");
             {
-                ShowPickableBounds = showPickableBounds;
-            }
-
-            var showArtObjects = ShowArtObjects.Value;
-            if (ImGui.Checkbox("Art Objects", ref showArtObjects))
-            {
-                ShowArtObjects = showArtObjects;
+                var visuals = (int)Visuals.Value;
+                var edited = false;
+                edited |= ImGui.CheckboxFlags("Pickable Bounds", ref visuals, (int)EddyVisuals.PickableBounds);
+                edited |= ImGui.CheckboxFlags("Collision Map", ref visuals, (int)EddyVisuals.CollisionMap);
+                edited |= ImGui.CheckboxFlags("Triles", ref visuals, (int)EddyVisuals.Triles);
+                edited |= ImGui.CheckboxFlags("Art Objects", ref visuals, (int)EddyVisuals.ArtObjects);
+                edited |= ImGui.CheckboxFlags("Background Planes", ref visuals, (int)EddyVisuals.BackgroundPlanes);
+                edited |= ImGui.CheckboxFlags("Non-Playable Characters", ref visuals, (int)EddyVisuals.NonPlayableCharacters);
+                edited |= ImGui.CheckboxFlags("Volumes", ref visuals, (int)EddyVisuals.Volumes);
+                edited |= ImGui.CheckboxFlags("Paths", ref visuals, (int)EddyVisuals.Paths);
+                edited |= ImGui.CheckboxFlags("Liquid", ref visuals, (int)EddyVisuals.Liquid);
+                edited |= ImGui.CheckboxFlags("Sky", ref visuals, (int)EddyVisuals.Sky);
+                edited |= ImGui.CheckboxFlags("Gomez", ref visuals, (int)EddyVisuals.Gomez);
+                if (edited) Visuals = (EddyVisuals)visuals;
             }
 
             ImGui.EndPopup();

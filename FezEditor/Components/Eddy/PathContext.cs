@@ -13,6 +13,27 @@ internal class PathContext : BaseContext
     {
     }
 
+    protected override void TestConditions()
+    {
+        if (Eddy.Visuals.IsDirty)
+        {
+            var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Paths);
+            foreach (var actor in _pathActors.Values)
+            {
+                actor.Visible = visible;
+                var mesh = actor.GetComponent<PathMesh>();
+                mesh.Pickable = visible;
+            }
+        }
+    }
+
+    protected override void Act()
+    {
+        Eddy.AllowedTools.Add(EddyTool.Select);
+        Eddy.AllowedTools.Add(EddyTool.Translate);
+        Eddy.AllowedTools.Add(EddyTool.Paint);
+    }
+
     public override void Revisualize(bool partial = false)
     {
         if (Eddy.SelectedContext != EddyContext.Path && partial)
@@ -36,13 +57,6 @@ internal class PathContext : BaseContext
         }
 
         #endregion
-    }
-
-    protected override void Act()
-    {
-        Eddy.AllowedTools.Add(EddyTool.Select);
-        Eddy.AllowedTools.Add(EddyTool.Translate);
-        Eddy.AllowedTools.Add(EddyTool.Paint);
     }
 
     protected override bool IsContextAllowed(EddyContext context)

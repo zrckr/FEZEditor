@@ -120,11 +120,6 @@ public class TrilesMesh : ActorComponent, IPickable
 
     public PickHit? Pick(Ray ray)
     {
-        if (!Pickable)
-        {
-            return null;
-        }
-
         float? nearestDist = null;
         var nearestIndex = -1;
         var index = 0;
