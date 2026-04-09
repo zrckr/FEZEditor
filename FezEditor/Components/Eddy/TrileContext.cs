@@ -794,6 +794,10 @@ internal sealed class TrileContext : BaseContext
 
                 var mesh = actor.AddComponent<TrilesMesh>();
                 mesh.Visualize(_set, id);
+                if (!mesh.HasGeometry)
+                {
+                    mesh.Pickable = Eddy.Visuals.Value.HasFlag(EddyVisuals.CollisionMap);
+                }
             }
 
             #endregion

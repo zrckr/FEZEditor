@@ -30,6 +30,12 @@ public class MapZoomControl : ActorComponent
     }
 
 
+    public void Reset()
+    {
+        _sizeIndex = 2;
+        _targetSize = Sizes[_sizeIndex];
+    }
+
     public override void Update(GameTime gameTime)
     {
         _status.AddHints(("Scroll Wheel", "Cycle Zoom"));

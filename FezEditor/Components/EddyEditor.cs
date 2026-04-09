@@ -5,6 +5,9 @@ using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Level;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
+using Quaternion = Microsoft.Xna.Framework.Quaternion;
+using Vector2 = Microsoft.Xna.Framework.Vector2;
+using Vector3 = Microsoft.Xna.Framework.Vector3;
 
 namespace FezEditor.Components;
 
@@ -49,6 +52,10 @@ public class EddyEditor : EditorComponent, IEddyEditor
     private Actor _cursorActor = null!;
 
     private Actor _gizmoActor = null!;
+
+    private ViewMode _viewMode = ViewMode.Perspective;
+
+    private PerspectiveState _savedPerspectiveState;
 
     private readonly List<BaseContext> _contexts = new();
 
@@ -108,6 +115,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
             camera.FieldOfView = 90f;
             camera.Far = 5000f;
             orientation.UseFaceLabels = false;
+
         }
         {
             // DefaultContext is instantiated first so its subroot is first in the scene (draws before level geometry).
@@ -259,6 +267,46 @@ public class EddyEditor : EditorComponent, IEddyEditor
         base.Dispose();
     }
 
+    private void SwitchToPerspective()
+    {
+        _viewMode = ViewMode.Perspective;
+        _cameraActor.RemoveComponent<MapPanControl>();
+        _cameraActor.RemoveComponent<MapZoomControl>();
+        _cameraActor.AddComponent<FirstPersonControl>();
+        Camera.Projection = Camera.ProjectionType.Perspective;
+        Camera.FieldOfView = 90f;
+        _cameraActor.Transform.Position = _savedPerspectiveState.Position;
+        _cameraActor.Transform.Rotation = _savedPerspectiveState.Rotation;
+        Camera.Offset = _savedPerspectiveState.Offset;
+    }
+
+    private void SwitchToOrtho(ViewMode mode, float yaw)
+    {
+        if (_viewMode == ViewMode.Perspective)
+        {
+            _savedPerspectiveState = new PerspectiveState(
+                _cameraActor.Transform.Position,
+                _cameraActor.Transform.Rotation,
+                Camera.Offset
+            );
+            _cameraActor.RemoveComponent<FirstPersonControl>();
+        }
+        else
+        {
+            _cameraActor.RemoveComponent<MapPanControl>();
+            _cameraActor.RemoveComponent<MapZoomControl>();
+        }
+
+        _viewMode = mode;
+        Camera.Projection = Camera.ProjectionType.Orthographic;
+        _cameraActor.Transform.Rotation = Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f);
+        _cameraActor.Transform.Position = _level.Size.ToXna() / 2f;
+        Camera.Offset = new Vector3(0f, 0f, 500f);
+        _cameraActor.AddComponent<MapPanControl>();
+        var zoom = _cameraActor.AddComponent<MapZoomControl>();
+        zoom.Reset();
+    }
+
     private void DrawToolbar()
     {
         DrawToolButton(Lucide.MousePointer2, EddyTool.Select);
@@ -328,6 +376,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         {
             _showInstanceBrowser = true;
         }
+
         ImGui.EndDisabled();
 
         ImGui.SameLine();
@@ -356,6 +405,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         {
             _showProperties = true;
         }
+
         ImGui.EndDisabled();
 
         ImGui.SameLine();
@@ -364,7 +414,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     private void DrawViewOptions()
     {
-        if (ImGui.Button($"{Icons.KebabVertical} {Camera.Projection}"))
+        if (ImGui.Button($"{Icons.KebabVertical} {_viewMode}"))
         {
             ImGui.OpenPopup("##ViewOptions");
         }
@@ -375,22 +425,27 @@ public class EddyEditor : EditorComponent, IEddyEditor
             {
                 if (ImGui.Button("Perspective View"))
                 {
+                    SwitchToPerspective();
                 }
 
                 if (ImGui.Button("Front View"))
                 {
+                    SwitchToOrtho(ViewMode.Front, 0f);
                 }
 
                 if (ImGui.Button("Right View"))
                 {
+                    SwitchToOrtho(ViewMode.Right, MathHelper.PiOver2);
                 }
 
                 if (ImGui.Button("Back View"))
                 {
+                    SwitchToOrtho(ViewMode.Back, MathHelper.Pi);
                 }
 
                 if (ImGui.Button("Left View"))
                 {
+                    SwitchToOrtho(ViewMode.Left, -MathHelper.PiOver2);
                 }
             }
 
@@ -520,4 +575,15 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
         _cameraActor.GetComponent<FirstPersonControl>().FocusOn(target, approachDir, placementDist);
     }
+
+    private enum ViewMode
+    {
+        Perspective,
+        Front,
+        Back,
+        Right,
+        Left
+    }
+
+    private readonly record struct PerspectiveState(Vector3 Position, Quaternion Rotation, Vector3 Offset);
 }

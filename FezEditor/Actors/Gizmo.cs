@@ -495,44 +495,24 @@ public class Gizmo : ActorComponent
     {
         var ringR = RingRadius * scale;
         var halfW = RingHalfWidth * scale;
+        var axis = GetRingAxis(origin);
 
-        var toOrigin = ray.Position - origin;
-        var b = Vector3.Dot(toOrigin, ray.Direction);
-        var c = Vector3.Dot(toOrigin, toOrigin) - (ringR + halfW) * (ringR + halfW);
-        var disc = b * b - c;
-        if (disc < 0)
+        // Intersect ray with the ring's plane (normal = axis)
+        var denom = Vector3.Dot(ray.Direction, axis);
+        if (MathF.Abs(denom) < 0.0001f)
         {
             return false;
         }
 
-        var sqrtDisc = MathF.Sqrt(disc);
-        for (var sign = -1; sign <= 1; sign += 2)
+        var t = Vector3.Dot(origin - ray.Position, axis) / denom;
+        if (t < 0)
         {
-            var t = -b + sign * sqrtDisc;
-            if (t < 0)
-            {
-                continue;
-            }
-
-            var local = ray.Position + ray.Direction * t - origin;
-
-            if (MathF.Abs(local.Y) > halfW)
-            {
-                continue;
-            }
-
-            if (Vector3.Dot(Vector3.UnitY, Vector3.Normalize(Camera.Position - origin)) < 0)
-            {
-                continue;
-            }
-
-            if (MathF.Abs(new Vector3(local.X, 0, local.Z).Length() - ringR) < halfW * 2f)
-            {
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        var hit = ray.Position + ray.Direction * t;
+        var dist = Vector3.Distance(hit, origin);
+        return MathF.Abs(dist - ringR) < halfW * 3f;
     }
 
     private static Handle HitTestScale(Ray ray, Vector3 origin, float scale)
@@ -698,6 +678,7 @@ public class Gizmo : ActorComponent
     {
         _rendering.MeshClear(_mesh);
         Actor.Transform.Position = origin;
+        Actor.Transform.Rotation = Quaternion.Identity;
         Actor.Transform.Scale = Vector3.One * scale;
 
         _translateX.SetColor(_rendering, _hoveredHandle == Handle.TranslateX);
@@ -722,6 +703,7 @@ public class Gizmo : ActorComponent
         _rendering.MeshClear(_mesh);
         Actor.Transform.Position = origin;
         Actor.Transform.Scale = Vector3.One * scale;
+        Actor.Transform.Rotation = QuaternionFromTo(Vector3.UnitY, GetRingAxis(origin));
 
         _ring.SetColor(_rendering, _hoveredHandle == Handle.Ring);
         _ring.AddSurface(_rendering, _mesh, PrimitiveType.TriangleList);
@@ -733,6 +715,7 @@ public class Gizmo : ActorComponent
     {
         _rendering.MeshClear(_mesh);
         Actor.Transform.Position = origin;
+        Actor.Transform.Rotation = Quaternion.Identity;
         Actor.Transform.Scale = Vector3.One * gizmoScale;
 
         _scaleX.SetColor(_rendering, _hoveredHandle == Handle.ScaleX);
@@ -752,6 +735,7 @@ public class Gizmo : ActorComponent
     {
         _rendering.MeshClear(_mesh);
         Actor.Transform.Position = origin;
+        Actor.Transform.Rotation = Quaternion.Identity;
         Actor.Transform.Scale = Vector3.One * scale;
 
         _face.SetColor(_rendering, _hoveredHandle == Handle.Face);
@@ -805,6 +789,35 @@ public class Gizmo : ActorComponent
             Normals = new[] { Vector3.UnitX, Vector3.UnitX, Vector3.UnitX, Vector3.UnitX },
             Indices = new[] { 0, 1, 2, 2, 1, 3 }
         };
+    }
+
+    private Vector3 GetRingAxis(Vector3 origin)
+    {
+        var dir = Camera.Position - origin;
+        return dir.LengthSquared() > 0.001f ? Vector3.Normalize(dir) : Vector3.UnitY;
+    }
+
+    private static Quaternion QuaternionFromTo(Vector3 from, Vector3 to)
+    {
+        var dot = Vector3.Dot(from, to);
+        if (dot >= 1f - 0.0001f)
+        {
+            return Quaternion.Identity;
+        }
+
+        if (dot <= -1f + 0.0001f)
+        {
+            var perp = Vector3.Cross(from, Vector3.UnitX);
+            if (perp.LengthSquared() < 0.001f)
+            {
+                perp = Vector3.Cross(from, Vector3.UnitZ);
+            }
+
+            return Quaternion.CreateFromAxisAngle(Vector3.Normalize(perp), MathHelper.Pi);
+        }
+
+        var axis = Vector3.Cross(from, to);
+        return Quaternion.Normalize(new Quaternion(axis, 1f + dot));
     }
 
     private enum Handle
