@@ -198,13 +198,31 @@ internal class DefaultContext : BaseContext
             }
         }
 
-        var skyName = Level.SkyName;
-        if (ImGui.InputText("Sky Name", ref skyName, 255))
+        ImGui.LabelText("Sky Name", Level.SkyName);
+        ImGui.SameLine();
+        if (ImGui.Button("...##SkyPick"))
         {
-            using (Eddy.History.BeginScope("Edit Level Sky Name"))
+            var skiesDir = ResourceService.GetFullPath("Skies");
+            var options = new FileDialog.Options
             {
-                Level.SkyName = skyName;
-            }
+                Title = "Select Sky",
+                DefaultLocation = skiesDir,
+                Filters = [new FileDialog.Filter("Sky", "fezsky.json")]
+            };
+
+            FileDialog.Show(FileDialog.Type.OpenFile, files =>
+            {
+                if (files.Length == 0)
+                {
+                    return;
+                }
+
+                var picked = Path.GetFileName(files[0]).Replace(".fezsky.json", "");
+                using (Eddy.History.BeginScope("Edit Level Sky Name"))
+                {
+                    Level.SkyName = picked;
+                }
+            }, options);
         }
 
         var songName = Level.SongName;
