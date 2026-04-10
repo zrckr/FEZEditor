@@ -512,9 +512,12 @@ internal sealed class TrileContext : BaseContext
 
         var centroid = ComputeSelectionCentroid();
         var faceVec = _selectedCursor.Face.Value.AsVector();
-        var disabled = faceVec.X < 0 && _levelBounds.Min.X <= 0 ||
-                       faceVec.Y < 0 && _levelBounds.Min.Y <= 0 ||
-                       faceVec.Z < 0 && _levelBounds.Min.Z <= 0;
+        var selectionMin = _selectedCursor.Emplacements.Aggregate(
+            new Vector3(float.MaxValue),
+            (min, e) => Vector3.Min(min, new Vector3(e.X, e.Y, e.Z)));
+        var disabled = faceVec.X < 0 && selectionMin.X <= 0 ||
+                       faceVec.Y < 0 && selectionMin.Y <= 0 ||
+                       faceVec.Z < 0 && selectionMin.Z <= 0;
 
         if (Eddy.Gizmo.ScaleFace(centroid, _selectedCursor.Face.Value, out var delta, disabled))
         {
