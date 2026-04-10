@@ -61,9 +61,9 @@ public class Scene : IDisposable
         }
 
         var parent = _hierarchy[actor].Parent;
-        if (parent != null)
+        if (parent != null && _hierarchy.TryGetValue(parent, out var hierarchyNode))
         {
-            _hierarchy[parent].Children.Remove(actor);
+            hierarchyNode.Children.Remove(actor);
         }
 
         var stack = new Stack<Actor>();
@@ -71,7 +71,12 @@ public class Scene : IDisposable
         while (stack.Count > 0)
         {
             var current = stack.Pop();
-            foreach (var child in _hierarchy[current].Children)
+            if (!_hierarchy.TryGetValue(current, out var node))
+            {
+                continue;
+            }
+
+            foreach (var child in node.Children)
             {
                 stack.Push(child);
             }
