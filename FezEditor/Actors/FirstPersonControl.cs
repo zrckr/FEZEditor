@@ -15,6 +15,8 @@ public class FirstPersonControl : ActorComponent
 
     private float _pitch;
 
+    private TimeSpan _ctrlPenalty;
+
     private readonly InputService _input;
 
     private readonly StatusService _status;
@@ -68,12 +70,23 @@ public class FirstPersonControl : ActorComponent
 
         #region Handle key input
 
-        var inputDirection = _input.GetActionsVector(
-            InputActions.MoveLeft,
-            InputActions.MoveRight,
-            InputActions.MoveBackward,
-            InputActions.MoveForward
-        );
+        if (ImGuiNET.ImGui.GetIO().KeyCtrl)
+        {
+            _ctrlPenalty = TimeSpan.FromMilliseconds(500);
+        }
+        else if (_ctrlPenalty > TimeSpan.Zero)
+        {
+            _ctrlPenalty -= gameTime.ElapsedGameTime;
+        }
+
+        var inputDirection = _ctrlPenalty > TimeSpan.Zero
+            ? Vector2.Zero
+            : _input.GetActionsVector(
+                InputActions.MoveLeft,
+                InputActions.MoveRight,
+                InputActions.MoveBackward,
+                InputActions.MoveForward
+            );
 
         var rotation = _transform.Rotation;
         var forward = Vector3.Transform(Vector3.Forward, rotation);
