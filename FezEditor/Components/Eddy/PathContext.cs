@@ -434,6 +434,7 @@ internal class PathContext : BaseContext
 
     public override void Dispose()
     {
+        _translateScope?.Dispose();
         TeardownVisualization();
         base.Dispose();
     }

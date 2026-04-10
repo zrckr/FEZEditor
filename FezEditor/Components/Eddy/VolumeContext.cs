@@ -618,6 +618,8 @@ internal class VolumeContext : BaseContext
 
     public override void Dispose()
     {
+        _translateScope?.Dispose();
+        _scaleScope?.Dispose();
         TeardownVisualization();
         base.Dispose();
     }

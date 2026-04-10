@@ -273,6 +273,7 @@ internal class GomezContext : BaseContext
 
     public override void Dispose()
     {
+        _translateScope?.Dispose();
         TeardownVisualization();
         base.Dispose();
     }
