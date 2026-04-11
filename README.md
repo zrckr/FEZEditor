@@ -2,22 +2,17 @@
 
 ## A Modding Tool for FEZ
 
-<img src="Docs/JadeEditor.png" alt="JadeEditor" width="720"/>
-
-*Editor for World Map (live and interactive)*
-
-<img src="Docs/ChrisEditor.png" alt="ChrisEditor" width="720"/>
-
-*Editor for trixel models (Art Objects and Trile Sets)*
+[![Showcase of level editing](https://img.youtube.com/vi/bksXuaovHVk/maxresdefault.jpg)](https://youtu.be/bksXuaovHVk?si=VkoavjHpnpSEzVkE)
 
 ## Overview
 
 FEZEditor is a GUI tool created for managing and modding FEZ's assets.
 
 > [!WARNING]
-> FEZEditor is in a development state, and only suitable for use by modding developers.
+> FEZEditor is in a pre-release state!
 >
-> Expect that some features will be missing or will not work at all.
+> The editor currently saves assets in FEZRepacker's format only!
+> Refer asset mod creation here: https://fezmodding.github.io/wiki/guides/create_asset_mod
 
 ## Cloning
 
@@ -81,14 +76,30 @@ dotnet publish -c Release -r osx-arm64  # macOS
 * Opening folders with extracted assets (XNB and FEZRepacker formats are supported)
 * Extracting assets from PAK
 
-### Asset Editing
+### Asset Editing / Viewing
 
+* `EddyEditor`: Levels
+* `ChrisEditor`: Art Objects and Trile Sets
 * `JadeEditor`: World Map
+* `LukeEditor`: Sky definitions
 * `DiezEditor`: Tracked Songs
+* `MuEditor`: NPC Metadata
 * `PoEditor`: Static text (localization files)
 * `SallyEditor`: Save files (PC format only)
 * `ZuEditor`: SpriteFonts
-* `ChrisEditor`: ArtObjects and TrileSets
+* `RickViewer`: Sound effects
+* `PhilExporter`: Exporting levels as GLTF dioramas
+
+## Screenshots
+
+|                                                |                                             |
+|------------------------------------------------|---------------------------------------------|
+| <img src="Docs/EddyEditor.png" alt="Eddy"/>    | <img src="Docs/Diorama.png" alt="Diorama"/> |
+| <img src="Docs/ChrisEditor.png" alt="Chris"/>  | <img src="Docs/JadeEditor.png" alt="Jade"/> |
+| <img src="Docs/TexViewer.png" alt="Tex"/>      | <img src="Docs/LukeEditor.png" alt="Luke"/> |
+| <img src="Docs/ZuEditor.png" alt="Zu"/>        | <img src="Docs/PoEditor.png" alt="Po"/>    |
+| <img src="Docs/SallyEditor.png" alt="Sally"/>  | <img src="Docs/MuEditor.png" alt="Mu"/>     |
+| <img src="Docs/DiezEditor.png" alt="Diez"/>    | <img src="Docs/RickViewer.png" alt="Rick"/> |
 
 ## Documentation
 
