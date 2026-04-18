@@ -411,7 +411,7 @@ public class Gizmo : ActorComponent
     private float ComputeGizmoScale(Vector3 origin)
     {
         var p0 = Camera.Project(origin, Viewport);
-        var p1 = Camera.Project(origin + Vector3.UnitY, Viewport);
+        var p1 = Camera.Project(origin + Camera.InverseView.Up, Viewport);
         var pixelsPerUnit = MathF.Abs(p0.Y - p1.Y);
         if (pixelsPerUnit < 0.001f)
         {
