@@ -428,34 +428,26 @@ public class Gizmo : ActorComponent
         var tipDist = (ArrowShaftLength + ArrowTipLength * 0.5f) * scale;
         var pickR = PickRadius * scale;
 
-        float? dX = HitTestSphere(ray, origin + Vector3.UnitX * tipDist, pickR)
-            ? RayDistanceToPoint(ray, origin + Vector3.UnitX * tipDist)
-            : null;
-
-        float? dY = HitTestSphere(ray, origin + Vector3.UnitY * tipDist, pickR)
-            ? RayDistanceToPoint(ray, origin + Vector3.UnitY * tipDist)
-            : null;
-
-        float? dZ = HitTestSphere(ray, origin + Vector3.UnitZ * tipDist, pickR)
-            ? RayDistanceToPoint(ray, origin + Vector3.UnitZ * tipDist)
-            : null;
+        var dX = RayClosestDistanceToLineSegment(ray, origin, origin + Vector3.UnitX * tipDist);
+        var dY = RayClosestDistanceToLineSegment(ray, origin, origin + Vector3.UnitY * tipDist);
+        var dZ = RayClosestDistanceToLineSegment(ray, origin, origin + Vector3.UnitZ * tipDist);
 
         var best = Handle.None;
         var bestDist = float.MaxValue;
 
-        if (dX < bestDist)
+        if (dX <= pickR && dX < bestDist)
         {
-            bestDist = dX.Value;
+            bestDist = dX;
             best = Handle.TranslateX;
         }
 
-        if (dY < bestDist)
+        if (dY <= pickR && dY < bestDist)
         {
-            bestDist = dY.Value;
+            bestDist = dY;
             best = Handle.TranslateY;
         }
 
-        if (dZ < bestDist)
+        if (dZ <= pickR && dZ < bestDist)
         {
             best = Handle.TranslateZ;
         }
@@ -527,49 +519,35 @@ public class Gizmo : ActorComponent
 
     private static Handle HitTestScale(Ray ray, Vector3 origin, float scale)
     {
-        var tipDist = (ArrowShaftLength + ArrowTipLength * 0.5f) * scale;
         var pickR = PickRadius * scale;
+        if (HitTestSphere(ray, origin, pickR))
+        {
+            return Handle.ScaleCenter;
+        }
 
-        float? dX = HitTestSphere(ray, origin + Vector3.UnitX * tipDist, pickR)
-            ? RayDistanceToPoint(ray, origin + Vector3.UnitX * tipDist)
-            : null;
-
-        float? dY = HitTestSphere(ray, origin + Vector3.UnitY * tipDist, pickR)
-            ? RayDistanceToPoint(ray, origin + Vector3.UnitY * tipDist)
-            : null;
-
-        float? dZ = HitTestSphere(ray, origin + Vector3.UnitZ * tipDist, pickR)
-            ? RayDistanceToPoint(ray, origin + Vector3.UnitZ * tipDist)
-            : null;
-
-        float? dC = HitTestSphere(ray, origin, pickR)
-            ? RayDistanceToPoint(ray, origin)
-            : null;
+        var tipDist = (ArrowShaftLength + ArrowTipLength * 0.5f) * scale;
+        var dX = RayClosestDistanceToLineSegment(ray, origin, origin + Vector3.UnitX * tipDist);
+        var dY = RayClosestDistanceToLineSegment(ray, origin, origin + Vector3.UnitY * tipDist);
+        var dZ = RayClosestDistanceToLineSegment(ray, origin, origin + Vector3.UnitZ * tipDist);
 
         var best = Handle.None;
         var bestDist = float.MaxValue;
 
-        if (dX < bestDist)
+        if (dX <= pickR && dX < bestDist)
         {
-            bestDist = dX.Value;
+            bestDist = dX;
             best = Handle.ScaleX;
         }
 
-        if (dY < bestDist)
+        if (dY <= pickR && dY < bestDist)
         {
-            bestDist = dY.Value;
+            bestDist = dY;
             best = Handle.ScaleY;
         }
 
-        if (dZ < bestDist)
+        if (dZ <= pickR && dZ < bestDist)
         {
-            bestDist = dZ.Value;
             best = Handle.ScaleZ;
-        }
-
-        if (dC < bestDist)
-        {
-            best = Handle.ScaleCenter;
         }
 
         return best;
@@ -583,8 +561,37 @@ public class Gizmo : ActorComponent
         return b * b - c >= 0;
     }
 
-    private static float RayDistanceToPoint(Ray ray, Vector3 point)
-        => Vector3.Dot(point - ray.Position, ray.Direction);
+    private static float RayClosestDistanceToLineSegment(Ray ray, Vector3 linePointA, Vector3 linePointB)
+    {
+        var lineDelta= linePointB - linePointA;
+        var lineToRayDelta = ray.Position - linePointA;
+
+        var rayDirLengthSquared = Vector3.Dot(ray.Direction, ray.Direction);
+        var rayDirDotLineDelta = Vector3.Dot(ray.Direction, lineDelta);
+        var lineLengthSquared = Vector3.Dot(lineDelta, lineDelta);
+        var rayDirDotLineToRay = Vector3.Dot(ray.Direction, lineToRayDelta);
+        var lineDeltaDotLineToRay = Vector3.Dot(lineDelta, lineToRayDelta);
+
+        var denominator = rayDirLengthSquared * lineLengthSquared - rayDirDotLineDelta * rayDirDotLineDelta;
+
+        var rayFraction = 0f;
+        if (denominator > float.Epsilon)
+        {
+            rayFraction = (rayDirDotLineDelta * lineDeltaDotLineToRay - lineLengthSquared * rayDirDotLineToRay) / denominator;
+            rayFraction = Math.Max(0f, rayFraction);
+        }
+
+        var lineFraction = (rayDirDotLineDelta * rayFraction + lineDeltaDotLineToRay) / lineLengthSquared;
+        lineFraction = Math.Clamp(lineFraction, 0f, 1f);
+
+        rayFraction = (rayDirDotLineDelta * lineFraction - rayDirDotLineToRay) / rayDirLengthSquared;
+        rayFraction = Math.Max(0f, rayFraction);
+
+        var closestOnRay = ray.Position + ray.Direction * rayFraction;
+        var closestOnLine = linePointA + lineDelta * lineFraction;
+
+        return (closestOnRay - closestOnLine).Length();
+    }
 
     private void InitDragPlane(Vector3 origin, Handle handle)
     {
