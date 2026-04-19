@@ -31,12 +31,12 @@ internal class GomezContext : BaseContext
             if (_gomezActor != null)
             {
                 _gomezActor.Visible = visible;
-                var mesh = _gomezActor.GetComponent<NpcMesh>();
+                var mesh = _gomezActor.GetComponent<GomezMesh>();
                 mesh.Pickable = visible;
             }
         }
 
-        if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<NpcMesh>())
+        if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.HasComponent<GomezMesh>())
         {
             var actor = Eddy.Hit.Value.Actor;
             if (_gomezActor == actor && Eddy.Tool is EddyTool.Select or EddyTool.Pick)
@@ -182,7 +182,7 @@ internal class GomezContext : BaseContext
 
     private (MeshSurface, PrimitiveType)? BuildWireframeForGomez(Color color)
     {
-        if (_gomezActor == null || !_gomezActor.TryGetComponent<NpcMesh>(out var mesh))
+        if (_gomezActor == null || !_gomezActor.TryGetComponent<GomezMesh>(out var mesh))
         {
             return null;
         }
@@ -258,10 +258,7 @@ internal class GomezContext : BaseContext
             _gomezActor.Transform.Position = Level.StartingFace.Id.ToXna().ToVector3() + Vector3.Up;
             _gomezActor.Transform.Rotation = Level.StartingFace.Face.AsQuaternion();
 
-            var mesh = _gomezActor.AddComponent<NpcMesh>();
-            mesh.Billboard = false;
-            var animations = ResourceService.LoadAnimations("Character Animations/Gomez");
-            mesh.Visualize(animations, "IdleWink");
+            _gomezActor.AddComponent<GomezMesh>();
         }
 
         #endregion
