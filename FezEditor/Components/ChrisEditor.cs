@@ -535,7 +535,7 @@ public class ChrisEditor : EditorComponent
                             _confirm.Title = "Export";
                             _confirm.Text = $"The texture has been exported to\n'{exportPath}'";
                             _confirm.ConfirmButtonText = "Ok";
-                            _confirm.CancelButtonText = "";
+                            _confirm.DenyButtonText = "";
                             _confirm.Confirmed = () => _texture!.OpenInEditor();
                         }
                     }
@@ -626,9 +626,9 @@ public class ChrisEditor : EditorComponent
         _confirm.Title = "Confirm texture overriding";
         _confirm.Text = $"The texture has been changed externally. Save it to the bundle '{Title}'?";
         _confirm.ConfirmButtonText = "Yes";
-        _confirm.CancelButtonText = "No";
+        _confirm.DenyButtonText = "No";
         _confirm.Confirmed = () => ResourceService.Save(Title, _context.GetAsset(_obj));
-        _confirm.Canceled = null;
+        _confirm.Denied = null;
     }
 
     private TrixelFace? RaycastTrixelFace(Ray ray)

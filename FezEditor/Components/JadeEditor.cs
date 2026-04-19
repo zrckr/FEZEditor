@@ -345,7 +345,7 @@ public class JadeEditor : EditorComponent
         {
             _confirm.Text = $"Delete \"{_selectedNode!.LevelName}\" map node?";
             _confirm.Confirmed = RemoveMapNode;
-            _confirm.Canceled = () => { _selectedNode = null; };
+            _confirm.Closed = () => { _selectedNode = null; };
             _nextState = State.MapView;
         }
     }

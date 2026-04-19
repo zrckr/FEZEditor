@@ -141,9 +141,9 @@ internal class ScriptBrowser : IDisposable
                         _confirm.Title = "Script Browser";
                         _confirm.Text = "Delete this script?";
                         _confirm.ConfirmButtonText = "Yes";
-                        _confirm.CancelButtonText = "No";
+                        _confirm.DenyButtonText = "No";
                         _confirm.Confirmed = () => _level.Scripts.Remove(id);
-                        _confirm.Canceled = null;
+                        _confirm.Denied = null;
                     }
 
                     ImGui.EndPopup();

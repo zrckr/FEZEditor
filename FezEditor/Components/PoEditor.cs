@@ -233,7 +233,10 @@ public class PoEditor : EditorComponent
             UpdateTableView();
         };
 
-        _confirm.Canceled = () => { _pendingDeleteId = ""; };
+        _confirm.Closed = () =>
+        {
+            _pendingDeleteId = "";
+        };
 
         _nextState = State.TableView;
     }

@@ -12,11 +12,15 @@ public class ConfirmWindow : DrawableGameComponent
 
     public Dirty<string> ConfirmButtonText { get; set; } = new("Yes");
 
-    public Dirty<string> CancelButtonText { get; set; } = new("No");
+    public Dirty<string> DenyButtonText { get; set; } = new("No");
 
-    public Action? Canceled { get; set; }
+    public Dirty<string> CancelButtonText { get; set; } = new("Cancel");
 
     public Action? Confirmed { get; set; }
+
+    public Action? Denied { get; set; }
+
+    public Action? Closed { get; set; }
 
     private bool _isDirty;
 
@@ -37,7 +41,7 @@ public class ConfirmWindow : DrawableGameComponent
                Title.IsDirty ||
                Text.IsDirty ||
                ConfirmButtonText.IsDirty ||
-               CancelButtonText.IsDirty;
+               DenyButtonText.IsDirty;
     }
 
     private void Clear()
@@ -46,7 +50,7 @@ public class ConfirmWindow : DrawableGameComponent
         Title = Title.Clean();
         Text = Text.Clean();
         ConfirmButtonText = ConfirmButtonText.Clean();
-        CancelButtonText = CancelButtonText.Clean();
+        DenyButtonText = DenyButtonText.Clean();
     }
 
     public override void Draw(GameTime gameTime)
@@ -86,21 +90,37 @@ public class ConfirmWindow : DrawableGameComponent
             if (ImGui.Button(ConfirmButtonText) || ImGui.IsKeyPressed(ImGuiKey.Enter))
             {
                 Confirmed?.Invoke();
-                ImGui.CloseCurrentPopup();
+                ClosePopup();
             }
 
-            ImGui.SameLine();
+            var showCancelButton = Denied != null && !string.IsNullOrEmpty(CancelButtonText);
 
-            if (!string.IsNullOrEmpty(CancelButtonText))
+            if (!string.IsNullOrEmpty(DenyButtonText))
             {
+                ImGui.SameLine();
+                if (ImGui.Button(DenyButtonText) || (!showCancelButton && ImGui.IsKeyPressed(ImGuiKey.Escape)))
+                {
+                    Denied?.Invoke();
+                    ClosePopup();
+                }
+            }
+
+            if (showCancelButton)
+            {
+                ImGui.SameLine();
                 if (ImGui.Button(CancelButtonText) || ImGui.IsKeyPressed(ImGuiKey.Escape))
                 {
-                    Canceled?.Invoke();
-                    ImGui.CloseCurrentPopup();
+                    ClosePopup();
                 }
             }
 
             ImGui.EndPopup();
         }
+    }
+
+    private void ClosePopup()
+    {
+        ImGui.CloseCurrentPopup();
+        Closed?.Invoke();
     }
 }

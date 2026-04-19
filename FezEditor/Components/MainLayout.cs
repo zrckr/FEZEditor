@@ -209,11 +209,13 @@ public class MainLayout : DrawableGameComponent
         {
             _editorService.SaveEditorChanges(editor);
             _editorService.CloseEditor(editor);
-            _confirmPending = false;
         };
-        _confirm.Canceled = () =>
+        _confirm.Denied = () =>
         {
             _editorService.CloseEditor(editor);
+        };
+        _confirm.Closed = () =>
+        {
             _confirmPending = false;
         };
     }
