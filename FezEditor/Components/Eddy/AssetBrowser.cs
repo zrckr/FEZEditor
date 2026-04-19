@@ -528,7 +528,7 @@ public class AssetBrowser : IDisposable
         _entries[AssetType.NonPlayableCharacter] = npcs;
         _entries[AssetType.Trile] = triles;
 
-        if (triles.Count > 0)
+        if (triles.Count > 0 && _recentEntries.Count == 0)
         {
             Select(triles[0]);
         }
