@@ -91,8 +91,10 @@ internal class ScriptBrowser : IDisposable
         // Disable mouse capturing for calling context menu via RMB
         _input.CaptureMouse(false);
 
-        if (ImGui.BeginTable("##ScriptList", Columns,
-                ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollY))
+        var tableFlags = ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollY;
+        var tableSize = new NVector2(0, ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing());
+
+        if (ImGui.BeginTable("##ScriptList", Columns, tableFlags, tableSize))
         {
             ImGuiX.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(8, 8));
             ImGui.TableSetupColumn("Id", ImGuiTableColumnFlags.WidthFixed);
@@ -118,9 +120,7 @@ internal class ScriptBrowser : IDisposable
                 {
                     if (ImGui.MenuItem($"{Lucide.Plus} Add New"))
                     {
-                        var nextId = _level.Scripts.Keys.DefaultIfEmpty(-1).Max() + 1;
-                        _level.Scripts.Add(nextId, new Script());
-                        OpenEditor(nextId, _level.Scripts[nextId]);
+                        CreateNewScript();
                     }
 
                     if (ImGui.MenuItem($"{Lucide.Pencil} Edit"))
@@ -161,6 +161,8 @@ internal class ScriptBrowser : IDisposable
 
             ImGui.EndTable();
         }
+
+        DrawTableFooter();
     }
 
     private static string TruncateLines(IEnumerable<string> lines, int max = 3)
@@ -174,6 +176,21 @@ internal class ScriptBrowser : IDisposable
         var head = list.Take(max / 2);
         var tail = list.TakeLast(max / 2);
         return string.Join("\n", head) + "\n...\n" + string.Join("\n", tail);
+    }
+
+    private void DrawTableFooter()
+    {
+        if (ImGui.Button($"{Lucide.Plus} Add new"))
+        {
+            CreateNewScript();
+        }
+    }
+
+    private void CreateNewScript()
+    {
+        var nextId = _level.Scripts.Keys.DefaultIfEmpty(-1).Max() + 1;
+        _level.Scripts.Add(nextId, new Script());
+        OpenEditor(nextId, _level.Scripts[nextId]);
     }
 
     #endregion
