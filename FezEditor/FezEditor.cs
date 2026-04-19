@@ -91,7 +91,7 @@ public class FezEditor : Game
         this.AddComponent(new MainLayout(this));
         _editor.OpenEditor(new WelcomeComponent(this));
 
-        _appStorage.LoadWindowState(_deviceManager);
+        _appStorage.LoadWindowState();
         base.Initialize();
     }
 
@@ -111,7 +111,6 @@ public class FezEditor : Game
 
     protected override void Dispose(bool disposing)
     {
-        _appStorage.SaveWindowState();
         this.RemoveServices();
         base.Dispose(disposing);
     }

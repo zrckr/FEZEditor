@@ -16,5 +16,5 @@ public record Settings
 
     public record RecentProvider(string Path, string Kind);
 
-    public record WindowSize(int Width, int Height);
+    public record WindowSize(int Width, int Height, bool IsMaximized = false);
 }

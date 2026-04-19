@@ -2,6 +2,7 @@ using System.Text.Json;
 using FezEditor.Structure;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
+using SDL3;
 using Serilog;
 
 namespace FezEditor.Services;
@@ -32,11 +33,13 @@ public class AppStorageService : IDisposable
         _game = game;
         Directory.CreateDirectory(CacheDir);
         Load();
+        game.Window.ClientSizeChanged += OnClientSizeChanged;
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+        _game.Window.ClientSizeChanged -= OnClientSizeChanged;
         SaveWindowState();
         Save();
     }
@@ -88,20 +91,42 @@ public class AppStorageService : IDisposable
         Save();
     }
 
-    public void SaveWindowState()
+    private void OnClientSizeChanged(object? sender, EventArgs e)
     {
+        var flags = SDL.SDL_GetWindowFlags(_game.Window.Handle);
+        if ((flags & SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED) == 0)
+        {
+            SDL.SDL_GetWindowSize(_game.Window.Handle, out var width, out var height);
+            _data = _data with
+            {
+                Window = _data.Window with
+                {
+                    Width = width,
+                    Height = height
+                }
+            };
+        }
+    }
+
+    private void SaveWindowState()
+    {
+        var maximized = (SDL.SDL_GetWindowFlags(_game.Window.Handle) & SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED) != 0;
         _data = _data with
         {
-            Window = new Settings.WindowSize(
-                _game.GraphicsDevice.PresentationParameters.BackBufferWidth,
-                _game.GraphicsDevice.PresentationParameters.BackBufferHeight)
+            Window = _data.Window with
+            {
+                IsMaximized = maximized
+            }
         };
     }
 
-    public void LoadWindowState(GraphicsDeviceManager gdm)
+    public void LoadWindowState()
     {
-        gdm.PreferredBackBufferWidth = _data.Window.Width;
-        gdm.PreferredBackBufferHeight = _data.Window.Height;
+        SDL.SDL_SetWindowSize(_game.Window.Handle, _data.Window.Width, _data.Window.Height);
+        if (_data.Window.IsMaximized)
+        {
+            SDL.SDL_MaximizeWindow(_game.Window.Handle);
+        }
     }
 
     public static bool HasCacheFile(string filename)
