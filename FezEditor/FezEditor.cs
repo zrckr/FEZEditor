@@ -78,10 +78,10 @@ public class FezEditor : Game
 
         _appStorage = this.CreateService<AppStorageService>();
         _content = this.CreateService<ContentService>();
+        _input = this.CreateService<InputService>();
         _imGui = this.CreateService<ImGuiService>();
         _rendering = this.CreateService<RenderingService>();
         _resources = this.CreateService<ResourceService>();
-        _input = this.CreateService<InputService>();
         _status = this.CreateService<StatusService>();
         _editor = this.CreateService<EditorService>();
         Content = (ContentManager)_content.Global;

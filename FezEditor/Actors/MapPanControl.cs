@@ -51,14 +51,11 @@ public class MapPanControl : ActorComponent
             return;
         }
 
-        _input.CaptureMouse(false);
-        if (_input.IsRightMousePressed())
+        if (_input.CaptureRightMouseDelta(out var delta1))
         {
-            var delta = _input.GetMouseDelta();
             var right = Vector3.Transform(Vector3.Right, _transform.Rotation);
-            _transform.Position -= right * delta.X * PanSensitivity * _camera.Size;
-            _transform.Position += Vector3.Up * delta.Y * PanSensitivity * _camera.Size;
-            _input.CaptureMouse(true);
+            _transform.Position -= right * delta1.X * PanSensitivity * _camera.Size;
+            _transform.Position += Vector3.Up * delta1.Y * PanSensitivity * _camera.Size;
         }
     }
 }

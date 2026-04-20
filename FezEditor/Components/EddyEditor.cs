@@ -194,7 +194,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
             if (texture is { IsDisposed: false })
             {
                 ImGuiX.Image(texture, size);
-                InputService.CaptureScroll(ImGui.IsItemHovered());
+                InputService.IsViewportHovered = ImGui.IsItemHovered();
 
                 var viewportMin = ImGuiX.GetItemRectMin();
                 _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;

@@ -88,12 +88,9 @@ internal class ScriptBrowser : IDisposable
 
     private void DrawTable()
     {
-        // Disable mouse capturing for calling context menu via RMB
-        _input.CaptureMouse(false);
-
-        var tableFlags = ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollY;
+        const ImGuiTableFlags tableFlags = ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders |
+                                           ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollY;
         var tableSize = new NVector2(0, ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing());
-
         if (ImGui.BeginTable("##ScriptList", Columns, tableFlags, tableSize))
         {
             ImGuiX.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(8, 8));

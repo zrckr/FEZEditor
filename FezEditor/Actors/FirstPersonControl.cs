@@ -56,14 +56,11 @@ public class FirstPersonControl : ActorComponent
 
         #region Handle mouse input
 
-        _input.CaptureMouse(false);
-        if (_input.IsRightMousePressed())
+        if (_input.CaptureRightMouseDelta(out var delta))
         {
-            var delta = _input.GetMouseDelta();
             _yaw -= delta.X * MouseSensitivity;
             _pitch -= delta.Y * MouseSensitivity;
             _pitch = MathHelper.Clamp(_pitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
-            _input.CaptureMouse(true);
         }
 
         #endregion

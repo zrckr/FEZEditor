@@ -52,7 +52,7 @@ public class TestComponent : EditorComponent
             if (texture is { IsDisposed: false })
             {
                 ImGuiX.Image(texture, size);
-                InputService.CaptureScroll(ImGui.IsItemHovered());
+                InputService.IsViewportHovered = ImGui.IsItemHovered();
             }
         }
     }

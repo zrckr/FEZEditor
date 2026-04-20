@@ -3,6 +3,7 @@ using ImGuiNET;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using SDL = SDL3.SDL;
 using Serilog;
 
 namespace FezEditor.Services;
@@ -12,9 +13,11 @@ public class InputService
 {
     private static readonly ILogger Logger = Logging.Create<InputService>();
 
-    private Point MouseCenter => new(
-        _game.GraphicsDevice.PresentationParameters.BackBufferWidth / 2,
-        _game.GraphicsDevice.PresentationParameters.BackBufferHeight / 2);
+    public bool IsViewportHovered { private get; set; }
+
+    public MouseState CurrentMouseState => _currentMouseState;
+
+    public KeyboardState CurrentKeyboardState => _currentKeyboardState;
 
     private readonly Game _game;
 
@@ -28,11 +31,11 @@ public class InputService
 
     private MouseState _previousMouseState;
 
-    private bool _mouseCaptured;
+    private bool _middleMouseButtonCaptured;
 
-    private bool _mouseWasCaptured;
+    private bool _rightMouseButtonCaptured;
 
-    private bool _scrollCaptured;
+    private Vector2 _mouseDelta;
 
     public InputService(Game game)
     {
@@ -123,91 +126,57 @@ public class InputService
         return vector;
     }
 
-    public bool IsRightMousePressed()
+    public bool CaptureMiddleMouseDelta(out Vector2 delta)
     {
-        return _currentMouseState.RightButton == ButtonState.Pressed;
+        _middleMouseButtonCaptured = CaptureMouseDelta(_currentMouseState.MiddleButton == ButtonState.Pressed, out delta);
+        return _middleMouseButtonCaptured;
     }
 
-    public bool IsMiddleMousePressed()
+    public bool CaptureRightMouseDelta(out Vector2 delta)
     {
-        return _currentMouseState.MiddleButton == ButtonState.Pressed;
+        _rightMouseButtonCaptured = CaptureMouseDelta(_currentMouseState.RightButton == ButtonState.Pressed, out delta);
+        return _rightMouseButtonCaptured;
     }
 
-    public bool IsLeftMousePressed()
+    private bool CaptureMouseDelta(bool pressed, out Vector2 delta)
     {
-        return _currentMouseState.LeftButton == ButtonState.Pressed;
-    }
-
-    public Vector2 GetMousePosition()
-    {
-        return new Vector2(_currentMouseState.X, _currentMouseState.Y);
-    }
-
-    public Vector2 GetMouseDelta()
-    {
-        var deltaX = _currentMouseState.X - _previousMouseState.X;
-        var deltaY = _currentMouseState.Y - _previousMouseState.Y;
-        return new Vector2(deltaX, deltaY);
-    }
-
-    public int GetScrollWheelDelta()
-    {
-        if (!_scrollCaptured)
+        if (pressed && _game.IsActive && IsViewportHovered)
         {
-            return 0;
+            var vp = _game.GraphicsDevice.Viewport;
+            SDL.SDL_WarpMouseInWindow(_game.Window.Handle, vp.Width / 2f, vp.Height / 2f);
+
+            delta = _mouseDelta;
+            return true;
         }
 
-        return _currentMouseState.ScrollWheelValue - _previousMouseState.ScrollWheelValue;
+        delta = Vector2.Zero;
+        return false;
     }
 
-    public void CaptureScroll(bool captured)
+    public bool CaptureScrollWheelDelta(out float delta)
     {
-        _scrollCaptured = captured;
-    }
+        if (_game.IsActive && IsViewportHovered)
+        {
+            delta = _currentMouseState.ScrollWheelValue - _previousMouseState.ScrollWheelValue;
+            return !Mathz.IsZeroApprox(delta);
+        }
 
-    public void CaptureMouse(bool captured)
-    {
-        _mouseCaptured = captured;
-        _game.IsMouseVisible = !captured;
+        delta = 0f;
+        return false;
     }
 
     public void Update()
     {
+        // Read relative delta BEFORE Mouse.GetState(): FNA's GetMouseState also calls
+        // SDL_GetRelativeMouseState, which drains the accumulator.
+        SDL.SDL_GetRelativeMouseState(out var dx, out var dy);
+        _mouseDelta = new Vector2(dx, dy);
+        _game.IsMouseVisible = !_rightMouseButtonCaptured && !_middleMouseButtonCaptured;
+
         _previousKeyboardState = _currentKeyboardState;
         _currentKeyboardState = Keyboard.GetState();
         _previousMouseState = _currentMouseState;
         _currentMouseState = Mouse.GetState();
-        if (_mouseCaptured && _game.IsActive)
-        {
-            _previousMouseState = new MouseState(
-                MouseCenter.X, MouseCenter.Y,
-                _previousMouseState.ScrollWheelValue,
-                _previousMouseState.LeftButton,
-                _previousMouseState.MiddleButton,
-                _previousMouseState.RightButton,
-                _previousMouseState.XButton1,
-                _previousMouseState.XButton2
-            );
-            // If capture just started this frame, also align current to center
-            // so the delta is zero and the capture-start position doesn't bleed in.
-            if (!_mouseWasCaptured)
-            {
-                _currentMouseState = new MouseState(
-                    MouseCenter.X, MouseCenter.Y,
-                    _currentMouseState.ScrollWheelValue,
-                    _currentMouseState.LeftButton,
-                    _currentMouseState.MiddleButton,
-                    _currentMouseState.RightButton,
-                    _currentMouseState.XButton1,
-                    _currentMouseState.XButton2
-                );
-            }
-
-            Mouse.SetPosition(MouseCenter.X, MouseCenter.Y);
-        }
-
-        _mouseWasCaptured = _mouseCaptured;
-        _mouseCaptured = false;
     }
 
     private List<Binding> GetLazyBindings(string action)

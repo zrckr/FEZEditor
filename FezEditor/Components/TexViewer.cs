@@ -139,22 +139,18 @@ public class TexViewer : EditorComponent
         var canvasMax = canvasMin + avail;
         var canvasCenter = canvasMin + avail * 0.5f;
 
-        InputService.CaptureScroll(ImGui.IsItemHovered());
-        if (ImGui.IsItemHovered())
+        InputService.IsViewportHovered = ImGui.IsItemHovered();
+        if (InputService.CaptureScrollWheelDelta(out var scrollDelta))
         {
-            var scrollDelta = InputService.GetScrollWheelDelta();
-            if (scrollDelta != 0)
-            {
-                var mousePos = ImGuiX.GetMousePos();
-                var mouseBeforeZoom = (mousePos - canvasCenter - _pan) / _zoom;
+            var mousePos = ImGuiX.GetMousePos();
+            var mouseBeforeZoom = (mousePos - canvasCenter - _pan) / _zoom;
 
-                var zoomFactor = scrollDelta > 0 ? 1.2f : 1f / 1.2f;
-                _zoom = MathHelper.Clamp(_zoom * zoomFactor, MinZoom, MaxZoom);
+            var zoomFactor = scrollDelta > 0 ? 1.2f : 1f / 1.2f;
+            _zoom = MathHelper.Clamp(_zoom * zoomFactor, MinZoom, MaxZoom);
 
-                // Adjust pan so the zoom is centered on mouse
-                var mouseAfterZoom = mouseBeforeZoom * _zoom;
-                _pan = mousePos - canvasCenter - mouseAfterZoom;
-            }
+            // Adjust pan so the zoom is centered on mouse
+            var mouseAfterZoom = mouseBeforeZoom * _zoom;
+            _pan = mousePos - canvasCenter - mouseAfterZoom;
         }
 
         if (ImGui.IsItemActive() && (ImGui.IsMouseDragging(ImGuiMouseButton.Middle) ||

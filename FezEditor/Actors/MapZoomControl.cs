@@ -49,8 +49,7 @@ public class MapZoomControl : ActorComponent
             _camera.Size = _targetSize;
         }
 
-        var scroll = _input.GetScrollWheelDelta();
-        if (scroll != 0)
+        if (_input.CaptureScrollWheelDelta(out var scroll))
         {
             _sizeIndex = Math.Clamp(_sizeIndex + Math.Sign(scroll), 0, Sizes.Length - 1);
             _targetSize = Sizes[_sizeIndex];

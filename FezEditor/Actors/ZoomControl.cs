@@ -30,8 +30,7 @@ public class ZoomControl : ActorComponent
     public override void Update(GameTime gameTime)
     {
         _status.AddHints(("Scroll Wheel", "Zoom"));
-        var scroll = _input.GetScrollWheelDelta();
-        if (scroll != 0)
+        if (_input.CaptureScrollWheelDelta(out var scroll))
         {
             Distance -= scroll * ZoomSensitivity;
             Distance = MathHelper.Clamp(Distance, MinDistance, MaxDistance);

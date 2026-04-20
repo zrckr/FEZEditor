@@ -27,6 +27,8 @@ public partial class ImGuiService : IDisposable
 
     private readonly Game _game;
 
+    private readonly InputService _input;
+
     private readonly Texture2D _fontTexture;
 
     private readonly BasicEffect _basicEffect;
@@ -54,6 +56,7 @@ public partial class ImGuiService : IDisposable
     public unsafe ImGuiService(Game game)
     {
         _game = game;
+        _input = game.GetService<InputService>();
 
         // Set up the context
         {
@@ -150,7 +153,7 @@ public partial class ImGuiService : IDisposable
         // Update inputs
         if (_gameWindowFocused)
         {
-            var mouse = Mouse.GetState();
+            var mouse = _input.CurrentMouseState;
             io.AddMousePosEvent(mouse.X, mouse.Y);
             io.AddMouseButtonEvent(0, mouse.LeftButton == ButtonState.Pressed);
             io.AddMouseButtonEvent(1, mouse.RightButton == ButtonState.Pressed);
@@ -160,7 +163,7 @@ public partial class ImGuiService : IDisposable
             io.AddMouseWheelEvent(0, (mouse.ScrollWheelValue - _previousScrollWheelValue) / WheelDelta);
             _previousScrollWheelValue = mouse.ScrollWheelValue;
 
-            var keyboard = Keyboard.GetState();
+            var keyboard = _input.CurrentKeyboardState;
             foreach (var key in KeyMappings.Keys)
             {
                 io.AddKeyEvent(KeyMappings[key], keyboard.IsKeyDown(key));

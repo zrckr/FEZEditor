@@ -36,13 +36,10 @@ public class OrbitControl : ActorComponent
     public override void Update(GameTime gameTime)
     {
         _status.AddHints(("MMB", "Orbit"));
-        _input.CaptureMouse(false);
-        if (_input.IsMiddleMousePressed())
+        if (_input.CaptureMiddleMouseDelta(out var delta))
         {
-            var delta = _input.GetMouseDelta();
             Yaw -= delta.X * MouseSensitivity;
             Pitch -= delta.Y * MouseSensitivity;
-            _input.CaptureMouse(true);
         }
 
         _transform.Rotation = Quaternion.CreateFromYawPitchRoll(Yaw, Pitch, 0f);

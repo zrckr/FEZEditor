@@ -201,7 +201,7 @@ public class LukeEditor : EditorComponent
             if (texture is { IsDisposed: false })
             {
                 ImGuiX.Image(texture, size);
-                InputService.CaptureScroll(ImGui.IsItemHovered());
+                InputService.IsViewportHovered = ImGui.IsItemHovered();
 
                 var imageMin = ImGuiX.GetItemRectMin();
                 ImGuiX.DrawStats(imageMin + new Vector2(8, 8), RenderingService.GetStats());
