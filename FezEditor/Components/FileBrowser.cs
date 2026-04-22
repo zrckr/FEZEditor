@@ -565,6 +565,13 @@ public class FileBrowser : DrawableGameComponent
         return anyChildMatches;
     }
 
+    public void RegenerateThumbnails()
+    {
+        AppStorageService.ClearCache();
+        _thumbnailsGenerated = false;
+        UpdateNodeTree();
+    }
+
     private void UpdateNodeTree()
     {
         if (_resourceService.HasNoProvider)

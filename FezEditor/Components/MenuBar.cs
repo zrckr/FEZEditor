@@ -25,6 +25,8 @@ public class MenuBar : DrawableGameComponent
 
     private MainLayout _mainLayout = null!;
 
+    private FileBrowser _fileBrowser = null!;
+
     public MenuBar(Game game) : base(game)
     {
         game.AddComponent(_confirmWindow = new ConfirmWindow(game));
@@ -54,6 +56,7 @@ public class MenuBar : DrawableGameComponent
     {
         _logoTexture = Game.Content.Load<Texture2D>("Icon");
         _mainLayout = Game.GetComponent<MainLayout>();
+        _fileBrowser = Game.GetComponent<FileBrowser>();
     }
 
     public override void Update(GameTime gameTime)
@@ -164,6 +167,25 @@ public class MenuBar : DrawableGameComponent
                 if (ImGui.MenuItem("Quit", shortcut))
                 {
                     ShowQuitDialog();
+                }
+
+                ImGui.EndMenu();
+            }
+
+            if (ImGui.BeginMenu("Editor"))
+            {
+                if (_editorService.ActiveEditor is EddyEditor eddy)
+                {
+                    if (ImGui.MenuItem("Export Level as Diorama..."))
+                    {
+                        eddy.ExportAsDiorama();
+                    }
+                }
+
+                var hasProvider = !_resourceService.HasNoProvider;
+                if (ImGui.MenuItem("Regenerate Thumbnails", null, false, hasProvider))
+                {
+                    _fileBrowser.RegenerateThumbnails();
                 }
 
                 ImGui.EndMenu();

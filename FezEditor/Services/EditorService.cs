@@ -16,6 +16,8 @@ public partial class EditorService
 
     public IEnumerable<EditorComponent> Editors => _editors;
 
+    public EditorComponent? ActiveEditor => _activeEditor;
+
     private readonly List<EditorComponent> _editors = new();
 
     private readonly List<EditorComponent> _pendingClose = new();

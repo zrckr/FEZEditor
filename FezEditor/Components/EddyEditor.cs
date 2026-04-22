@@ -523,20 +523,6 @@ public class EddyEditor : EditorComponent, IEddyEditor
             ImGui.Separator();
             ImGui.Checkbox("Raycast Debug", ref _showRaycastDebug);
 
-            if (ImGui.Button("Export as Diorama"))
-            {
-                FileDialog.Show(FileDialog.Type.SaveFile, files =>
-                {
-                    var exporter = new PhilExporter(Game, _level, files[0]);
-                    Game.AddComponent(exporter);
-                }, new FileDialog.Options
-                {
-                    Title = "Export level diorama",
-                    DefaultLocation = Path.Combine(ResourceService.GetFullPath(""), $"{_level.Name}.glb"),
-                    Filters = [new FileDialog.Filter("GLB file", "glb")]
-                });
-            }
-
             ImGui.EndPopup();
         }
     }
@@ -644,6 +630,20 @@ public class EddyEditor : EditorComponent, IEddyEditor
         var placementDist = Math.Min(Vector3.Distance(finalCamPos, target), desiredDistance);
 
         _cameraActor.GetComponent<FirstPersonControl>().FocusOn(target, approachDir, placementDist);
+    }
+
+    public void ExportAsDiorama()
+    {
+        FileDialog.Show(FileDialog.Type.SaveFile, files =>
+        {
+            var exporter = new PhilExporter(Game, _level, files[0]);
+            Game.AddComponent(exporter);
+        }, new FileDialog.Options
+        {
+            Title = "Export level diorama",
+            DefaultLocation = Path.Combine(ResourceService.GetFullPath(""), $"{_level.Name}.glb"),
+            Filters = [new FileDialog.Filter("GLB file", "glb")]
+        });
     }
 
     private enum ViewMode

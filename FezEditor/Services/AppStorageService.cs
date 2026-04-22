@@ -129,6 +129,14 @@ public class AppStorageService : IDisposable
         }
     }
 
+    public static void ClearCache()
+    {
+        foreach (var file in Directory.GetFiles(CacheDir))
+        {
+            File.Delete(file);
+        }
+    }
+
     public static bool HasCacheFile(string filename)
     {
         return File.Exists(Path.Combine(CacheDir, filename));
