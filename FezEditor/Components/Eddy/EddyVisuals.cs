@@ -14,5 +14,7 @@ public enum EddyVisuals
     Liquid = 256,
     Sky = 512,
     Gomez = 1024,
-    Default = Triles | ArtObjects | BackgroundPlanes | NonPlayableCharacters | Volumes | Paths | Liquid | Sky | Gomez
+    EmptyTriles = 2048,
+    Default = Triles | ArtObjects | BackgroundPlanes | NonPlayableCharacters |
+              Volumes | Paths | Liquid | Sky | Gomez | EmptyTriles
 }

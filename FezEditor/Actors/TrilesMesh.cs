@@ -20,6 +20,8 @@ public class TrilesMesh : ActorComponent, IPickable
 
     private static readonly Vector3 EmplacementCenter = new(0.5f);
 
+    private const float FallbackOversize = 1.001f;
+
     public int InstanceCount => _instances.Count;
 
     public bool HasGeometry { get; private set; }
@@ -37,6 +39,8 @@ public class TrilesMesh : ActorComponent, IPickable
     private readonly Rid _material;
 
     private Texture2D? _texture;
+
+    private Texture2D? _emptyTexture;
 
     private bool _instancesDirty;
 
@@ -56,6 +60,7 @@ public class TrilesMesh : ActorComponent, IPickable
     {
         var effect = content.Load<Effect>("Effects/TrilesMesh");
         _rendering.MaterialAssignEffect(_material, effect);
+        _emptyTexture = content.Load<Texture2D>("Textures/Empty");
     }
 
     public override void Dispose()
@@ -69,16 +74,30 @@ public class TrilesMesh : ActorComponent, IPickable
 
     public void Visualize(TrileSet trileSet, int id)
     {
-        _texture?.Dispose();
-        _texture = RepackerExtensions.ConvertToTexture2D(trileSet.TextureAtlas);
-        _rendering.MaterialAssignBaseTexture(_material, _texture);
+        if (trileSet.Triles.TryGetValue(id, out var trile))
+        {
+            _size = trile.Size.ToXna();
+            HasGeometry = trile.Geometry.Indices.Length > 0;
+            if (HasGeometry)
+            {
+                _texture?.Dispose();
+                _texture = RepackerExtensions.ConvertToTexture2D(trileSet.TextureAtlas);
+                _rendering.MaterialAssignBaseTexture(_material, _texture);
 
-        var trile = trileSet.Triles[id];
-        _size = trile.Size.ToXna();
-        HasGeometry = trile.Geometry.Indices.Length > 0;
+                var surface = RepackerExtensions.ConvertToMesh(trile.Geometry.Vertices, trile.Geometry.Indices);
+                _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
+                return;
+            }
+        }
+        else
+        {
+            _size = Vector3.One;
+            HasGeometry = false;
+        }
 
-        var surface = RepackerExtensions.ConvertToMesh(trile.Geometry.Vertices, trile.Geometry.Indices);
-        _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
+        _rendering.MaterialAssignBaseTexture(_material, _emptyTexture!);
+        var fallback = MeshSurface.CreateTexturedBox(_size * FallbackOversize); // prevents z-fighting
+        _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, fallback, _material);
     }
 
     public TrileEmplacement GetEmplacement(int index)

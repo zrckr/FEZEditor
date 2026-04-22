@@ -509,6 +509,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
                 edited |= ImGui.CheckboxFlags("Pickable Bounds", ref visuals, (int)EddyVisuals.PickableBounds);
                 edited |= ImGui.CheckboxFlags("Collision Map", ref visuals, (int)EddyVisuals.CollisionMap);
                 edited |= ImGui.CheckboxFlags("Triles", ref visuals, (int)EddyVisuals.Triles);
+                edited |= ImGui.CheckboxFlags("Empty Triles", ref visuals, (int)EddyVisuals.EmptyTriles);
                 edited |= ImGui.CheckboxFlags("Art Objects", ref visuals, (int)EddyVisuals.ArtObjects);
                 edited |= ImGui.CheckboxFlags("Background Planes", ref visuals, (int)EddyVisuals.BackgroundPlanes);
                 edited |= ImGui.CheckboxFlags("Non-Playable Characters", ref visuals, (int)EddyVisuals.NonPlayableCharacters);

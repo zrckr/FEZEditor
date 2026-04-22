@@ -52,22 +52,16 @@ internal sealed class TrileContext : BaseContext
                 var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.CollisionMap);
                 var collisionMesh = _collisionMapActor.GetComponent<TrileCollisionMesh>();
                 collisionMesh.Visible = visible;
-
-                foreach (var actor in _trileActors.Values)
-                {
-                    var trilesMesh = actor.GetComponent<TrilesMesh>();
-                    if (trilesMesh is { HasGeometry: false })
-                    {
-                        trilesMesh.Pickable = visible;
-                    }
-                }
             }
+
+            var triles = Eddy.Visuals.Value.HasFlag(EddyVisuals.Triles);
+            var emptyTriles = Eddy.Visuals.Value.HasFlag(EddyVisuals.EmptyTriles);
 
             foreach (var actor in _trileActors.Values)
             {
-                var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Triles);
-                actor.Visible = visible;
                 var trilesMesh = actor.GetComponent<TrilesMesh>();
+                var visible = trilesMesh.HasGeometry ? triles : emptyTriles;
+                actor.Visible = visible;
                 trilesMesh.Pickable = visible;
             }
         }
@@ -896,7 +890,9 @@ internal sealed class TrileContext : BaseContext
                 mesh.Visualize(_set, id);
                 if (!mesh.HasGeometry)
                 {
-                    mesh.Pickable = Eddy.Visuals.Value.HasFlag(EddyVisuals.CollisionMap);
+                    var emptyTriles = Eddy.Visuals.Value.HasFlag(EddyVisuals.EmptyTriles);
+                    actor.Visible = emptyTriles;
+                    mesh.Pickable = emptyTriles;
                 }
             }
 
@@ -1441,7 +1437,9 @@ internal sealed class TrileContext : BaseContext
         }
 
         var actor = CreateSubActor();
-        actor.Name = $"{trileId}: {_set!.Triles[trileId].Name}";
+        actor.Name = _set!.Triles.TryGetValue(trileId, out var trile)
+            ? $"{trileId}: {trile.Name}"
+            : $"{trileId}: (missing)";
         _trileActors[trileId] = actor;
 
         var mesh = actor.AddComponent<TrilesMesh>();
