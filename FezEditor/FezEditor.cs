@@ -91,7 +91,7 @@ public class FezEditor : Game
         this.AddComponent(new MainLayout(this));
         _editor.OpenEditor(new WelcomeComponent(this));
 
-        _appStorage.LoadWindowState();
+        _appStorage.LoadWindowState(_deviceManager);
         base.Initialize();
     }
 

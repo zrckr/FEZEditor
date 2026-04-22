@@ -120,13 +120,17 @@ public class AppStorageService : IDisposable
         };
     }
 
-    public void LoadWindowState()
+    public void LoadWindowState(GraphicsDeviceManager gdm)
     {
         SDL.SDL_SetWindowSize(_game.Window.Handle, _data.Window.Width, _data.Window.Height);
         if (_data.Window.IsMaximized)
         {
             SDL.SDL_MaximizeWindow(_game.Window.Handle);
         }
+
+        gdm.PreferredBackBufferWidth = _data.Window.Width;
+        gdm.PreferredBackBufferHeight = _data.Window.Height;
+        gdm.ApplyChanges();
     }
 
     public static void ClearCache()
