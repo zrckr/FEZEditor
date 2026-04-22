@@ -110,7 +110,7 @@ public class MenuBar : DrawableGameComponent
                     _editorService.SaveActiveEditorChanges();
                 }
 
-                enabled = _editorService.Flags.HasFlag(EditorFlags.SaveFile);
+                enabled = _editorService.Flags.HasFlag(EditorFlags.CloseFile);
                 shortcut = _inputService.GetActionBinding(InputActions.UiSaveAs);
                 if (ImGui.MenuItem("Save File As...", shortcut, false, enabled))
                 {

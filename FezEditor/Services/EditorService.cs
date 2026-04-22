@@ -191,17 +191,30 @@ public partial class EditorService
 
     public void SaveActiveEditorChangesAs()
     {
-        FileDialog.Show(FileDialog.Type.SaveFile, files =>
+        if (_tracking.TryGetValue(_activeEditor!, out var tracking))
         {
-            if (_tracking.TryGetValue(_activeEditor!, out var tracking) && tracking.HasChanges)
+            var type = _activeEditor!.Asset.GetType();
+            var extension = GetExtensionForType(type);
+
+            var currentFullPath = _resourceService.GetFullPath(tracking.Path);
+            currentFullPath = currentFullPath.Replace("." + extension, string.Empty);
+
+            var options = new FileDialog.Options
             {
-                _resourceService.Save(files[0], _activeEditor!.Asset);
-                tracking.HasChanges = false;
-                _tracking[_activeEditor] = tracking;
-                Logger.Information("Saving {0} as...", _activeEditor);
+                DefaultLocation = currentFullPath,
+                Filters = [new FileDialog.Filter(type.Name, extension)]
+            };
+
+            FileDialog.Show(FileDialog.Type.SaveFile, files =>
+            {
+                var relativePath = _resourceService.GetRelativePath(files[0]);
+                _resourceService.Save(relativePath, _activeEditor!.Asset);
+                _activeEditor!.Title = relativePath;
+                _tracking[_activeEditor!] = new EditorTracking(relativePath, false);
+                Logger.Information("Saved {0} as {1}", _activeEditor!, relativePath);
                 UpdateFlags();
-            }
-        });
+            }, options);
+        }
     }
 
     public void SaveEditorChanges(EditorComponent editor)

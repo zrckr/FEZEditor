@@ -7,7 +7,7 @@ namespace FezEditor.Components;
 
 public abstract class EditorComponent
 {
-    public string Title { get; }
+    public string Title { get; set; }
 
     public virtual object Asset => null!;
 
