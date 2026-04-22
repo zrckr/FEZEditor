@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using FezEditor.Structure;
 using FezEditor.Tools;
+using FEZRepacker.Core.Definitions.Game.TrileSet;
 using JetBrains.Annotations;
 using Microsoft.Xna.Framework;
 using Serilog;
@@ -15,6 +16,8 @@ public class ResourceService : IDisposable
     public event Action? ProviderChanged;
 
     public event Action? ProviderReset;
+
+    public event Action? ThumbnailsReady;
 
     public bool HasNoProvider => _provider == null;
 
@@ -148,6 +151,17 @@ public class ResourceService : IDisposable
         return saveData;
     }
 
+    public Dictionary<int, string> GetTrileSetList(string path)
+    {
+        if (_provider!.GetExtension(path) == ".fezts.glb")
+        {
+            var trileSet = _provider!.Load<TrileSet>(path);
+            return trileSet.Triles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+        }
+
+        return new Dictionary<int, string>();
+    }
+
     public Dictionary<string, RAnimatedTexture> LoadAnimations(string path)
     {
         if (_cache.TryGetValue(path, out var weakRef) && weakRef.TryGetTarget(out var cached))
@@ -236,6 +250,11 @@ public class ResourceService : IDisposable
         {
             Process.Start("xdg-open", $"\"{Path.GetDirectoryName(target)}\"");
         }
+    }
+
+    public void NotifyThumbnailsReady()
+    {
+        ThumbnailsReady?.Invoke();
     }
 
     public void Dispose()

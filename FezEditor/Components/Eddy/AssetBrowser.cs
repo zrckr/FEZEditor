@@ -1,20 +1,15 @@
 using FezEditor.Services;
 using FezEditor.Structure;
 using FezEditor.Tools;
-using FEZRepacker.Core.Definitions.Game.ArtObject;
-using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Serilog;
 
 namespace FezEditor.Components.Eddy;
 
 public class AssetBrowser : IDisposable
 {
-    private static readonly ILogger Logger = Logging.Create<AssetBrowser>();
-
     private static readonly Dictionary<string, Texture2D> SharedThumbnails = new();
 
     private static int s_instanceCount;
@@ -31,8 +26,6 @@ public class AssetBrowser : IDisposable
 
     private const float RowHeight = CellSize + LabelHeight;
 
-    private const int MaxThumbnailsPerFrame = 2;
-
     private const int MaxRecentEntries = 10;
 
     private Entry _selectedEntry;
@@ -45,13 +38,9 @@ public class AssetBrowser : IDisposable
 
     private readonly Dictionary<AssetType, IReadOnlyList<Entry>> _entries = new();
 
-    private readonly Queue<Entry> _pendingQueue = new();
-
     private string? _trileSetPath;
 
     private TrileSet? _trileSet;
-
-    private readonly Dictionary<CollisionType, RTexture2D> _collisionTextures = new();
 
     private Texture2D _placeholder = null!;
 
@@ -62,7 +51,98 @@ public class AssetBrowser : IDisposable
         _resources = game.GetService<ResourceService>();
         _resources.ProviderChanged += OnProviderChanged;
         _resources.ProviderReset += OnProviderReset;
+        _resources.ThumbnailsReady += BuildEntries;
         s_instanceCount++;
+    }
+
+    public void LoadContent(IContentManager content)
+    {
+        _placeholder = content.Load<Texture2D>("Missing");
+    }
+
+    private void BuildEntries()
+    {
+        if (_resources.HasNoProvider)
+        {
+            return;
+        }
+
+        var triles = new List<Entry>();
+        var artObjects = new List<Entry>();
+        var planes = new List<Entry>();
+        var npcFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var npcs = new List<Entry>();
+
+        if (_trileSet != null && _trileSetPath != null)
+        {
+            triles.AddRange(_trileSet.Triles.Values.Select(trile => new Entry(trile.Name, _trileSetPath, AssetType.Trile)));
+        }
+
+        foreach (var file in _resources.Files)
+        {
+            if (file.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase))
+            {
+                var extension = _resources.GetExtension(file);
+                if (!extension.EndsWith(".png"))
+                {
+                    artObjects.Add(new Entry(file["Art Objects/".Length..], file, AssetType.ArtObject));
+                }
+            }
+            else if (file.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
+            {
+                planes.Add(new Entry(file["Background Planes/".Length..], file, AssetType.BackgroundPlane));
+            }
+            else if (file.StartsWith("Character Animations/", StringComparison.OrdinalIgnoreCase) &&
+                     !file.Contains("Metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                var remainder = file["Character Animations/".Length..];
+                var slashIndex = remainder.IndexOf('/');
+                if (slashIndex >= 0)
+                {
+                    var folder = remainder[..slashIndex];
+                    if (npcFolders.Add(folder))
+                    {
+                        npcs.Add(new Entry(folder, $"Character Animations/{folder}", AssetType.NonPlayableCharacter));
+                    }
+                }
+            }
+        }
+
+        artObjects.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        triles.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        planes.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        npcs.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+
+        _entries[AssetType.ArtObject] = artObjects;
+        _entries[AssetType.BackgroundPlane] = planes;
+        _entries[AssetType.NonPlayableCharacter] = npcs;
+        _entries[AssetType.Trile] = triles;
+
+        if (triles.Count > 0 && _recentEntries.Count == 0)
+        {
+            Select(triles[0]);
+        }
+
+        _selectionDirtyType = null;
+
+        foreach (var entry in _entries.Values.SelectMany(e => e))
+        {
+            if (SharedThumbnails.TryGetValue(entry.CachePath, out var value) && value != _placeholder)
+            {
+                continue;
+            }
+
+            var lastWrite = _resources.GetLastWriteTimeUtc(entry.Path);
+            var cacheProbe = new Thumbnailer(entry.CachePath, lastWrite);
+            if (cacheProbe.TryLoad(out var cached) && cached != null)
+            {
+                SharedThumbnails[entry.CachePath] = RepackerExtensions.ConvertToTexture2D(cached);
+            }
+            else
+            {
+                SharedThumbnails[entry.CachePath] = _placeholder;
+            }
+        }
     }
 
     public void SetTrileSet(string path, TrileSet set)
@@ -70,23 +150,7 @@ public class AssetBrowser : IDisposable
         _trileSetPath = path;
         _trileSet = set;
         _entries.Clear();
-    }
-
-    public void LoadContent(IContentManager content)
-    {
-        _placeholder = content.Load<Texture2D>("Missing");
-        foreach (var collision in Enum.GetValues<CollisionType>())
-        {
-            var texture = content.Load<Texture2D>($"Textures/{collision}");
-            var data = new byte[texture.Width * texture.Height * 4];
-            texture.GetData(data);
-            _collisionTextures[collision] = new RTexture2D
-            {
-                Width = texture.Width,
-                Height = texture.Height,
-                TextureData = data
-            };
-        }
+        BuildEntries();
     }
 
     public void Pick(string name, AssetType type)
@@ -160,6 +224,9 @@ public class AssetBrowser : IDisposable
         DrawSelectionBar();
         ImGui.Separator();
 
+        DrawFilter();
+        ImGui.Separator();
+
         var footerHeight = ImGui.GetFrameHeightWithSpacing() + ImGui.GetStyle().ItemSpacing.Y;
         ImGui.BeginChild("##Content", new NVector2(0, -footerHeight));
 
@@ -200,9 +267,6 @@ public class AssetBrowser : IDisposable
         }
 
         ImGui.EndChild();
-
-        ImGui.Separator();
-        DrawFooter();
     }
 
     private void DrawSelectionBar()
@@ -266,11 +330,9 @@ public class AssetBrowser : IDisposable
         ImGui.EndChild();
     }
 
-    private void DrawFooter()
+    private void DrawFilter()
     {
-        ImGui.SetNextItemWidth(256);
         ImGui.InputTextWithHint("", "Filter assets...", ref _filterEntries, 255);
-
         if (!string.IsNullOrEmpty(_filterEntries))
         {
             ImGui.SameLine();
@@ -279,186 +341,6 @@ public class AssetBrowser : IDisposable
                 _filterEntries = string.Empty;
             }
         }
-
-        var isGenerating = _pendingQueue.Count > 0;
-        if (isGenerating)
-        {
-            ImGui.BeginDisabled();
-        }
-
-        ImGui.SameLine();
-        if (ImGui.Button($"{Icons.Refresh} Refresh Thumbnails"))
-        {
-            foreach (var entry in _entries.Values.SelectMany(e => e))
-            {
-                new ThumbnailGenerator(entry.CachePath, default).Delete();
-            }
-
-            ClearSharedThumbnails(_placeholder);
-            _entries.Clear();
-        }
-
-        if (isGenerating)
-        {
-            ImGui.EndDisabled();
-        }
-
-        if (_pendingQueue.Count > 0)
-        {
-            var spinner = "|/-\\"[(int)(ImGui.GetTime() * 8) % 4];
-            ImGui.SameLine();
-            ImGui.TextDisabled($"{spinner} Generating thumbnails... ({_pendingQueue.Count} remaining)");
-        }
-    }
-
-    public void Update()
-    {
-        ProcessQueue();
-        TryBuildEntries();
-    }
-
-    private void ProcessQueue()
-    {
-        var generated = 0;
-        while (_pendingQueue.Count > 0)
-        {
-            var entry = _pendingQueue.Dequeue();
-
-            try
-            {
-                var lastWrite = _resources.GetLastWriteTimeUtc(entry.Path);
-
-                // Get thumbnail from cache
-                var cacheProbe = new ThumbnailGenerator(entry.CachePath, lastWrite);
-                var cached = cacheProbe.Load();
-                if (cached != null)
-                {
-                    SharedThumbnails[entry.CachePath] = RepackerExtensions.ConvertToTexture2D(cached);
-                    continue;
-                }
-
-                // Cache miss - limit expensive generation to avoid stalling
-                if (generated >= MaxThumbnailsPerFrame)
-                {
-                    AddToPending(entry);
-                    break;
-                }
-
-                // Load asset and generate thumbnail
-                ThumbnailGenerator? generator = null;
-                switch (entry.Type)
-                {
-                    case AssetType.ArtObject:
-                        {
-                            var asset = _resources.Load(entry.Path);
-                            if (asset is ArtObject ao)  // exclude AOs with texture only
-                            {
-                                generator = new ThumbnailGenerator(entry.CachePath, lastWrite, ao);
-                            }
-
-                            break;
-                        }
-
-                    case AssetType.Trile:
-                        {
-                            if (_trileSet != null)
-                            {
-                                var trile = _trileSet.FindByName(entry.Name).Trile;
-                                if (trile == null)
-                                {
-                                    break;
-                                }
-
-                                if (trile.Geometry.Vertices.Length > 0)
-                                {
-                                    var atlas = _trileSet.TextureAtlas;
-                                    generator = new ThumbnailGenerator(entry.CachePath, lastWrite, trile, atlas);
-                                }
-                                else if (trile.Faces.TryGetValue(FaceOrientation.Front, out var collisionType) &&
-                                         _collisionTextures.TryGetValue(collisionType, out var collisionTex))
-                                {
-                                    generator = new ThumbnailGenerator(entry.CachePath, lastWrite, collisionTex);
-                                }
-                            }
-
-                            break;
-                        }
-
-                    case AssetType.BackgroundPlane:
-                        {
-                            var asset = _resources.Load(entry.Path);
-                            if (asset is RAnimatedTexture anim)
-                            {
-                                generator = new ThumbnailGenerator(entry.CachePath, lastWrite, anim);
-                            }
-                            else if (asset is RTexture2D tex)
-                            {
-                                generator = new ThumbnailGenerator(entry.CachePath, lastWrite, tex);
-                            }
-
-                            break;
-                        }
-
-                    case AssetType.NonPlayableCharacter:
-                        {
-                            var animations = _resources.LoadAnimations(entry.Path);
-
-                            RAnimatedTexture? selected = null;
-                            if (animations.TryGetValue("IdleWink", out var idleWink))
-                            {
-                                selected = idleWink;
-                            }
-                            else if (animations.TryGetValue("Idle", out var idle))
-                            {
-                                selected = idle;
-                            }
-                            else if (animations.TryGetValue("Walk", out var walk))
-                            {
-                                selected = walk;
-                            }
-                            else if (animations.Count > 0)
-                            {
-                                selected = animations.Values.First();
-                            }
-
-                            if (selected != null)
-                            {
-                                generator = new ThumbnailGenerator(entry.CachePath, lastWrite, selected);
-                            }
-
-                            break;
-                        }
-
-                    default:
-                        throw new InvalidOperationException();
-                }
-
-                if (generator == null)
-                {
-                    continue;
-                }
-
-                var thumb = generator.Generate();
-                SharedThumbnails[entry.CachePath] = RepackerExtensions.ConvertToTexture2D(thumb);
-                generator.Save(thumb);
-                generated++;
-            }
-            catch (Exception e)
-            {
-                Logger.Warning(e, "Failed to generate thumbnail for {0}", entry.Path);
-            }
-        }
-    }
-
-    private void AddToPending(Entry entry)
-    {
-        var extension = _resources.GetExtension(entry.Path);
-        if (entry.Path.StartsWith("Art Object", StringComparison.OrdinalIgnoreCase) && extension.EndsWith(".png"))
-        {
-            return;
-        }
-
-        _pendingQueue.Enqueue(entry);
     }
 
     public void Dispose()
@@ -466,87 +348,13 @@ public class AssetBrowser : IDisposable
         GC.SuppressFinalize(this);
         _resources.ProviderChanged -= OnProviderChanged;
         _resources.ProviderReset -= OnProviderReset;
+        _resources.ThumbnailsReady -= BuildEntries;
 
         s_instanceCount--;
         if (s_instanceCount <= 0)
         {
             ClearSharedThumbnails(_placeholder);
         }
-    }
-
-    private void TryBuildEntries()
-    {
-        if (_entries.Count > 0 || _resources.HasNoProvider)
-        {
-            return;
-        }
-
-        var triles = new List<Entry>();
-        var artObjects = new List<Entry>();
-        var planes = new List<Entry>();
-        var npcFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var npcs = new List<Entry>();
-
-        if (_trileSet != null && _trileSetPath != null)
-        {
-            triles.AddRange(_trileSet.Triles.Values.Select(trile => new Entry(trile.Name, _trileSetPath, AssetType.Trile)));
-        }
-
-        foreach (var file in _resources.Files)
-        {
-            if (file.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase))
-            {
-                artObjects.Add(new Entry(file["Art Objects/".Length..], file, AssetType.ArtObject));
-            }
-            else if (file.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
-            {
-                planes.Add(new Entry(file["Background Planes/".Length..], file, AssetType.BackgroundPlane));
-            }
-            else if (file.StartsWith("Character Animations/", StringComparison.OrdinalIgnoreCase) &&
-                     !file.Contains("Metadata", StringComparison.OrdinalIgnoreCase))
-            {
-                var remainder = file["Character Animations/".Length..];
-                var slashIndex = remainder.IndexOf('/');
-                if (slashIndex >= 0)
-                {
-                    var folder = remainder[..slashIndex];
-                    if (npcFolders.Add(folder))
-                    {
-                        npcs.Add(new Entry(folder, $"Character Animations/{folder}", AssetType.NonPlayableCharacter));
-                    }
-                }
-            }
-        }
-
-        artObjects.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        triles.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        planes.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        npcs.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-
-        _entries[AssetType.ArtObject] = artObjects;
-        _entries[AssetType.BackgroundPlane] = planes;
-        _entries[AssetType.NonPlayableCharacter] = npcs;
-        _entries[AssetType.Trile] = triles;
-
-        if (triles.Count > 0 && _recentEntries.Count == 0)
-        {
-            Select(triles[0]);
-        }
-
-        _selectionDirtyType = null;
-
-        // Pre-fill thumbnails with placeholder and enqueue for generation
-        foreach (var entry in _entries.Values.SelectMany(e => e))
-        {
-            if (SharedThumbnails.TryAdd(entry.CachePath, _placeholder) ||
-                SharedThumbnails[entry.CachePath] == _placeholder)
-            {
-                AddToPending(entry);
-            }
-        }
-
-        Logger.Debug("Built {0} art objects, {1} triles, {2} planes, {3} NPCs",
-            artObjects.Count, triles.Count, planes.Count, npcs.Count);
     }
 
     private unsafe void DrawGrid(IReadOnlyList<Entry> entries)
@@ -671,7 +479,7 @@ public class AssetBrowser : IDisposable
     private void OnProviderChanged()
     {
         _entries.Clear();
-        _pendingQueue.Clear();
+        BuildEntries();
     }
 
     private void OnProviderReset()

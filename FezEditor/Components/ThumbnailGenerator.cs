@@ -1,187 +1,317 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
-using FezEditor.Services;
+﻿using FezEditor.Services;
+using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
+using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.TrileSet;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using Rectangle = Microsoft.Xna.Framework.Rectangle;
+using ImGuiNET;
+using JetBrains.Annotations;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Serilog;
 
 namespace FezEditor.Components;
 
-public class ThumbnailGenerator
+[UsedImplicitly]
+public class ThumbnailGenerator : DrawableGameComponent
 {
-    private const int BytesPerPixel = 4;
+    private static readonly ILogger Logger = Logging.Create<ThumbnailGenerator>();
 
-    private readonly RTexture2D _source;
+    private readonly ResourceService _resources;
 
-    private readonly string _thumbPath;
+    private readonly Dictionary<CollisionType, RTexture2D> _collisionTextures = new();
 
-    private readonly string _metaPath;
+    private float _progress;
 
-    private readonly DateTime _lastWrite;
+    private string _status = "";
 
-    public ThumbnailGenerator(string path, DateTime lastWrite, ArtObject ao) : this(path, lastWrite)
+    private State _state = State.Processing;
+
+    private State _previousState = State.Disposed;
+
+    private CancellationTokenSource? _cts;
+
+    public ThumbnailGenerator(Game game) : base(game)
     {
-        var cubemap = ao.Cubemap;
-        var faceWidth = cubemap.Width / 6;
-        var faceRect = new Rectangle(0, 0, faceWidth, cubemap.Height);
-        var data = CropRawRegion(cubemap.TextureData, cubemap.Width, faceRect);
-        SetOpaqueAlpha(data);
-        _source = new RTexture2D
-        {
-            Width = faceWidth,
-            Height = cubemap.Height,
-            TextureData = data
-        };
+        _resources = game.GetService<ResourceService>();
+        _ = ProcessAsync();
     }
 
-    public ThumbnailGenerator(string path, DateTime lastWrite, Trile trile, RTexture2D atlas) : this(path, lastWrite)
+    protected override void LoadContent()
     {
-        var px = (int)MathF.Round(trile.AtlasOffset.X * atlas.Width);
-        var py = (int)MathF.Round(trile.AtlasOffset.Y * atlas.Height);
-        var rect = new Rectangle(px + 1, py + 1, 16, 16);
-        var data = CropRawRegion(atlas.TextureData, atlas.Width, rect);
-        SetOpaqueAlpha(data);
-        _source = new RTexture2D
+        var content = Game.GetService<ContentService>().Get(this);
+        foreach (var collision in Enum.GetValues<CollisionType>())
         {
-            Width = 16,
-            Height = 16,
-            TextureData = data
-        };
-    }
-
-    public ThumbnailGenerator(string path, DateTime lastWrite, RTexture2D texture) : this(path, lastWrite)
-    {
-        _source = texture;
-    }
-
-    public ThumbnailGenerator(string path, DateTime lastWrite, RAnimatedTexture anim) : this(path, lastWrite)
-    {
-        var frame = anim.Frames[0].Rectangle.ToXna();
-        _source = new RTexture2D
-        {
-            Width = frame.Width,
-            Height = frame.Height,
-            TextureData = CropRawRegion(anim.TextureData, anim.AtlasWidth, frame)
-        };
-    }
-
-    public ThumbnailGenerator(string path, DateTime lastWrite)
-    {
-        _lastWrite = lastWrite;
-        _source = new RTexture2D();
-        {
-            var hashBytes = MD5.HashData(Encoding.UTF8.GetBytes(path));
-            var hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
-            _thumbPath = $"thumb-{hash}.png";
-            _metaPath = Path.ChangeExtension(_thumbPath, ".json");
+            var texture = content.Load<Texture2D>($"Textures/{collision}");
+            var data = new byte[texture.Width * texture.Height * 4];
+            texture.GetData(data);
+            _collisionTextures[collision] = new RTexture2D
+            {
+                Width = texture.Width,
+                Height = texture.Height,
+                TextureData = data
+            };
         }
     }
 
-    public void Delete()
+    public override void Update(GameTime gameTime)
     {
-        AppStorageService.DeleteCacheFile(_thumbPath);
-        AppStorageService.DeleteCacheFile(_metaPath);
+        if (_state == State.Disposed)
+        {
+            Game.RemoveComponent(this);
+        }
     }
 
-    public RTexture2D? Load()
+    public override void Draw(GameTime gameTime)
     {
-        if (!AppStorageService.HasCacheFile(_thumbPath) || !AppStorageService.HasCacheFile(_metaPath))
+        const string popup = "Thumbnails";
+        if (_state != _previousState)
         {
-            return null;
+            ImGuiX.SetNextWindowCentered();
+            ImGui.OpenPopup(popup);
+            _previousState = _state;
         }
 
-        ThumbMeta? meta;
+        var isOpen = true;
+        if (ImGui.BeginPopupModal(popup, ref isOpen, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse))
+        {
+            switch (_state)
+            {
+                case State.Processing:
+                    ImGui.Text(_status);
+                    ImGuiX.ProgressBar(_progress, new Vector2(400, 0), $"{_progress * 100:F1}%");
+                    break;
+
+                case State.Complete:
+                    _state = State.Disposed;
+                    ImGui.CloseCurrentPopup();
+                    break;
+            }
+
+            ImGui.EndPopup();
+        }
+
+        if (!isOpen)
+        {
+            _state = State.Disposed;
+        }
+    }
+
+    private async Task ProcessAsync()
+    {
+        _cts = new CancellationTokenSource();
+        _state = State.Processing;
+        _status = "Processing thumbnails...";
+        _progress = 0f;
+
         try
         {
-            using var stream = AppStorageService.LoadFromCache(_metaPath);
-            stream.Seek(0, SeekOrigin.Begin);
-            meta = JsonSerializer.Deserialize<ThumbMeta>(stream);
+            var ct = _cts.Token;
+            await Task.Run(() => ProcessInternal(ct), ct);
+            _status = "Generation complete!";
+            _progress = 1.0f;
         }
-        catch
+        catch (OperationCanceledException)
         {
-            meta = null;
+            _status = "Generation cancelled";
         }
-
-        if (meta == null || meta.LastWrite != _lastWrite)
+        catch (Exception ex)
         {
-            return null;
+            _status = $"Error: {ex.Message}";
+            Logger.Error(ex, "Thumbnail generation failed");
         }
-
-        using var image = Image.Load<Rgba32>(AppStorageService.LoadFromCache(_thumbPath));
-        var data = new byte[image.Width * image.Height * BytesPerPixel];
-        image.CopyPixelDataTo(data);
-
-        return new RTexture2D
+        finally
         {
-            Width = image.Width,
-            Height = image.Height,
-            TextureData = data
-        };
+            _state = State.Complete;
+        }
     }
 
-    public RTexture2D Generate()
+    private void ProcessInternal(CancellationToken ct)
     {
-        using var image = Image.LoadPixelData<Rgba32>(_source.TextureData, _source.Width, _source.Height);
-        var data = new byte[_source.Width * _source.Height * BytesPerPixel];
-        image.CopyPixelDataTo(data);
-
-        return new RTexture2D
+        var entries = new Queue<Entry>();
+        var npcFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in _resources.Files)
         {
-            Width = image.Width,
-            Height = image.Height,
-            TextureData = data
-        };
+            ct.ThrowIfCancellationRequested();
+            if (file.StartsWith("Trile Sets/", StringComparison.OrdinalIgnoreCase))
+            {
+                var lastWrite = _resources.GetLastWriteTimeUtc(file);
+                var trileNames = _resources.GetTrileSetList(file);
+                foreach (var name in trileNames.Values)
+                {
+                    if (!new Thumbnailer($"{file}/{name}", lastWrite).HasInCache())
+                    {
+                        entries.Enqueue(new Entry(file, AssetType.Trile, name));
+                    }
+                }
+            }
+            else if (file.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase))
+            {
+                var extension = _resources.GetExtension(file);
+                if (!extension.EndsWith(".png"))
+                {
+                    entries.Enqueue(new Entry(file, AssetType.ArtObject));
+                }
+            }
+            else if (file.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
+            {
+                entries.Enqueue(new Entry(file, AssetType.BackgroundPlane));
+            }
+            else if (file.StartsWith("Character Animations/", StringComparison.OrdinalIgnoreCase) &&
+                     !file.Contains("Metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                var remainder = file["Character Animations/".Length..];
+                var slashIndex = remainder.IndexOf('/');
+                if (slashIndex >= 0)
+                {
+                    var folder = $"Character Animations/{remainder[..slashIndex]}";
+                    if (npcFolders.Add(folder))
+                    {
+                        entries.Enqueue(new Entry(folder, AssetType.NonPlayableCharacter));
+                    }
+                }
+            }
+        }
+
+        var processed = 0;
+        var total = entries.Count;
+        TrileSet? cachedTrileSet = null;
+        string? cachedTrileSetPath = null;
+
+        while (entries.Count > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var entry = entries.Dequeue();
+            try
+            {
+                var lastWrite = _resources.GetLastWriteTimeUtc(entry.Path);
+                var cachePath = entry.CachePath;
+
+                var cacheProbe = new Thumbnailer(cachePath, lastWrite);
+                if (cacheProbe.HasInCache())
+                {
+                    Logger.Debug("Thumbnail for {0} already cached", cachePath);
+                    processed++;
+                    _progress = (float)processed / total;
+                    continue;
+                }
+
+                Thumbnailer thumbnailer = null!;
+                switch (entry.Type)
+                {
+                    case AssetType.ArtObject:
+                        {
+                            var ao = (ArtObject)_resources.Load(entry.Path);
+                            thumbnailer = new Thumbnailer(cachePath, lastWrite, ao);
+                            break;
+                        }
+
+                    case AssetType.Trile:
+                        {
+                            if (cachedTrileSetPath != entry.Path)
+                            {
+                                cachedTrileSet = (TrileSet)_resources.Load(entry.Path);
+                                cachedTrileSetPath = entry.Path;
+                            }
+
+                            var trile = cachedTrileSet!.Triles.Values
+                                .FirstOrDefault(t => t.Name == entry.TrileName);
+                            if (trile == null)
+                            {
+                                break;
+                            }
+
+                            if (trile.Geometry.Indices.Length > 0)
+                            {
+                                thumbnailer = new Thumbnailer(cachePath, lastWrite, trile, cachedTrileSet.TextureAtlas);
+                            }
+                            else if (trile.Faces.TryGetValue(FaceOrientation.Front, out var collisionType) &&
+                                     _collisionTextures.TryGetValue(collisionType, out var collisionTex))
+                            {
+                                thumbnailer = new Thumbnailer(cachePath, lastWrite, collisionTex);
+                            }
+
+                            break;
+                        }
+
+                    case AssetType.BackgroundPlane:
+                        {
+                            var asset = _resources.Load(entry.Path);
+                            if (asset is RAnimatedTexture anim)
+                            {
+                                thumbnailer = new Thumbnailer(cachePath, lastWrite, anim);
+                            }
+                            else if (asset is RTexture2D tex)
+                            {
+                                thumbnailer = new Thumbnailer(cachePath, lastWrite, tex);
+                            }
+
+                            break;
+                        }
+
+                    case AssetType.NonPlayableCharacter:
+                        {
+                            var animations = _resources.LoadAnimations(entry.Path);
+
+                            RAnimatedTexture? selected = null;
+                            if (animations.TryGetValue("IdleWink", out var idleWink))
+                            {
+                                selected = idleWink;
+                            }
+                            else if (animations.TryGetValue("Idle", out var idle))
+                            {
+                                selected = idle;
+                            }
+                            else if (animations.TryGetValue("Walk", out var walk))
+                            {
+                                selected = walk;
+                            }
+                            else if (animations.Count > 0)
+                            {
+                                selected = animations.Values.First();
+                            }
+
+                            if (selected != null)
+                            {
+                                thumbnailer = new Thumbnailer(cachePath, lastWrite, selected);
+                            }
+
+                            break;
+                        }
+
+                    default:
+                        throw new InvalidOperationException();
+                }
+
+                var thumbnail = thumbnailer.Generate();
+                thumbnailer.Save(thumbnail);
+
+                processed++;
+                _progress = (float)processed / total;
+            }
+            catch (Exception e)
+            {
+                Logger.Warning(e, "Failed to generate thumbnail for {0}", entry.CachePath);
+            }
+        }
     }
 
-    public void Save(RTexture2D texture)
+    protected override void Dispose(bool disposing)
     {
-        #region Thumbnail
-
-        {
-            using var image = Image.LoadPixelData<Rgba32>(texture.TextureData, texture.Width, texture.Height);
-            using var png = new MemoryStream();
-            image.SaveAsPng(png);
-            AppStorageService.SaveToCache(_thumbPath, png);
-        }
-
-        #endregion
-
-        #region Metadata
-
-        {
-            var meta = new ThumbMeta(_lastWrite, texture.Width, texture.Height);
-            using var stream = new MemoryStream();
-            JsonSerializer.Serialize(stream, meta);
-            AppStorageService.SaveToCache(_metaPath, stream);
-        }
-
-        #endregion
+        Game.GetService<ContentService>().Unload(this);
+        _cts?.Dispose();
+        base.Dispose(disposing);
     }
 
-    private static void SetOpaqueAlpha(byte[] data)
+    private enum State
     {
-        for (var i = 3; i < data.Length; i += BytesPerPixel)
-        {
-            data[i] = 255;
-        }
+        Disposed,
+        Processing,
+        Complete
     }
 
-    private static byte[] CropRawRegion(byte[] data, int stride, Rectangle rect)
+    private readonly record struct Entry(string Path, AssetType Type, string? TrileName = null)
     {
-        var result = new byte[rect.Width * rect.Height * BytesPerPixel];
-        for (var row = 0; row < rect.Height; row++)
-        {
-            var srcOffset = ((rect.Y + row) * stride + rect.X) * BytesPerPixel;
-            var dstOffset = row * rect.Width * BytesPerPixel;
-            Buffer.BlockCopy(data, srcOffset, result, dstOffset, rect.Width * BytesPerPixel);
-        }
-
-        return result;
+        public string CachePath => TrileName != null ? $"{Path}/{TrileName}" : Path;
     }
-
-    private record ThumbMeta(DateTime LastWrite, int Width, int Height); // last write datetime of asset
 }

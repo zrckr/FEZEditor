@@ -40,6 +40,10 @@ public class FileBrowser : DrawableGameComponent
 
     private readonly ConfirmWindow _confirmWindow;
 
+    private ThumbnailGenerator? _thumbnailGenerator;
+
+    private bool _thumbnailsGenerated;
+
     private enum SortMode
     {
         NameAscending,
@@ -563,6 +567,22 @@ public class FileBrowser : DrawableGameComponent
 
     private void UpdateNodeTree()
     {
+        if (_resourceService.HasNoProvider)
+        {
+            _thumbnailsGenerated = false;
+        }
+        else if (_thumbnailGenerator == null && !_thumbnailsGenerated)
+        {
+            _thumbnailGenerator = new ThumbnailGenerator(Game);
+            _thumbnailGenerator.Disposed += (_, _) =>
+            {
+                _thumbnailGenerator = null;
+                _thumbnailsGenerated = true;
+                _resourceService.NotifyThumbnailsReady();
+            };
+            Game.AddComponent(_thumbnailGenerator);
+        }
+
         BuildNodeTree();
         SortAllNodes();
     }

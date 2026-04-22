@@ -97,7 +97,6 @@ public class EddyEditor : EditorComponent, IEddyEditor
         AllowedTools.Clear();
         HoveredContext = EddyContext.Default;
 
-        AssetBrowser.Update();
         Clock.Tick(gameTime);
 
         foreach (var context in _contexts)
