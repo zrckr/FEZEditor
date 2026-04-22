@@ -191,6 +191,7 @@ internal class VolumeContext : BaseContext
             }
 
             _selectedIds.Add(_hoveredId.Value);
+            Eddy.SelectedContext = EddyContext.Volume;
         }
     }
 

@@ -186,6 +186,7 @@ internal class ArtObjectContext : BaseContext
             }
 
             _selectedIds.Add(_hoveredId.Value);
+            Eddy.SelectedContext = EddyContext.ArtObject;
         }
     }
 

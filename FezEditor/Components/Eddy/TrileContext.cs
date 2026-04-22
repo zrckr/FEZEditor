@@ -395,6 +395,10 @@ internal sealed class TrileContext : BaseContext
             }
 
             _selectedCursor.Face = _hoveredCursor.Face;
+            if (_selectedCursor.Emplacements.Count > 0)
+            {
+                Eddy.SelectedContext = EddyContext.Trile;
+            }
         }
     }
 

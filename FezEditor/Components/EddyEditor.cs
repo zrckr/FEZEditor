@@ -233,8 +233,9 @@ public class EddyEditor : EditorComponent, IEddyEditor
                                            ImGuiWindowFlags.NoCollapse;
 
             var context = SelectedContext.GetLabel();
-            if (ImGui.Begin($"{context} Properties##Properties", ref _showProperties, flags))
+            if (ImGui.Begin("Properties", ref _showProperties, flags))
             {
+                ImGui.SeparatorText(context);
                 foreach (var ctx in _contexts)
                 {
                     ctx.DrawProperties();

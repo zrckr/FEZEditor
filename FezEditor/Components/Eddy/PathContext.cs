@@ -147,6 +147,8 @@ internal class PathContext : BaseContext
             {
                 _selectedWaypointIndices.Add(_hoveredWaypointIndex.Value);
             }
+
+            Eddy.SelectedContext = EddyContext.Path;
         }
 
         UpdateTranslate();

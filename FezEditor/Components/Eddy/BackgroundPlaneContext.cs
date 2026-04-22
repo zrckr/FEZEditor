@@ -185,6 +185,7 @@ internal class BackgroundPlaneContext : BaseContext
             }
 
             _selectedIds.Add(_hoveredId.Value);
+            Eddy.SelectedContext = EddyContext.BackgroundPlane;
         }
     }
 

@@ -130,6 +130,7 @@ internal class GomezContext : BaseContext
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && _hovered)
         {
             _selected = true;
+            Eddy.SelectedContext = EddyContext.Gomez;
         }
     }
 

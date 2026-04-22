@@ -186,6 +186,7 @@ internal class NpcContext : BaseContext
             }
 
             _selectedIds.Add(_hoveredId.Value);
+            Eddy.SelectedContext = EddyContext.NonPlayableCharacter;
         }
     }
 
