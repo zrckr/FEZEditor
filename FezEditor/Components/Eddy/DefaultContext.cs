@@ -10,6 +10,8 @@ namespace FezEditor.Components.Eddy;
 
 internal class DefaultContext : BaseContext
 {
+    private string? _skyName;
+
     private Sky? _sky;
 
     private Actor? _skyActor;
@@ -377,20 +379,24 @@ internal class DefaultContext : BaseContext
                 boundsMesh!.Size = Level.Size.ToXna();
             }
 
+            if (Level.SkyName != _skyName)
+            {
+                _skyName = Level.SkyName;
+                _sky = (Sky)ResourceService.Load($"Skies/{_skyName}");
+                Eddy.Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
+                Eddy.Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
+
+                if (_skyActor!.TryGetComponent<SkyVisualizer>(out var visualizer))
+                {
+                    visualizer!.LevelSize = Level.Size.ToXna();
+                    visualizer.Visualize(_sky);
+                    visualizer.VisualizeShadows(_sky.Name, _sky.Shadows);
+                }
+            }
+
             if (Eddy.SelectedContext != EddyContext.Default)
             {
                 return;
-            }
-
-            _sky = (Sky)ResourceService.Load($"Skies/{Level.SkyName}");
-            Eddy.Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
-            Eddy.Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
-
-            if (_skyActor!.TryGetComponent<SkyVisualizer>(out var visualizer))
-            {
-                visualizer!.LevelSize = Level.Size.ToXna();
-                visualizer.Visualize(_sky);
-                visualizer.VisualizeShadows(_sky.Name, _sky.Shadows);
             }
 
             if (Level.WaterType == LiquidType.None && _liquidActor != null)
@@ -418,6 +424,7 @@ internal class DefaultContext : BaseContext
 
         #region Sky
 
+        _skyName = Level.SkyName;
         _sky = (Sky)ResourceService.Load($"Skies/{Level.SkyName}");
         Eddy.Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
         Eddy.Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
