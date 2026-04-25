@@ -35,7 +35,7 @@ internal sealed class TrileContext : BaseContext
 
     private IDisposable? _scaleScope;
 
-    private IDisposable? _paintScope;
+    private readonly HashSet<PaintOp> _paintOps = new();
 
     private readonly Dictionary<TrileEmplacement, int> _emplacementGroups = new();
 
@@ -76,8 +76,14 @@ internal sealed class TrileContext : BaseContext
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
         {
             var index = Eddy.Hit.Value.Index;
+            if (index >= mesh.InstanceCount)
+            {
+                return;
+            }
+
             var emplacement = mesh.GetEmplacement(index);
-            if (Level.Triles.ContainsKey(emplacement) && Eddy.Tool is EddyTool.Select or EddyTool.Pick or EddyTool.Paint)
+            if (Level.Triles.ContainsKey(emplacement) &&
+                Eddy.Tool is EddyTool.Select or EddyTool.Pick or EddyTool.Paint)
             {
                 var box = mesh.GetBounds().ElementAt(index);
                 var distance = Eddy.Hit.Value.Distance;
@@ -176,13 +182,15 @@ internal sealed class TrileContext : BaseContext
             if (_selectedCursor.Face.HasValue)
             {
                 var normal = _selectedCursor.Face.Value.AsVector();
-                var faceSurfaces = _selectedCursor.Emplacements.Select(e =>
-                {
-                    var trileCenter = Level.Triles[e].Position.ToXna() + new Vector3(0.5f);
-                    var origin = trileCenter + normal * (0.5f + CursorMesh.OverlayOffset);
-                    var s = MeshSurface.CreateFaceQuad(Vector3.One, origin, _selectedCursor.Face.Value);
-                    return (s, PrimitiveType.TriangleList);
-                });
+                var faceSurfaces = _selectedCursor.Emplacements
+                    .Where(e => Level.Triles.ContainsKey(e))
+                    .Select(e =>
+                    {
+                        var trileCenter = Level.Triles[e].Position.ToXna() + new Vector3(0.5f);
+                        var origin = trileCenter + normal * (0.5f + CursorMesh.OverlayOffset);
+                        var s = MeshSurface.CreateFaceQuad(Vector3.One, origin, _selectedCursor.Face.Value);
+                        return (s, PrimitiveType.TriangleList);
+                    });
                 Eddy.Cursor.SetSelectionSurfaces(faceSurfaces, SelectionColor);
             }
         }
@@ -375,7 +383,8 @@ internal sealed class TrileContext : BaseContext
                             _selectedCursor.Emplacements.UnionWith(groupSet);
                         }
 
-                        _selectedCursor.GroupId = _selectedCursor.Emplacements.Count > 0 ? _hoveredCursor.GroupId : null;
+                        _selectedCursor.GroupId =
+                            _selectedCursor.Emplacements.Count > 0 ? _hoveredCursor.GroupId : null;
                     }
                     else
                     {
@@ -655,7 +664,7 @@ internal sealed class TrileContext : BaseContext
 
     public override void DrawOverlay()
     {
-        if (Eddy.Tool != EddyTool.Paint || !Eddy.IsViewportHovered || Eddy.SelectedContext != EddyContext.Trile)
+        if (Eddy.Tool != EddyTool.Paint || !Eddy.IsViewportHovered)
         {
             return;
         }
@@ -681,94 +690,179 @@ internal sealed class TrileContext : BaseContext
     {
         StatusService.AddHints(
             ("LMB", "Paint"),
-            ("Shift+LMB", "Append")
+            ("Shift+LMB", "Append"),
+            ("Ctrl+LMB", "Erase")
         );
 
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-        {
-            _paintScope?.Dispose();
-            _paintScope = Eddy.History.BeginScope("Paint Triles");
-        }
+        var entry = Eddy.AssetBrowser.GetSelectedEntry(AssetType.Trile);
+        var trileId = !string.IsNullOrEmpty(entry)
+            ? _set!.FindByName(entry).Id
+            : InvalidId;
 
-        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
-        {
-            _paintScope?.Dispose();
-            _paintScope = null;
-        }
+        #region Selected triles
 
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Left))
+        if (_selectedCursor.Emplacements.Count > 0 &&
+            _selectedCursor.Emplacements.Contains(_hoveredCursor.Emplacement ?? new TrileEmplacement()) &&
+            ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
-            var entry = Eddy.AssetBrowser.GetSelectedEntry(AssetType.Trile);
-            var trileId = !string.IsNullOrEmpty(entry)
-                ? _set!.FindByName(entry).Id
-                : InvalidId;
-
-            if (trileId != InvalidId)
+            var emplacements = _selectedCursor.Emplacements.ToList();
+            if (ImGui.GetIO().KeyShift)
             {
-                if (ImGui.GetIO().KeyShift && _hoveredCursor.Emplacement != null && _hoveredCursor.Face.HasValue)
+                foreach (var emplacement in emplacements)
                 {
-                    var faceNormal = _hoveredCursor.Face.Value.AsVector();
-                    var hovered = _hoveredCursor.Emplacement;
-                    var emp = new TrileEmplacement(
-                        hovered.X + (int)faceNormal.X,
-                        hovered.Y + (int)faceNormal.Y,
-                        hovered.Z + (int)faceNormal.Z);
-
-                    if (!Level.Triles.ContainsKey(emp))
-                    {
-                        var instance = new TrileInstance
-                        {
-                            TrileId = trileId,
-                            PhiLight = 0,
-                            Position = new Vector3(emp.X, emp.Y, emp.Z).ToRepacker()
-                        };
-
-                        Level.Triles[emp] = instance;
-                        EnsureTrileActor(trileId).GetComponent<TrilesMesh>()
-                            .SetInstanceData(emp, instance.Position.ToXna(), instance.PhiLight);
-                        UpdateCollisionMesh();
-                    }
+                    AppendNewTrile(emplacement);
                 }
-                else
+
+                UpdateCollisionMesh();
+            }
+            else if (ImGui.GetIO().KeyCtrl)
+            {
+                foreach (var emplacement in emplacements)
                 {
-                    var targetEmplacements = new List<TrileEmplacement>();
-                    if (_selectedCursor.Emplacements.Count > 0)
+                    EraseTrile(emplacement);
+                }
+
+                UpdateCollisionMesh();
+                EnsurePlaceholder();
+            }
+            else
+            {
+                foreach (var emplacement in emplacements)
+                {
+                    ChangeTrile(emplacement);
+                }
+
+                UpdateCollisionMesh();
+            }
+        }
+
+        #endregion
+
+        #region Single hovered trile
+
+        if (_hoveredCursor is { Emplacement: not null, Face: not null } &&
+            _selectedCursor.Emplacements.Count == 0 &&
+            (ImGui.IsMouseClicked(ImGuiMouseButton.Left) ||
+             ImGui.IsMouseDragging(ImGuiMouseButton.Left)))
+        {
+            Eddy.SelectedContext = EddyContext.Trile;
+            if (ImGui.GetIO().KeyShift)
+            {
+                AppendNewTrile(_hoveredCursor.Emplacement!);
+                UpdateCollisionMesh();
+            }
+            else if (ImGui.GetIO().KeyCtrl)
+            {
+                EraseTrile(_hoveredCursor.Emplacement!);
+                UpdateCollisionMesh();
+                EnsurePlaceholder();
+            }
+            else
+            {
+                ChangeTrile(_hoveredCursor.Emplacement!);
+                UpdateCollisionMesh();
+            }
+        }
+
+        #endregion
+
+        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) && _paintOps.Count != 0)
+        {
+            using (Eddy.History.BeginScope("Paint Triles"))
+            {
+                foreach (var op in _paintOps)
+                {
+                    switch (op)
                     {
-                        targetEmplacements.AddRange(_selectedCursor.Emplacements);
+                        case PaintOp.Added(var emplacement, var id):
+                            {
+                                Level.Triles[emplacement] = new TrileInstance
+                                {
+                                    TrileId = id,
+                                    PhiLight = 0,
+                                    Position = new Vector3(emplacement.X, emplacement.Y, emplacement.Z).ToRepacker()
+                                };
+                                break;
+                            }
+
+                        case PaintOp.Changed(var emplacement, var newId):
+                            {
+                                if (Level.Triles.TryGetValue(emplacement, out var instance))
+                                {
+                                    instance.TrileId = newId;
+                                }
+
+                                break;
+                            }
+
+                        case PaintOp.Erased(var emplacement):
+                            {
+                                Level.Triles.Remove(emplacement);
+                                break;
+                            }
                     }
-                    else if (_hoveredCursor.Emplacement != null)
-                    {
-                        targetEmplacements.Add(_hoveredCursor.Emplacement);
-                    }
-
-                    foreach (var emp in targetEmplacements)
-                    {
-                        if (!Level.Triles.TryGetValue(emp, out var instance))
-                        {
-                            continue;
-                        }
-
-                        var oldTrileId = instance.TrileId;
-                        if (oldTrileId == trileId)
-                        {
-                            continue;
-                        }
-
-                        if (_trileActors.TryGetValue(oldTrileId, out var oldActor))
-                        {
-                            var oldMesh = oldActor.GetComponent<TrilesMesh>();
-                            oldMesh.RemoveInstance(emp);
-                            CleanupEmptyActor(oldTrileId, oldMesh);
-                        }
-
-                        instance.TrileId = trileId;
-                        EnsureTrileActor(trileId).GetComponent<TrilesMesh>()
-                            .SetInstanceData(emp, instance.Position.ToXna(), instance.PhiLight);
-                    }
-
-                    UpdateCollisionMesh();
                 }
             }
+
+            _paintOps.Clear();
+        }
+
+        return;
+
+        void AppendNewTrile(TrileEmplacement emplacement)
+        {
+            var faceNormal = _hoveredCursor.Face!.Value.AsVector();
+            var newEmp = new TrileEmplacement(
+                emplacement.X + (int)faceNormal.X,
+                emplacement.Y + (int)faceNormal.Y,
+                emplacement.Z + (int)faceNormal.Z
+            );
+
+            var position = new Vector3(newEmp.X, newEmp.Y, newEmp.Z);
+            var mesh = EnsureTrileActor(trileId).GetComponent<TrilesMesh>();
+            mesh.SetInstanceData(newEmp, position, 0);
+
+            _paintOps.Add(new PaintOp.Added(newEmp, trileId));
+            if (_selectedCursor.Emplacements.Remove(emplacement))
+            {
+                _selectedCursor.Emplacements.Add(newEmp);
+            }
+        }
+
+        void EraseTrile(TrileEmplacement emplacement)
+        {
+            var removedId = Level.Triles[emplacement].TrileId;
+            if (_trileActors.TryGetValue(removedId, out var actor))
+            {
+                var mesh = actor.GetComponent<TrilesMesh>();
+                mesh.RemoveInstance(emplacement);
+                CleanupEmptyActor(removedId, mesh);
+            }
+
+            _paintOps.Add(new PaintOp.Erased(emplacement));
+            _selectedCursor.Emplacements.Remove(emplacement);
+        }
+
+        void ChangeTrile(TrileEmplacement emplacement)
+        {
+            var instance = Level.Triles[emplacement];
+            var oldTrileId = instance.TrileId;
+            if (oldTrileId == trileId || trileId == InvalidId)
+            {
+                return;
+            }
+
+            if (_trileActors.TryGetValue(oldTrileId, out var oldActor))
+            {
+                var oldMesh = oldActor.GetComponent<TrilesMesh>();
+                oldMesh.RemoveInstance(emplacement);
+                CleanupEmptyActor(oldTrileId, oldMesh);
+            }
+
+            var mesh = EnsureTrileActor(trileId).GetComponent<TrilesMesh>();
+            mesh.SetInstanceData(emplacement, instance.Position.ToXna(), instance.PhiLight);
+
+            _paintOps.Add(new PaintOp.Changed(emplacement, trileId));
         }
     }
 
@@ -1112,6 +1206,7 @@ internal sealed class TrileContext : BaseContext
                 }
             }
         }
+
         if (!ImGui.IsItemActive())
         {
             _previousPositionDrag = Vector3.Zero;
@@ -1154,6 +1249,7 @@ internal sealed class TrileContext : BaseContext
             {
                 ImGui.SameLine();
             }
+
             if (ImGui.Button($"{Icons.Trash} Remove from All"))
             {
                 using (Eddy.History.BeginScope("Remove ActorSettings"))
@@ -1350,7 +1446,7 @@ internal sealed class TrileContext : BaseContext
     {
         _translateScope?.Dispose();
         _scaleScope?.Dispose();
-        _paintScope?.Dispose();
+        _paintOps.Clear();
         TeardownVisualization(force: true);
         base.Dispose();
     }
@@ -1664,6 +1760,15 @@ internal sealed class TrileContext : BaseContext
         public bool WasDrag;
         public bool PressedOnViewport;
         public readonly List<ClipboardEntry> Clipboard = new();
+    }
+
+    private abstract record PaintOp(TrileEmplacement Emp)
+    {
+        public record Added(TrileEmplacement Emp, int Id) : PaintOp(Emp);
+
+        public record Erased(TrileEmplacement Emp) : PaintOp(Emp);
+
+        public record Changed(TrileEmplacement Emp, int NewId) : PaintOp(Emp);
     }
 
     private record struct TrileEntry(TrileEmplacement Emp, int TrileId, byte PhiLight);

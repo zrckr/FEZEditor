@@ -378,7 +378,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         ImGui.TextDisabled("|");
 
         ImGui.SameLine();
-        DrawToolButton(Lucide.Paintbrush, EddyTool.Paint);
+        DrawToolButton(Lucide.Pencil, EddyTool.Paint);
 
         ImGui.SameLine();
         DrawToolButton(Lucide.Pipette, EddyTool.Pick);
