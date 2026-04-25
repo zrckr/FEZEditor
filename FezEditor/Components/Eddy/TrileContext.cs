@@ -186,6 +186,7 @@ internal sealed class TrileContext : BaseContext
         StatusService.AddHints(
             ("LMB", "Select"),
             ("Shift+LMB", "Add to Selection"),
+            ("Alt+LMB", "Select Overlapped"),
             ("LMB Drag", "Select Multiple")
         );
 

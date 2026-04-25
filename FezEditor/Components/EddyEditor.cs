@@ -35,7 +35,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     public Ray Ray { get; private set; }
 
-    public RaycastHit? Hit { get; private set; }
+    public RaycastHit? Hit => _hits.Length > 0 ? _hits[_hitIndex] : null;
 
     public EddyTool Tool { get; set; } = EddyTool.Select;
 
@@ -76,6 +76,12 @@ public class EddyEditor : EditorComponent, IEddyEditor
     private bool _showRaycastDebug;
 
     private bool _queueRevisualization;
+
+    private RaycastHit[] _hits = Array.Empty<RaycastHit>();
+
+    private RaycastHit[] _prevHits = Array.Empty<RaycastHit>();
+
+    private int _hitIndex;
 
     public EddyEditor(Game game, string title, Level level) : base(game, title)
     {
@@ -198,12 +204,24 @@ public class EddyEditor : EditorComponent, IEddyEditor
                 var viewportMin = ImGuiX.GetItemRectMin();
                 _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;
 
-                Hit = null;
+                _hits = Array.Empty<RaycastHit>();
                 IsViewportHovered = ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right);
                 if (IsViewportHovered)
                 {
                     Ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
-                    Hit = Scene.Raycast(Ray);
+                    _hits = Scene.RaycastAll(Ray);
+
+                    var hitsChanged = _hits.Length != _prevHits.Length ||
+                                      _hits.Zip(_prevHits).Any(p => p.First.Actor != p.Second.Actor);
+                    if (hitsChanged)
+                    {
+                        _hitIndex = 0;
+                        _prevHits = _hits;
+                    }
+                    else if (_hits.Length > 1 && ImGui.GetIO().KeyAlt && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                    {
+                        _hitIndex = (_hitIndex + 1) % _hits.Length;
+                    }
                 }
 
                 foreach (var ctx in _contexts)
@@ -555,7 +573,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         {
             var actor = Hit.Value.Actor;
             var index = Hit.Value.Index;
-            stats["Hit"] = actor.Name;
+            stats["Hit"] = $"{actor.Name} ({_hitIndex + 1}/{_hits.Length})";
             stats["Distance"] = $"{Hit.Value.Distance:F2}";
             stats["Triangle"] = $"{index}";
             if (actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)

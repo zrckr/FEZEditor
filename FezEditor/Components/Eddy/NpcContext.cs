@@ -128,7 +128,8 @@ internal class NpcContext : BaseContext
     {
         StatusService.AddHints(
             ("LMB", "Select"),
-            ("Shift+LMB", "Add to Selection")
+            ("Shift+LMB", "Add to Selection"),
+            ("Alt+LMB", "Select Overlapped")
         );
 
         if (_selectedIds.Count > 0)
