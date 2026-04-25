@@ -12,6 +12,11 @@ namespace FezEditor.Components.Eddy;
 
 internal sealed class TrileContext : BaseContext
 {
+    private static readonly string[] Rotations = FaceExtensions.NaturalOrder
+        .Where(fo => fo.IsSide())
+        .Select(fo => fo.ToString())
+        .ToArray();
+
     private readonly Dictionary<int, Actor> _trileActors = new();
 
     private Actor? _collisionMapActor;
@@ -36,7 +41,9 @@ internal sealed class TrileContext : BaseContext
 
     private readonly Dictionary<int, HashSet<TrileEmplacement>> _groupEmplacements = new();
 
-    private BoundingBox _levelBounds = new();
+    private BoundingBox _levelBounds;
+
+    private Vector3 _previousPositionDrag;
 
     public TrileContext(Game game, Level level, IEddyEditor eddy) : base(game, level, eddy)
     {
@@ -957,6 +964,12 @@ internal sealed class TrileContext : BaseContext
             return;
         }
 
+        if (_selectedCursor.Emplacements.Count > 1)
+        {
+            DrawMultiProperties();
+            return;
+        }
+
         var emplacement = _selectedCursor.Emplacements.First();
         if (!Level.Triles.TryGetValue(emplacement, out var instance) || instance.TrileId == InvalidId)
         {
@@ -1067,6 +1080,88 @@ internal sealed class TrileContext : BaseContext
                 using (Eddy.History.BeginScope("Edit Host Volume"))
                 {
                     instance.ActorSettings.HostVolume = hostVolume;
+                }
+            }
+        }
+    }
+
+    private void DrawMultiProperties()
+    {
+        var instances = _selectedCursor.Emplacements
+            .Where(e => Level.Triles.TryGetValue(e, out var ti) && ti.TrileId != InvalidId)
+            .Select(e => Level.Triles[e])
+            .ToList();
+
+        if (instances.Count == 0)
+        {
+            return;
+        }
+
+        ImGui.TextDisabled($"{instances.Count} triles selected");
+
+        var positionDrag = _previousPositionDrag;
+        if (ImGuiX.DragFloat3("Position", ref positionDrag, 0.1f))
+        {
+            var delta = positionDrag - _previousPositionDrag;
+            _previousPositionDrag = positionDrag;
+            using (Eddy.History.BeginScope("Edit Triles Position"))
+            {
+                foreach (var inst in instances)
+                {
+                    inst.Position = (inst.Position.ToXna() + delta).ToRepacker();
+                }
+            }
+        }
+        if (!ImGui.IsItemActive())
+        {
+            _previousPositionDrag = Vector3.Zero;
+        }
+
+        var allSameFace = instances.All(i => i.PhiLight == instances[0].PhiLight);
+        var face = allSameFace ? instances[0].PhiLight : -1;
+        if (ImGui.Combo("Rotation", ref face, Rotations, Rotations.Length))
+        {
+            using (Eddy.History.BeginScope("Edit Trile Rotation"))
+            {
+                foreach (var inst in instances)
+                {
+                    inst.PhiLight = (byte)face;
+                }
+            }
+        }
+
+        ImGui.SeparatorText("Actor Settings");
+        var anyWithout = instances.Any(i => i.ActorSettings == null);
+        var anyWith = instances.Any(i => i.ActorSettings != null);
+
+        if (anyWithout)
+        {
+            if (ImGui.Button($"{Icons.Add} Add to All"))
+            {
+                using (Eddy.History.BeginScope("Add ActorSettings"))
+                {
+                    foreach (var inst in instances.Where(i => i.ActorSettings == null))
+                    {
+                        inst.ActorSettings = new TrileInstanceActorSettings();
+                    }
+                }
+            }
+        }
+
+        if (anyWith)
+        {
+            if (anyWithout)
+            {
+                ImGui.SameLine();
+            }
+            if (ImGui.Button($"{Icons.Trash} Remove from All"))
+            {
+                using (Eddy.History.BeginScope("Remove ActorSettings"))
+                {
+                    foreach (var inst in instances.Where(i => i.ActorSettings != null))
+                    {
+                        inst.ActorSettings = null;
+                    }
                 }
             }
         }
