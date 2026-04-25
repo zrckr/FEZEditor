@@ -10,7 +10,7 @@ namespace FezEditor.Actors;
 
 public class TrilesMesh : ActorComponent, IPickable
 {
-    private static readonly Quaternion[] PhiAngles = new[]
+    public static readonly Quaternion[] PhiAngles = new[]
     {
         Quaternion.CreateFromAxisAngle(Vector3.Up, -MathF.Tau / 2f),
         Quaternion.CreateFromAxisAngle(Vector3.Up, -MathF.Tau / 4f),
@@ -18,7 +18,7 @@ public class TrilesMesh : ActorComponent, IPickable
         Quaternion.CreateFromAxisAngle(Vector3.Up, +MathF.Tau / 4f)
     };
 
-    private static readonly Vector3 EmplacementCenter = new(0.5f);
+    public static readonly Vector3 EmplacementCenter = new(0.5f);
 
     private const float FallbackOversize = 1.001f;
 

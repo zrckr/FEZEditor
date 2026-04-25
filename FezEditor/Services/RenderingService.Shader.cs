@@ -13,7 +13,11 @@ public partial class RenderingService
     private Effect? _basicEffectVertexColor;
     public Effect BasicEffectVertexColor =>
         _basicEffectVertexColor ??= new BasicEffect(GraphicsDevice) { VertexColorEnabled = true };
-    
+
+    private Effect? _basicEffectTextured;
+    public Effect BasicEffectTextured =>
+        _basicEffectTextured ?? new BasicEffect(GraphicsDevice) { TextureEnabled = true };
+
     private static readonly HashSet<Type> AllowedParameterTypes = new()
     {
         typeof(bool),

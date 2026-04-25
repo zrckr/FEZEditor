@@ -1,4 +1,5 @@
 using FezEditor.Actors;
+using FezEditor.Services;
 using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Common;
@@ -45,8 +46,17 @@ internal sealed class TrileContext : BaseContext
 
     private Vector3 _previousPositionDrag;
 
+    private RotationMode _rotationMode = RotationMode.Default;
+
+    private byte _paintingPhi; // 0
+
+    private int _hologramTrileId = InvalidId;
+
+    private readonly InputService _input;
+
     public TrileContext(Game game, Level level, IEddyEditor eddy) : base(game, level, eddy)
     {
+        _input = game.GetService<InputService>();
     }
 
     protected override void TestConditions()
@@ -128,6 +138,11 @@ internal sealed class TrileContext : BaseContext
                 Eddy.FocusOn(centroid);
             }
         }
+
+        if (Eddy.Tool != EddyTool.Paint)
+        {
+            Eddy.Cursor.ClearHologram();
+        }
     }
 
     protected override void Act()
@@ -161,7 +176,8 @@ internal sealed class TrileContext : BaseContext
             {
                 Eddy.Cursor.SetHoverSurfaces(BuildBoxSurfaces(groupSet, HoverColor), HoverColor);
             }
-            else if (Level.Triles.TryGetValue(_hoveredCursor.Emplacement, out var hoveredInstance))
+            else if (Level.Triles.TryGetValue(_hoveredCursor.Emplacement, out var hoveredInstance)
+                     && Eddy.Tool != EddyTool.Paint)
             {
                 var face = _hoveredCursor.Face ?? FaceOrientation.Front;
                 var center = hoveredInstance.Position.ToXna() + new Vector3(0.5f);
@@ -690,16 +706,79 @@ internal sealed class TrileContext : BaseContext
 
     private void UpdatePaint()
     {
-        StatusService.AddHints(
-            ("LMB", "Paint"),
-            ("Shift+LMB", "Append"),
-            ("Ctrl+LMB", "Erase")
-        );
-
         var entry = Eddy.AssetBrowser.GetSelectedEntry(AssetType.Trile);
         var trileId = !string.IsNullOrEmpty(entry)
             ? _set!.FindByName(entry).Id
             : InvalidId;
+
+        #region Hologram sync
+
+        if (_set != null && trileId != _hologramTrileId)
+        {
+            _hologramTrileId = trileId;
+            Eddy.Cursor.UpdateHologram(_set, trileId);
+        }
+
+        #endregion
+
+        #region Rotation mode
+
+        if (_rotationMode == RotationMode.Default && _input.CaptureScrollWheelDelta(out var scroll))
+        {
+            var delta = scroll > 0 ? 1 : -1;
+            _paintingPhi = (byte)((_paintingPhi + delta + 4) % 4);
+        }
+
+        if (ImGui.IsKeyPressed(ImGuiKey.R))
+        {
+            _rotationMode = (RotationMode)(((int)_rotationMode + 1) % 3);
+        }
+
+        #endregion
+
+        #region Hologram pose
+
+        if (_hoveredCursor is { Emplacement: not null, Face: not null })
+        {
+            var emp = _hoveredCursor.Emplacement;
+            var candidatePos = new Vector3(emp.X, emp.Y, emp.Z) + TrilesMesh.EmplacementCenter;
+            var hologramPhi = GetPhi(emp);
+
+            if (ImGui.GetIO().KeyShift)
+            {
+                candidatePos += _hoveredCursor.Face.Value.AsVector();
+                if (_rotationMode != RotationMode.Copy)
+                {
+                    hologramPhi = _paintingPhi;
+                }
+            }
+
+            Eddy.Cursor.SetHologramPose(candidatePos, TrilesMesh.PhiAngles[hologramPhi]);
+        }
+        else
+        {
+            Eddy.Cursor.ClearHologram();
+        }
+
+        #endregion
+
+        #region Status hints
+
+        var rotation = _rotationMode switch
+        {
+            RotationMode.Random => "Random",
+            RotationMode.Copy => "Copy",
+            _ => $"{Rotations[_paintingPhi]} (Scroll)"
+        };
+
+        StatusService.AddHints(
+            ("LMB", "Paint"),
+            ("Shift+LMB", "Append"),
+            ("Ctrl+LMB", "Erase"),
+            ("R", $"Rotate: {rotation}")
+        );
+
+        #endregion
 
         #region Selected triles
 
@@ -710,9 +789,10 @@ internal sealed class TrileContext : BaseContext
             var emplacements = _selectedCursor.Emplacements.ToList();
             if (ImGui.GetIO().KeyShift)
             {
+                var appendPhi = GetPhi(_hoveredCursor.Emplacement);
                 foreach (var emplacement in emplacements)
                 {
-                    AppendNewTrile(emplacement);
+                    AppendNewTrile(emplacement, appendPhi);
                 }
 
                 UpdateCollisionMesh();
@@ -750,7 +830,8 @@ internal sealed class TrileContext : BaseContext
             Eddy.SelectedContext = EddyContext.Trile;
             if (ImGui.GetIO().KeyShift)
             {
-                AppendNewTrile(_hoveredCursor.Emplacement!);
+                var appendPhi = GetPhi(_hoveredCursor.Emplacement);
+                AppendNewTrile(_hoveredCursor.Emplacement!, appendPhi);
                 UpdateCollisionMesh();
             }
             else if (ImGui.GetIO().KeyCtrl)
@@ -776,12 +857,12 @@ internal sealed class TrileContext : BaseContext
                 {
                     switch (op)
                     {
-                        case PaintOp.Added(var emplacement, var id):
+                        case PaintOp.Added(var emplacement, var id, var phi):
                             {
                                 Level.Triles[emplacement] = new TrileInstance
                                 {
                                     TrileId = id,
-                                    PhiLight = 0,
+                                    PhiLight = phi,
                                     Position = new Vector3(emplacement.X, emplacement.Y, emplacement.Z).ToRepacker()
                                 };
                                 break;
@@ -811,7 +892,12 @@ internal sealed class TrileContext : BaseContext
 
         return;
 
-        void AppendNewTrile(TrileEmplacement emplacement)
+        byte GetPhi(TrileEmplacement? emplacement)
+        {
+            return Level.Triles.GetValueOrDefault(emplacement ?? new TrileEmplacement())?.PhiLight ?? _paintingPhi;
+        }
+
+        void AppendNewTrile(TrileEmplacement emplacement, byte phi)
         {
             var faceNormal = _hoveredCursor.Face!.Value.AsVector();
             var newEmp = new TrileEmplacement(
@@ -822,12 +908,17 @@ internal sealed class TrileContext : BaseContext
 
             var position = new Vector3(newEmp.X, newEmp.Y, newEmp.Z);
             var mesh = EnsureTrileActor(trileId).GetComponent<TrilesMesh>();
-            mesh.SetInstanceData(newEmp, position, 0);
+            mesh.SetInstanceData(newEmp, position, phi);
 
-            _paintOps.Add(new PaintOp.Added(newEmp, trileId));
+            _paintOps.Add(new PaintOp.Added(newEmp, trileId, phi));
             if (_selectedCursor.Emplacements.Remove(emplacement))
             {
                 _selectedCursor.Emplacements.Add(newEmp);
+            }
+
+            if (_rotationMode == RotationMode.Random)
+            {
+                _paintingPhi = (byte)Random.Shared.Next(4);
             }
         }
 
@@ -973,6 +1064,7 @@ internal sealed class TrileContext : BaseContext
 
             var path = $"Trile Sets/{Level.TrileSetName}";
             _set = (TrileSet)ResourceService.Load(path);
+            _hologramTrileId = InvalidId;
             Eddy.AssetBrowser.SetTrileSet(path, _set);
 
             #endregion
@@ -1766,7 +1858,7 @@ internal sealed class TrileContext : BaseContext
 
     private abstract record PaintOp(TrileEmplacement Emp)
     {
-        public record Added(TrileEmplacement Emp, int Id) : PaintOp(Emp);
+        public record Added(TrileEmplacement Emp, int Id, byte Phi) : PaintOp(Emp);
 
         public record Erased(TrileEmplacement Emp) : PaintOp(Emp);
 
@@ -1783,5 +1875,12 @@ internal sealed class TrileContext : BaseContext
         public readonly Queue<ScaleOp> Ops = new();
         public int PreviousSteps;
         public int Dx, Dy, Dz;
+    }
+
+    private enum RotationMode
+    {
+        Default,
+        Random,
+        Copy
     }
 }
