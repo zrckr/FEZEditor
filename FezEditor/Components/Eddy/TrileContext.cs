@@ -63,6 +63,7 @@ internal sealed class TrileContext : BaseContext
 
             var triles = Eddy.Visuals.Value.HasFlag(EddyVisuals.Triles);
             var emptyTriles = Eddy.Visuals.Value.HasFlag(EddyVisuals.EmptyTriles);
+            var displacements = Eddy.Visuals.Value.HasFlag(EddyVisuals.DisplacedTriles);
 
             foreach (var actor in _trileActors.Values)
             {
@@ -70,6 +71,7 @@ internal sealed class TrileContext : BaseContext
                 var visible = trilesMesh.HasGeometry ? triles : emptyTriles;
                 actor.Visible = visible;
                 trilesMesh.Pickable = visible;
+                trilesMesh.Displacements = displacements;
             }
         }
 
