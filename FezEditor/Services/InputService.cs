@@ -142,9 +142,10 @@ public class InputService
     {
         if (pressed && _game.IsActive && IsViewportHovered)
         {
-            var vp = _game.GraphicsDevice.Viewport;
-            SDL.SDL_WarpMouseInWindow(_game.Window.Handle, vp.Width / 2f, vp.Height / 2f);
-
+            var bounds = _game.Window.ClientBounds;
+            var width = MathF.Round(bounds.Width / 2f);
+            var height = MathF.Round(bounds.Height / 2f);
+            SDL.SDL_WarpMouseInWindow(_game.Window.Handle, width, height);
             delta = _mouseDelta;
             return true;
         }
