@@ -67,6 +67,10 @@ public class VolumeMesh : ActorComponent, IPickable
     public PickHit? Pick(Ray ray)
     {
         var box = GetBounds().First();
+        if (box.Contains(ray.Position) != ContainmentType.Disjoint)
+        {
+            return null;
+        }
         var dist = ray.Intersects(box);
         return dist.HasValue ? new PickHit(dist.Value, 0) : null;
     }
