@@ -20,7 +20,9 @@ public class TrilesMesh : ActorComponent, IPickable
 
     public static readonly Vector3 EmplacementCenter = new(0.5f);
 
-    private const float FallbackOversize = 1.001f;
+    private const float DepthBias = -1e-4f;
+
+    private const float SlopeScaleDepthBias = 0f;
 
     public int InstanceCount => _instances.Count;
 
@@ -111,6 +113,7 @@ public class TrilesMesh : ActorComponent, IPickable
             _texture?.Dispose();
             _texture = RepackerExtensions.ConvertToTexture2D(trileSet.TextureAtlas);
             _rendering.MaterialAssignBaseTexture(_material, _texture);
+            _rendering.MaterialSetDepthBias(_material, 0f, 0f);
 
             var surface = RepackerExtensions.ConvertToMesh(trile!.Geometry.Vertices, trile.Geometry.Indices);
             _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
@@ -118,7 +121,9 @@ public class TrilesMesh : ActorComponent, IPickable
         else
         {
             _rendering.MaterialAssignBaseTexture(_material, _emptyTexture!);
-            var fallback = MeshSurface.CreateTexturedBox(_size * FallbackOversize); // prevents z-fighting
+            _rendering.MaterialSetDepthBias(_material, DepthBias, SlopeScaleDepthBias);
+
+            var fallback = MeshSurface.CreateTexturedBox(_size);
             _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, fallback, _material);
         }
 
