@@ -85,61 +85,27 @@ public class MeshSurface
 
     public static MeshSurface CreateTexturedBox(Vector3 size)
     {
-        var half = size / 2f;
+        var vertices = new List<Vector3>();
+        var normals = new List<Vector3>();
+        var texCoords = new List<Vector2>();
+        var indices = new List<int>();
+
+        foreach (var face in Enum.GetValues<FaceOrientation>())
+        {
+            var quad = CreateFaceQuad(size, face);
+            var baseIndex = vertices.Count;
+            vertices.AddRange(quad.Vertices);
+            normals.AddRange(quad.Normals ?? []);
+            texCoords.AddRange(quad.TexCoords ?? []);
+            indices.AddRange(quad.Indices.Select(i => baseIndex + i));
+        }
+
         return new MeshSurface
         {
-            Vertices = new[]
-            {
-                new Vector3(-1f, -1f, -1f) * half,
-                new Vector3(-1f, 1f, -1f) * half,
-                new Vector3(1f, 1f, -1f) * half,
-                new Vector3(1f, -1f, -1f) * half,
-                new Vector3(1f, -1f, -1f) * half,
-                new Vector3(1f, 1f, -1f) * half,
-                new Vector3(1f, 1f, 1f) * half,
-                new Vector3(1f, -1f, 1f) * half,
-                new Vector3(1f, -1f, 1f) * half,
-                new Vector3(1f, 1f, 1f) * half,
-                new Vector3(-1f, 1f, 1f) * half,
-                new Vector3(-1f, -1f, 1f) * half,
-                new Vector3(-1f, -1f, 1f) * half,
-                new Vector3(-1f, 1f, 1f) * half,
-                new Vector3(-1f, 1f, -1f) * half,
-                new Vector3(-1f, -1f, -1f) * half,
-                new Vector3(-1f, -1f, -1f) * half,
-                new Vector3(-1f, -1f, 1f) * half,
-                new Vector3(1f, -1f, 1f) * half,
-                new Vector3(1f, -1f, -1f) * half,
-                new Vector3(-1f, 1f, -1f) * half,
-                new Vector3(-1f, 1f, 1f) * half,
-                new Vector3(1f, 1f, 1f) * half,
-                new Vector3(1f, 1f, -1f) * half
-            },
-            Normals = new[]
-            {
-                -Vector3.UnitZ, -Vector3.UnitZ, -Vector3.UnitZ, -Vector3.UnitZ,
-                Vector3.UnitX, Vector3.UnitX, Vector3.UnitX, Vector3.UnitX,
-                Vector3.UnitZ, Vector3.UnitZ, Vector3.UnitZ, Vector3.UnitZ,
-                -Vector3.UnitX, -Vector3.UnitX, -Vector3.UnitX, -Vector3.UnitX,
-                -Vector3.UnitY, -Vector3.UnitY, -Vector3.UnitY, -Vector3.UnitY,
-                Vector3.UnitY, Vector3.UnitY, Vector3.UnitY, Vector3.UnitY
-            },
-            TexCoords = new[]
-            {
-                new Vector2(0, size.Y), new Vector2(0, 0), new Vector2(size.X, 0), new Vector2(size.X, size.Y),
-                new Vector2(0, size.Y), new Vector2(0, 0), new Vector2(size.Z, 0), new Vector2(size.Z, size.Y),
-                new Vector2(0, size.Y), new Vector2(0, 0), new Vector2(size.X, 0), new Vector2(size.X, size.Y),
-                new Vector2(0, size.Y), new Vector2(0, 0), new Vector2(size.Z, 0), new Vector2(size.Z, size.Y),
-                new Vector2(0, size.Z), new Vector2(0, 0), new Vector2(size.X, 0), new Vector2(size.X, size.Z),
-                new Vector2(0, size.Z), new Vector2(0, 0), new Vector2(size.X, 0), new Vector2(size.X, size.Z)
-            },
-            Indices = new[]
-            {
-                0, 2, 1, 0, 3, 2, 4, 6, 5,
-                4, 7, 6, 8, 10, 9, 8, 11, 10,
-                12, 14, 13, 12, 15, 14, 16, 17, 18,
-                16, 18, 19, 20, 22, 21, 20, 23, 22
-            }
+            Vertices = vertices.ToArray(),
+            Normals = normals.ToArray(),
+            TexCoords = texCoords.ToArray(),
+            Indices = indices.ToArray()
         };
     }
 
@@ -265,18 +231,32 @@ public class MeshSurface
                 center + hr + hu // top-right
             },
             Normals = new[] { normal, normal, normal, normal },
-            TexCoords = new[]
-            {
-                new Vector2(0, 1),
-                new Vector2(1, 1),
-                new Vector2(0, 0),
-                new Vector2(1, 0)
-            },
-            Indices = new[]
-            {
-                0, 1, 2,
-                2, 1, 3
-            }
+            TexCoords = face is FaceOrientation.Top
+                ? new[]
+                {
+                    new Vector2(0, 0),
+                    new Vector2(1, 0),
+                    new Vector2(0, 1),
+                    new Vector2(1, 1)
+                }
+                : new[]
+                {
+                    new Vector2(0, 1),
+                    new Vector2(1, 1),
+                    new Vector2(0, 0),
+                    new Vector2(1, 0)
+                },
+            Indices = face is FaceOrientation.Top
+                ? new[]
+                {
+                    0, 1, 2,
+                    2, 1, 3
+                }
+                : new[]
+                {
+                    0, 2, 1,
+                    1, 2, 3
+                }
         };
     }
 
