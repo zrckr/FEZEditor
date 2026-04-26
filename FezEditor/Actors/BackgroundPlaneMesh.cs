@@ -10,9 +10,15 @@ namespace FezEditor.Actors;
 
 public class BackgroundPlaneMesh : ActorComponent, IPickable
 {
-    private const float ZFightingOffset = 0.001f;
+    private const float DepthBiasOrthographic = -1e-7f;
+
+    private const float SlopeScaleDepthBias = -0.1f;
+
+    private const float PerspectiveDividend = -0.0001f;
 
     public Vector3 PlaneSize { get; private set; }
+
+    public Camera Camera { get; set; } = null!;
 
     public bool Animated { get; private set; }
 
@@ -135,11 +141,13 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
             _transform.Rotation = Mathz.CreateYBillboard(viewMatrix, _transform.Position);
         }
 
-        // HACK: Override instance position to "fix" z-fighting
-        var forward = Vector3.Transform(Vector3.Forward, _transform.Rotation);
-        var position = _transform.Position - forward * ZFightingOffset;
-        _rendering.InstanceSetPosition(Actor.InstanceRid, position);
+        var depthBias = DepthBiasOrthographic;
+        if (Camera.Projection == Camera.ProjectionType.Perspective)
+        {
+            depthBias = PerspectiveDividend / (Camera.Far - Camera.Near);
+        }
 
+        _rendering.MaterialSetDepthBias(_material, depthBias, SlopeScaleDepthBias);
         _rendering.MaterialSetAlbedo(_material, Color * Opacity);
         _rendering.MaterialShaderSetParam(_material, "DoubleSided", DoubleSided ? 1f : 0f);
         _rendering.MaterialSetCullMode(_material, DoubleSided ? CullMode.None : CullMode.CullClockwiseFace);

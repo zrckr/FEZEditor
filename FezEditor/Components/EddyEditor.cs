@@ -129,7 +129,8 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
             camera.Projection = Camera.ProjectionType.Perspective;
             camera.FieldOfView = 90f;
-            camera.Far = 5000f;
+            camera.Near = 0.25f;
+            camera.Far = 500f;
             orientation.UseFaceLabels = false;
 
         }

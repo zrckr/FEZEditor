@@ -719,6 +719,7 @@ internal class BackgroundPlaneContext : BaseContext
                     _bgPlaneActors[id] = actor;
 
                     var mesh = actor.AddComponent<BackgroundPlaneMesh>();
+                    mesh.Camera = Eddy.Camera;
                     var ao = ResourceService.Load($"Background Planes/{instance.TextureName}");
                     mesh.Visualize(ao);
                 }
@@ -749,6 +750,7 @@ internal class BackgroundPlaneContext : BaseContext
             _bgPlaneActors[id] = actor;
 
             var mesh = actor.AddComponent<BackgroundPlaneMesh>();
+            mesh.Camera = Eddy.Camera;
             mesh.Billboard = bgPlane.Billboard;
             mesh.DoubleSided = bgPlane.Doublesided;
             mesh.Color = bgPlane.Filter.ToXna();
@@ -829,6 +831,7 @@ internal class BackgroundPlaneContext : BaseContext
             _bgPlaneActors[id] = actor;
 
             var mesh = actor.AddComponent<BackgroundPlaneMesh>();
+            mesh.Camera = Eddy.Camera;
             var bg = ResourceService.Load($"Background Planes/{instance.TextureName}");
             mesh.Visualize(bg);
 

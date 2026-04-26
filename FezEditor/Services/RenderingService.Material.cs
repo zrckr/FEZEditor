@@ -6,7 +6,13 @@ namespace FezEditor.Services;
 
 public partial class RenderingService
 {
-    private static readonly Dictionary<(CullMode, FillMode), RasterizerState> RasterizerStateCache = new();
+    private readonly record struct RasterizerKey(
+        CullMode CullMode,
+        FillMode FillMode,
+        float DepthBias,
+        float SlopeScaleDepthBias);
+
+    private static readonly Dictionary<RasterizerKey, RasterizerState> RasterizerStateCache = new();
 
     private static readonly Dictionary<int, BlendState> BlendStateCache = new();
 
@@ -22,6 +28,8 @@ public partial class RenderingService
         public ColorWriteChannels ColorWriteChannels = ColorWriteChannels.All;
         public SamplerState? SamplerState = SamplerState.PointClamp;
         public BlendState BlendState = ResolveBlendState(BlendMode.AlphaBlend, ColorWriteChannels.All);
+        public float DepthBias; // 0f
+        public float SlopeScaleDepthBias; // 0f
 
         public readonly DepthStencilState DepthStencilState = new()
         {
@@ -146,34 +154,42 @@ public partial class RenderingService
         GetResource(_materials, material).SamplerState = state;
     }
 
+    public void MaterialSetDepthBias(Rid material, float depthBias, float slopeScaleDepthBias)
+    {
+        var data = GetResource(_materials, material);
+        data.DepthBias = depthBias;
+        data.SlopeScaleDepthBias = slopeScaleDepthBias;
+    }
+
     private void ApplyMaterialState(MaterialData mat)
     {
         GraphicsDevice.SamplerStates[0] = mat.SamplerState;
         GraphicsDevice.BlendState = mat.BlendState;
         GraphicsDevice.DepthStencilState = mat.DepthStencilState;
-        GraphicsDevice.RasterizerState = ResolveRasterizerState(mat.CullMode, mat.FillMode);
-    }
-
-    private static RasterizerState ResolveRasterizerState(CullMode cullMode, FillMode fillMode)
-    {
-        if (fillMode == FillMode.Solid)
+        if (mat is { FillMode: FillMode.Solid, DepthBias: 0f, SlopeScaleDepthBias: 0f })
         {
-            return cullMode switch
+            GraphicsDevice.RasterizerState = mat.CullMode switch
             {
                 CullMode.None => RasterizerState.CullNone,
                 CullMode.CullClockwiseFace => RasterizerState.CullClockwise,
                 _ => RasterizerState.CullCounterClockwise
             };
         }
-
-        var key = (cullMode, fillMode);
-        if (!RasterizerStateCache.TryGetValue(key, out var state))
+        else
         {
-            state = new RasterizerState { CullMode = cullMode, FillMode = fillMode };
-            RasterizerStateCache[key] = state;
-        }
+            var key = new RasterizerKey(mat.CullMode, mat.FillMode, mat.DepthBias, mat.SlopeScaleDepthBias);
+            if (!RasterizerStateCache.TryGetValue(key, out var state))
+            {
+                state = new RasterizerState
+                {
+                    CullMode = mat.CullMode, FillMode = mat.FillMode, DepthBias = mat.DepthBias,
+                    SlopeScaleDepthBias = mat.SlopeScaleDepthBias
+                };
+                RasterizerStateCache[key] = state;
+            }
 
-        return state;
+            GraphicsDevice.RasterizerState = state;
+        }
     }
 
     private static BlendState ResolveBlendState(BlendMode mode, ColorWriteChannels colorWriteChannels)
