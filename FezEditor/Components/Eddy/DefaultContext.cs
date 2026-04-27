@@ -20,6 +20,8 @@ internal class DefaultContext : BaseContext
 
     private Actor? _liquidActor;
 
+    private Actor? _rainActor;
+
     private Actor? _pickablesActor;
 
     public DefaultContext(Game game, Level level, IEddyEditor eddy) : base(game, level, eddy)
@@ -417,6 +419,20 @@ internal class DefaultContext : BaseContext
                 mesh.Visualize(Level.WaterType, Level.WaterHeight, Level.Size.ToXna());
             }
 
+            if (Level.Rainy && _rainActor == null)
+            {
+                _rainActor = CreateSubActor();
+                _rainActor.Name = "Rain";
+                var rainMesh = _rainActor.AddComponent<RainMesh>();
+                rainMesh.Camera = Eddy.Camera;
+                rainMesh.LevelSize = Level.Size.ToXna();
+            }
+            else if (!Level.Rainy && _rainActor != null)
+            {
+                Eddy.Scene.DestroyActor(_rainActor);
+                _rainActor = null;
+            }
+
             return;
         }
 
@@ -462,6 +478,19 @@ internal class DefaultContext : BaseContext
 
             var mesh = _liquidActor.AddComponent<LiquidMesh>();
             mesh.Visualize(Level.WaterType, Level.WaterHeight, Level.Size.ToXna());
+        }
+
+        #endregion
+
+        #region Rain
+
+        if (Level.Rainy)
+        {
+            _rainActor = CreateSubActor();
+            _rainActor.Name = "Rain";
+            var rainMesh = _rainActor.AddComponent<RainMesh>();
+            rainMesh.Camera = Eddy.Camera;
+            rainMesh.LevelSize = Level.Size.ToXna();
         }
 
         #endregion
@@ -524,6 +553,12 @@ internal class DefaultContext : BaseContext
         {
             Eddy.Scene.DestroyActor(_pickablesActor);
             _pickablesActor = null;
+        }
+
+        if (_rainActor != null)
+        {
+            Eddy.Scene.DestroyActor(_rainActor);
+            _rainActor = null;
         }
 
         if (_liquidActor != null)
