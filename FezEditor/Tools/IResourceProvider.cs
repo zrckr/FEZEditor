@@ -1,6 +1,6 @@
 ﻿namespace FezEditor.Tools;
 
-internal interface IResourceProvider : IDisposable
+public interface IResourceProvider : IDisposable
 {
     bool IsReadonly { get; }
 

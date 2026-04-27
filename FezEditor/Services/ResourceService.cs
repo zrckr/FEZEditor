@@ -19,6 +19,8 @@ public class ResourceService : IDisposable
 
     public event Action? ThumbnailsReady;
 
+    public event Action? ModOpenedFirstTime;
+
     public bool HasNoProvider => _provider == null;
 
     public bool IsReadonly => _provider?.IsReadonly ?? true;
@@ -33,8 +35,6 @@ public class ResourceService : IDisposable
 
     private readonly Game _game;
 
-    private readonly AppStorageService _storage;
-
     private readonly Dictionary<string, WeakReference<object>> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     public ResourceService(Game game)
@@ -42,7 +42,6 @@ public class ResourceService : IDisposable
         _game = game;
         _game.Activated += OnGameActivated;
         _content = game.GetService<ContentService>().Global;
-        _storage = game.GetService<AppStorageService>();
     }
 
     private void OnGameActivated(object? o, EventArgs eventArgs)
@@ -54,21 +53,17 @@ public class ResourceService : IDisposable
         }
     }
 
-    public void OpenProvider(FileSystemInfo info)
+    public void OpenProvider(IResourceProvider provider)
     {
-        IResourceProvider provider = info switch
-        {
-            FileInfo file => new PakResourceProvider(file),
-            DirectoryInfo dir => new DirResourceProvider(dir),
-            _ => throw new ArgumentException("Not supported: " + info)
-        };
-
         CloseProvider();
         _provider = provider;
         ProviderReset?.Invoke();
         ProviderChanged?.Invoke();
         Logger.Information("Opened {0} at {1} with {2} file(s)",
-            provider.GetType().Name, info.FullName, provider.Files.Count());
+            provider.GetType().Name,
+            _provider.GetFullPath(string.Empty),
+            provider.Files.Count()
+        );
     }
 
     public void CloseProvider()
@@ -255,6 +250,42 @@ public class ResourceService : IDisposable
     public void NotifyThumbnailsReady()
     {
         ThumbnailsReady?.Invoke();
+    }
+
+    public void NotifyModOpenedFirstTime()
+    {
+        ModOpenedFirstTime?.Invoke();
+    }
+
+    public IReadOnlyList<string> GetModReferencePaths()
+    {
+        if (_provider is ModResourceProvider mod)
+        {
+            return mod.References
+                .Select(r => r.GetFullPath(string.Empty))
+                .ToList();
+        }
+
+        return new List<string>();
+    }
+
+    public void UpdateModReferences(IEnumerable<string> paths)
+    {
+        if (_provider is ModResourceProvider mod)
+        {
+            mod.UpdateReferences(paths);
+            ProviderChanged?.Invoke();
+        }
+    }
+
+    public void CopyFromReference(string path)
+    {
+        if (_provider is ModResourceProvider mod)
+        {
+            mod.CopyToMod(path);
+            ProviderChanged?.Invoke();
+            Logger.Information("Copied from reference - {0}", path);
+        }
     }
 
     public void Dispose()

@@ -12,6 +12,8 @@ public record Settings
 
     public Dictionary<string, List<string>> RecentFiles { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public Dictionary<string, List<string>> ReferenceProviders { get; init; } = new();
+
     public WindowSize Window { get; init; } = new(1280, 720);
 
     public record RecentProvider(string Path, string Kind);

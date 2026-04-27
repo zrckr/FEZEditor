@@ -26,11 +26,14 @@ public class WelcomeComponent : EditorComponent
 
     private readonly ResourceService _resourceService;
 
+    private readonly ConfirmWindow _confirm;
+
     public WelcomeComponent(Game game) : base(game, "Welcome!")
     {
         _appStorageService = game.GetService<AppStorageService>();
         _editorService = game.GetService<EditorService>();
         _resourceService = game.GetService<ResourceService>();
+        Game.AddComponent(_confirm = new ConfirmWindow(game));
     }
 
     public override void LoadContent()
@@ -77,7 +80,13 @@ public class WelcomeComponent : EditorComponent
                             name = entry.Path;
                         }
 
-                        var icon = entry.Kind == "File" ? Icons.Package : Icons.Folder;
+                        var icon = entry.Kind switch
+                        {
+                            "File" => Icons.Package,
+                            "Directory" => Icons.Folder,
+                            "Mod" => Icons.FileSubmodule,
+                            _ => throw new InvalidOperationException()
+                        };
                         if (ImGuiX.Button($"{icon} {name}##recent_{entry.Path}", new Vector2(-1, 0)))
                         {
                             OpenRecentEntry(entry);
@@ -116,6 +125,14 @@ public class WelcomeComponent : EditorComponent
             FileDialog.Show(FileDialog.Type.OpenFolder, OpenDirectory, new FileDialog.Options
             {
                 Title = "Choose assets directory..."
+            });
+        }
+
+        if (ImGui.Button($"{Icons.FileSubmodule} Open mod assets directory"))
+        {
+            FileDialog.Show(FileDialog.Type.OpenFolder, OpenMod, new FileDialog.Options
+            {
+                Title = "Choose mod assets directory..."
             });
         }
 
@@ -160,6 +177,12 @@ public class WelcomeComponent : EditorComponent
         ImGui.EndGroup();
     }
 
+    public override void Dispose()
+    {
+        base.Dispose();
+        Game.RemoveComponent(_confirm);
+    }
+
     private void ExtractPaksAndOpenDirectory(string[] sources, string[] targets)
     {
         if (_resourceExtractor == null)
@@ -177,7 +200,7 @@ public class WelcomeComponent : EditorComponent
         if (!string.IsNullOrEmpty(pakPath))
         {
             _appStorageService.AddRecentProvider(pakPath, "File");
-            _resourceService.OpenProvider(new FileInfo(pakPath));
+            _resourceService.OpenProvider(new PakResourceProvider(new FileInfo(pakPath)));
             _editorService.CloseEditor(this);
         }
     }
@@ -188,7 +211,42 @@ public class WelcomeComponent : EditorComponent
         if (!string.IsNullOrEmpty(dirPath))
         {
             _appStorageService.AddRecentProvider(dirPath, "Directory");
-            _resourceService.OpenProvider(new DirectoryInfo(dirPath));
+            _resourceService.OpenProvider(new DirResourceProvider(new DirectoryInfo(dirPath)));
+            _editorService.CloseEditor(this);
+        }
+    }
+
+    private void OpenMod(string[] files)
+    {
+        var modPath = files.FirstOrDefault()!;
+        var provider = new ModResourceProvider(new DirectoryInfo(modPath), _appStorageService);
+        if (provider.References.Count < 1)
+        {
+            var options = new FileDialog.Options
+            {
+                Title = "Add reference PAK files...",
+                AllowMultiple = true,
+                Filters = new[] { new FileDialog.Filter("PAK files", "pak") }
+            };
+
+            FileDialog.Show(FileDialog.Type.OpenFile, pakFiles =>
+            {
+                provider.UpdateReferences(pakFiles);
+                OpenModProvider();
+                _resourceService.NotifyModOpenedFirstTime();
+            }, options);
+        }
+        else
+        {
+            OpenModProvider();
+        }
+
+        return;
+
+        void OpenModProvider()
+        {
+            _appStorageService.AddRecentProvider(modPath, "Mod");
+            _resourceService.OpenProvider(provider);
             _editorService.CloseEditor(this);
         }
     }
@@ -209,9 +267,13 @@ public class WelcomeComponent : EditorComponent
         {
             OpenPakFile(new[] { provider.Path });
         }
-        else
+        else if (provider.Kind == "Directory")
         {
             OpenDirectory(new[] { provider.Path });
+        }
+        else if (provider.Kind == "Mod")
+        {
+            OpenMod(new[] { provider.Path });
         }
     }
 }

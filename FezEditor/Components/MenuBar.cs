@@ -15,6 +15,8 @@ public class MenuBar : DrawableGameComponent
 
     private readonly ConfirmWindow _confirmWindow;
 
+    private readonly ReferencesWindow _referencesWindow;
+
     private readonly EditorService _editorService;
 
     private readonly ResourceService _resourceService;
@@ -30,17 +32,21 @@ public class MenuBar : DrawableGameComponent
     public MenuBar(Game game) : base(game)
     {
         game.AddComponent(_confirmWindow = new ConfirmWindow(game));
+        game.AddComponent(_referencesWindow = new ReferencesWindow(game));
         _editorService = game.GetService<EditorService>();
         _resourceService = game.GetService<ResourceService>();
         _inputService = game.GetService<InputService>();
         _storageService = game.GetService<AppStorageService>();
         _resourceService.ProviderChanged += OnProviderChanged;
+        _resourceService.ModOpenedFirstTime += OnModOpenedFirstTime;
     }
 
     protected override void Dispose(bool disposing)
     {
         _resourceService.ProviderChanged -= OnProviderChanged;
+        _resourceService.ModOpenedFirstTime -= OnModOpenedFirstTime;
         _confirmWindow.Dispose();
+        _referencesWindow.Dispose();
         _aboutWindow?.Dispose();
     }
 
@@ -50,6 +56,14 @@ public class MenuBar : DrawableGameComponent
         {
             _storageService.PruneRecentFiles(_resourceService.Root, _resourceService.Exists);
         }
+    }
+
+    private void OnModOpenedFirstTime()
+    {
+        _confirmWindow.Title = "Mod assets opened";
+        _confirmWindow.Text = "You can add or manage references at any time\nvia Editor > Manage References.";
+        _confirmWindow.ConfirmButtonText = "Ok";
+        _confirmWindow.DenyButtonText = "";
     }
 
     protected override void LoadContent()
@@ -176,14 +190,25 @@ public class MenuBar : DrawableGameComponent
             {
                 if (_editorService.ActiveEditor is EddyEditor eddy)
                 {
+                    ImGui.SeparatorText("Eddy");
                     if (ImGui.MenuItem("Export Level as Diorama..."))
                     {
                         eddy.ExportAsDiorama();
                     }
                 }
 
+                if (_resourceService.GetModReferencePaths().Count > 0)
+                {
+                    ImGui.SeparatorText("Mod");
+                    if (ImGui.MenuItem("Manage references"))
+                    {
+                        _referencesWindow.Show();
+                    }
+                }
+
+                ImGui.SeparatorText("Thumbnails");
                 var hasProvider = !_resourceService.HasNoProvider;
-                if (ImGui.MenuItem("Regenerate Thumbnails", null, false, hasProvider))
+                if (ImGui.MenuItem("Regenerate", null, false, hasProvider))
                 {
                     _fileBrowser.RegenerateThumbnails();
                 }

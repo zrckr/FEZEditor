@@ -15,6 +15,8 @@ internal class PakResourceProvider : IResourceProvider
 
     private readonly FileInfo _pakFile;
 
+    private readonly string _musicPrefix;
+
     public PakResourceProvider(FileInfo info)
     {
         if (info is not { Extension: ".pak", Exists: true })
@@ -23,6 +25,7 @@ internal class PakResourceProvider : IResourceProvider
         }
 
         _pakFile = info;
+        _musicPrefix = info.Name.StartsWith("Music") ? "music/" : "";
         Refresh();
     }
 
@@ -55,16 +58,12 @@ internal class PakResourceProvider : IResourceProvider
             throw new FileNotFoundException(path);
         }
 
+        var pakPath = StripMusicPrefix(path);
         using var stream = _pakFile.OpenRead();
         using var reader = new PakReader(stream);
 
         var record = reader.ReadFiles().FirstOrDefault(r =>
-            r.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
-
-        if (record == null)
-        {
-            throw new FileNotFoundException(path);
-        }
+            r.Path.Equals(pakPath, StringComparison.OrdinalIgnoreCase)) ?? throw new FileNotFoundException(path);
 
         return record.Open();
     }
@@ -76,11 +75,12 @@ internal class PakResourceProvider : IResourceProvider
             throw new FileNotFoundException(path);
         }
 
+        var pakPath = StripMusicPrefix(path);
         using var stream = _pakFile.OpenRead();
         using var reader = new PakReader(stream);
 
         var record = reader.ReadFiles().FirstOrDefault(r =>
-                         r.Path.Replace('\\', '/').Equals(path, StringComparison.OrdinalIgnoreCase))
+                         r.Path.Replace('\\', '/').Equals(pakPath, StringComparison.OrdinalIgnoreCase))
                      ?? throw new FileNotFoundException(path);
 
         using var xnbStream = record.Open();
@@ -106,7 +106,10 @@ internal class PakResourceProvider : IResourceProvider
         throw new NotSupportedException();
     }
 
-    public void Duplicate(string path) => throw new NotSupportedException();
+    public void Duplicate(string path)
+    {
+        throw new NotSupportedException();
+    }
 
     public void Remove(string path)
     {
@@ -127,8 +130,21 @@ internal class PakResourceProvider : IResourceProvider
         foreach (var record in reader.ReadFiles())
         {
             var normalizedPath = record.Path.Replace('\\', '/');
-            _records[normalizedPath] = record.FindExtension();
+            var key = string.IsNullOrEmpty(_musicPrefix) ? normalizedPath : $"{_musicPrefix}{normalizedPath}";
+            _records[key] = record.FindExtension();
         }
+    }
+
+    private string StripMusicPrefix(string path)
+    {
+        if (string.IsNullOrEmpty(_musicPrefix))
+        {
+            return path;
+        }
+
+        return path.StartsWith(_musicPrefix, StringComparison.OrdinalIgnoreCase)
+            ? path[_musicPrefix.Length..]
+            : path;
     }
 
     public void Dispose()

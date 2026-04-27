@@ -71,7 +71,7 @@ public class FileBrowser : DrawableGameComponent
 
     public override void Update(GameTime gameTime)
     {
-        if (_selected == null || _resourceService.IsReadonly)
+        if (_selected == null || _resourceService.IsReadonly || _selected.IsReference)
         {
             return;
         }
@@ -244,7 +244,11 @@ public class FileBrowser : DrawableGameComponent
             if (ImGui.BeginPopupContextWindow("##EmptySpaceContext",
                     ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems))
             {
-                DrawContextMenu(_hoveredDir ?? _root, flatten: true);
+                var contextTarget = _hoveredDir ?? _root;
+                if (!contextTarget.IsReference)
+                {
+                    DrawContextMenu(contextTarget, flatten: true);
+                }
                 ImGui.EndPopup();
             }
 
@@ -299,7 +303,11 @@ public class FileBrowser : DrawableGameComponent
 
                 // Choose icon based on node type
                 var icon = node.IsDirectory
-                    ? node.IsOpen ? Icons.FolderOpened : Icons.Folder
+                    ? node is { IsReference: true, Path: "References" }
+                        ? Icons.References
+                        : node.IsOpen
+                            ? Icons.FolderOpened
+                            : Icons.Folder
                     : GetFileIcon(node.Extension);
 
                 var label = $"{icon} {node.Name}";
@@ -360,7 +368,14 @@ public class FileBrowser : DrawableGameComponent
 
                 if (ImGui.BeginPopupContextItem())
                 {
-                    DrawContextMenu(node, flatten: false);
+                    if (node.IsReference && !node.IsDirectory)
+                    {
+                        DrawReferenceContextMenu(node);
+                    }
+                    else if (!node.IsReference)
+                    {
+                        DrawContextMenu(node, flatten: false);
+                    }
                     ImGui.EndPopup();
                 }
 
@@ -443,6 +458,14 @@ public class FileBrowser : DrawableGameComponent
         if (ImGui.MenuItem($"{Icons.FolderOpened} Open in File Manager", openShortcut))
         {
             _resourceService.OpenInFileManager(node.Path);
+        }
+    }
+
+    private void DrawReferenceContextMenu(FileNode node)
+    {
+        if (ImGui.MenuItem($"{Icons.Copy} Copy to mod"))
+        {
+            _resourceService.CopyFromReference(node.Path);
         }
     }
 
@@ -640,6 +663,7 @@ public class FileBrowser : DrawableGameComponent
                         Name = segments[i],
                         Path = currentPath,
                         IsDirectory = true,
+                        IsReference = currentPath.StartsWith("References", StringComparison.OrdinalIgnoreCase),
                         Depth = parentNode.Depth + 1
                     };
 
@@ -658,6 +682,7 @@ public class FileBrowser : DrawableGameComponent
                 Name = fileName,
                 Path = path,
                 IsDirectory = false,
+                IsReference = currentPath.StartsWith("References", StringComparison.OrdinalIgnoreCase),
                 Depth = parentNodeForFile.Depth + 1,
                 Extension = _resourceService.GetExtension(path)
             };
@@ -786,6 +811,7 @@ public class FileBrowser : DrawableGameComponent
         public string Name { get; init; } = "";
         public string Path { get; init; } = "";
         public bool IsDirectory { get; init; }
+        public bool IsReference { get; init; }
         public List<FileNode> Children { get; set; } = new();
         public int Depth { get; init; } // Track depth for indentation
         public string Extension { get; init; } = "";

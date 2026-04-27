@@ -76,6 +76,19 @@ public class AppStorageService : IDisposable
         Save();
     }
 
+    public IReadOnlyList<string> GetReferenceProviders(string modPath)
+    {
+        return _data.ReferenceProviders.TryGetValue(modPath, out var list)
+            ? list
+            : new List<string>();
+    }
+
+    public void SetReferenceProviders(string modPath, IEnumerable<string> paths)
+    {
+        _data.ReferenceProviders[modPath] = paths.ToList();
+        Save();
+    }
+
     public void PruneRecentFiles(string provider, Func<string, bool> exists)
     {
         if (_data.RecentFiles.TryGetValue(provider, out var list))
