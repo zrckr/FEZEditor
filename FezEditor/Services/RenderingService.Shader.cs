@@ -16,7 +16,7 @@ public partial class RenderingService
 
     private Effect? _basicEffectTextured;
     public Effect BasicEffectTextured =>
-        _basicEffectTextured ?? new BasicEffect(GraphicsDevice) { TextureEnabled = true };
+        _basicEffectTextured ??= new BasicEffect(GraphicsDevice) { TextureEnabled = true };
 
     private static readonly HashSet<Type> AllowedParameterTypes = new()
     {
