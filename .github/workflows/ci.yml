@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+    paths-ignore:
+      - '.github/*'
+      - '.github/workflows/**.yml'
+      - '.gitattributes'
+      - '.gitignore'
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Install Wine
+        run: sudo apt-get install -y wine64
+
+      - name: Compile shaders
+        run: |
+          wine wineboot --init
+          dotnet msbuild FXC/CompileShaders.targets -t:CompileShaders
+        env:
+          WINEDEBUG: -all
+          WINEPREFIX: /home/runner/.wine
+
+      - name: Build
+        run: dotnet build FezEditor/FezEditor.csproj -c Debug

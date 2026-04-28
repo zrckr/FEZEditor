@@ -1,0 +1,125 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  shaders:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Install Wine
+        run: sudo apt-get install -y wine64
+
+      - name: Compile shaders
+        run: |
+          wine wineboot --init
+          dotnet msbuild FXC/CompileShaders.targets -t:CompileShaders
+        env:
+          WINEDEBUG: -all
+          WINEPREFIX: /home/runner/.wine
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shaders
+          path: Content/Effects/*.fxb
+
+  build:
+    needs: shaders
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: osx-x64
+            os: macos-latest
+          - rid: osx-arm64
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: shaders
+          path: Content/Effects/
+
+      - name: Publish
+        run: >
+          dotnet publish FezEditor/FezEditor.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          -o publish/
+
+      - name: Archive (Windows)
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath FEZEditor-${{ github.ref_name }}-${{ matrix.rid }}.zip
+
+      - name: Bundle (macOS)
+        if: startsWith(matrix.rid, 'osx-')
+        run: |
+          APP=publish/FEZEditor.app/Contents
+          mkdir -p "$APP/MacOS" "$APP/Resources"
+          find publish -maxdepth 1 -mindepth 1 ! -name FEZEditor.app -exec mv {} "$APP/MacOS/" \;
+          sed "s/\$(Version)/${{ github.ref_name }}/g" FezEditor/Info.plist > "$APP/Info.plist"
+
+      - name: Archive (macOS)
+        if: startsWith(matrix.rid, 'osx-')
+        run: tar -czf FEZEditor-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz --exclude='*.pdb' -C publish FEZEditor.app
+
+      - name: Archive (Linux)
+        if: matrix.rid == 'linux-x64'
+        run: tar -czf FEZEditor-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz --exclude='*.pdb' -C publish .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.rid }}
+          path: FEZEditor-${{ github.ref_name }}-${{ matrix.rid }}.*
+
+  release:
+    if: github.repository == 'FEZModding/FEZEditor'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          tag="${{ github.ref_name }}"
+          body=$(awk "/^## ${tag}/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md)
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.changelog.outputs.body }}
+          files: FEZEditor-*
+          fail_on_unmatched_files: true
