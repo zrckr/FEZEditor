@@ -2,11 +2,10 @@
   <PropertyGroup>
     <FxcDir>$(MSBuildThisFileDirectory)</FxcDir>
     <FxcExe Condition="'$(OS)' == 'Windows_NT'">$(FxcDir)fxc.exe</FxcExe>
-    <FxcExe Condition="'$(OS)' != 'Windows_NT'">wine $(FxcDir)fxc.exe</FxcExe>
   </PropertyGroup>
 
   <ItemGroup>
-    <ShaderFiles Include="$(MSBuildThisFileDirectory)..\Content\**\*.fx"/>
+    <ShaderFiles Include="$(FxcDir)..\Content\**\*.fx"/>
   </ItemGroup>
 
   <Target Name="CompileShaders"
@@ -16,13 +15,21 @@
 
     <Error Text="fxc.exe not found in FXC folder." Condition="!Exists('$(FxcDir)fxc.exe')" />
 
-    <Message Text="Compiling shader: %(ShaderFiles.FullPath)" Importance="High" />
-    <Exec Command="$(FxcExe) /nologo /Vd /T fx_2_0 /Fo &quot;%(ShaderFiles.Filename).fxb&quot; &quot;%(ShaderFiles.Filename)%(ShaderFiles.Extension)&quot;"
-          WorkingDirectory="%(ShaderFiles.RootDir)%(ShaderFiles.Directory)" />
+    <!-- Windows: invoke fxc.exe directly per shader -->
+    <Message Text="Compiling shader: %(ShaderFiles.FullPath)" Importance="High"
+             Condition="'$(OS)' == 'Windows_NT'" />
+    <Exec Command="&quot;$(FxcExe)&quot; /nologo /Vd /T fx_2_0 /Fo &quot;%(ShaderFiles.Filename).fxb&quot; &quot;%(ShaderFiles.Filename)%(ShaderFiles.Extension)&quot;"
+          WorkingDirectory="%(ShaderFiles.RootDir)%(ShaderFiles.Directory)"
+          Condition="'$(OS)' == 'Windows_NT'" />
 
-    <ItemGroup>
-      <FileWrites Include="@(ShaderFiles -> '%(RootDir)%(Directory)%(Filename).fxb')"/>
-    </ItemGroup>
+    <!-- Non-Windows: run all shaders in one Wine session via batch script -->
+    <Exec Command="wine cmd.exe /c CompileBatchOnWine.bat"
+          WorkingDirectory="$(FxcDir)"
+          IgnoreExitCode="true"
+          Condition="'$(OS)' != 'Windows_NT'" />
+    <Error Text="Shader compilation failed: %(ShaderFiles.Filename).fxb was not produced."
+           Condition="'$(OS)' != 'Windows_NT' and !Exists('%(ShaderFiles.RootDir)%(ShaderFiles.Directory)%(ShaderFiles.Filename).fxb')" />
+
   </Target>
 
 </Project>
