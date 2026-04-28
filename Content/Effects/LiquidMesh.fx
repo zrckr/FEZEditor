@@ -33,7 +33,7 @@ float4 PS(VS_OUTPUT input) : COLOR0
     return float4(color, alpha);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

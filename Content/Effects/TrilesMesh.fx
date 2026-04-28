@@ -2,8 +2,6 @@
 
 static const float EMPLACEMENT_CENTER = 0.5;
 
-DECLARE_TEXTURE(BaseTexture);
-
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -49,7 +47,7 @@ float4 PS(VS_OUTPUT input) : COLOR0
     return float4(color, 1.0);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

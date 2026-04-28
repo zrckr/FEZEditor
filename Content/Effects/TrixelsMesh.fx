@@ -2,8 +2,6 @@
 
 static const float3 TRIXEL_SIZE = float3(1.0 / 16.0, 1.0 / 16.0, 1.0 / 16.0);
 
-DECLARE_TEXTURE(BaseTexture);
-
 float4 Hovered;
 float4 Selected;
 
@@ -29,20 +27,20 @@ struct VS_OUTPUT
 VS_OUTPUT VS(VS_INPUT input)
 {
     VS_OUTPUT output;
-    
+
     float3x3 basis = QuaternionToMatrix(input.InstanceQuaternion);
     float4x4 xform = CreateTransform(input.InstancePositionFace.xyz, basis, TRIXEL_SIZE);
     float4 worldPos = mul(input.Position, xform);
-    
+
     float4 worldViewPos = TransformPositionToClip(worldPos);
     output.Position = ApplyTexelOffset(worldViewPos);
     output.Normal = mul(input.Normal, basis);
-    
+
     float2 t = input.Position.xy + 0.5;
     float2 bottom = lerp(input.InstanceTexCoord01.xy, input.InstanceTexCoord01.zw, t.x);
     float2 top = lerp(input.InstanceTexCoord23.xy, input.InstanceTexCoord23.zw, t.x);
     output.TexCoord = lerp(bottom, top, t.y);
-    
+
     output.FaceIndex = input.InstancePositionFace.w;
 
     return output;
@@ -51,10 +49,10 @@ VS_OUTPUT VS(VS_INPUT input)
 float4 PS(VS_OUTPUT input) : COLOR0
 {
     float4 texColor = SAMPLE_TEXTURE(BaseTexture, input.TexCoord);
-    
+
     float3 color = texColor.rgb;
     color *= ComputeLight(input.Normal, 0.0);
-    
+
     int faceRaw = (int)input.FaceIndex;
     bool isHovered  = (faceRaw / 10) % 2 == 1;
     bool isSelected = (faceRaw / 20) >= 1;
@@ -67,11 +65,11 @@ float4 PS(VS_OUTPUT input) : COLOR0
     {
         color = lerp(color, Hovered.rgb, Hovered.a);
     }
-    
+
     return float4(color, 1.0);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

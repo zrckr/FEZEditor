@@ -2,8 +2,6 @@
 
 float DoubleSided;      // boolean
 
-DECLARE_TEXTURE(BaseTexture);
-
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -48,7 +46,7 @@ float4 PS(VS_OUTPUT input, float vface : VFACE) : COLOR0
     return float4(color, alpha);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

@@ -7,8 +7,6 @@ float4 Colors[11];
 float Size;
 float4x4 Projection;
 
-DECLARE_TEXTURE(BaseTexture);
-
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -49,7 +47,7 @@ float4 PS(VS_OUTPUT input) : COLOR0
     return texColor * fogColor;
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

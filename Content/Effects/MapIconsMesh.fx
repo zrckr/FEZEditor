@@ -3,8 +3,6 @@
 float4x4 CameraRotation;
 float Billboard;        // boolean
 
-DECLARE_TEXTURE(BaseTexture);
-
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -41,7 +39,7 @@ float4 PS(VS_OUTPUT input) : COLOR0
     return SAMPLE_TEXTURE(BaseTexture, input.TexCoord);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

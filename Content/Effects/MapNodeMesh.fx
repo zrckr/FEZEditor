@@ -5,8 +5,6 @@ float2 TextureSize;
 float PixelsPerTrixel;
 float3 CubeOffset;
 
-DECLARE_TEXTURE(BaseTexture);
-
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -25,7 +23,7 @@ float NodeShading(float3 normal)
 {
     float shade = saturate(BaseAmbient).x;
     float remainder = (1.0 - BaseAmbient).x;
-    
+
     shade += saturate(dot(normal, 1.0)) * remainder;
     if (normal.z < -0.01)
     {
@@ -34,23 +32,23 @@ float NodeShading(float3 normal)
     else if (normal.x > 0.01)
     {
         shade -= abs(normal.x) * remainder * 0.2;
-    }	
+    }
     if (normal.x < -0.01)
     {
         shade += abs(normal.x) * remainder * 0.4;
-    }   
+    }
     if (normal.y > 0.01)
     {
         shade -= abs(normal.y) * remainder * 0.1;
     }
-    
+
     return saturate(shade);
 }
 
 VS_OUTPUT VS(VS_INPUT input)
 {
     VS_OUTPUT output;
-    
+
     float4 position = TransformPositionToClip(input.Position);
     output.Normal = TransformNormalToWorld(input.Normal);
     output.ProjTC = position;
@@ -75,11 +73,11 @@ float4 PS(VS_OUTPUT input) : COLOR0
 
     float3 color = SAMPLE_TEXTURE(BaseTexture, texCoord).rgb;
     color *= pow(NodeShading(input.Normal), 0.75);
-    
+
     return float4(color, Material_Opacity);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {

@@ -2,8 +2,6 @@
 
 float Opacity;
 
-DECLARE_TEXTURE(BaseTexture);
-
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -37,7 +35,7 @@ float4 PS(VS_OUTPUT input) : COLOR0
     return float4(alpha, alpha, alpha, alpha);
 }
 
-technique TSM2
+technique Main
 {
     pass Main
     {
