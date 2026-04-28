@@ -1,46 +1,25 @@
 <Project>
   <PropertyGroup>
-    <!-- WINDOWS: -->
-    <!-- 1) Use the local fxc.exe in FXC folder -->
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' == 'Windows_NT' AND Exists('$(MSBuildThisFileDirectory)fxc.exe')">"$(MSBuildThisFileDirectory)fxc.exe"</FxcCommandLine>
-    <!-- 2) Use the SDK version (Requires DirectX SDK (June 2010)) -->
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' == 'Windows_NT' AND Exists('$(DXSDK_DIR)\Utilities\bin\x86\fxc.exe')">"$(DXSDK_DIR)\Utilities\bin\x86\fxc.exe"</FxcCommandLine>
-
-    <!-- NON-WINDOWS (eg: OSX, Linux) (Requires wine is in PATH) -->
-    <!-- 1) Use the local fxc.exe in FXC folder (Requires "winetricks d3dcompiler_43" or "winetricks dxsdk_jun2010") -->
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' != 'Windows_NT' AND Exists('$(MSBuildThisFileDirectory)fxc.exe')">wine "$(MSBuildThisFileDirectory)fxc.exe"</FxcCommandLine>
-    <!-- 2) Use the SDK version (Requires "winetricks dxsdk_jun2010") -->
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' != 'Windows_NT' AND '$(WINEPREFIX)' != '' AND Exists('$(WINEPREFIX)/drive_c/Program Files/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe')">wine "$(WINEPREFIX)/drive_c/Program Files/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe"</FxcCommandLine>
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' != 'Windows_NT' AND '$(WINEPREFIX)' != '' AND Exists('$(WINEPREFIX)/drive_c/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe')">wine "$(WINEPREFIX)/drive_c/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe"</FxcCommandLine>
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' != 'Windows_NT' AND Exists('$(HOME)/.wine/drive_c/Program Files/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe')">wine "$(HOME)/.wine/drive_c/Program Files/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe"</FxcCommandLine>
-    <FxcCommandLine Condition="'$(FxcCommandLine)' == '' AND '$(OS)' != 'Windows_NT' AND Exists('$(HOME)/.wine/drive_c/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe')">wine "$(HOME)/.wine/drive_c/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Utilities/bin/x86/fxc.exe"</FxcCommandLine>
+    <FxcDir>$(MSBuildThisFileDirectory)</FxcDir>
+    <FxcExe Condition="'$(OS)' == 'Windows_NT'">$(FxcDir)fxc.exe</FxcExe>
+    <FxcExe Condition="'$(OS)' != 'Windows_NT'">wine $(FxcDir)fxc.exe</FxcExe>
   </PropertyGroup>
 
-  <!-- Auto-discover all shader files in Content folder -->
   <ItemGroup>
     <ShaderFiles Include="$(MSBuildThisFileDirectory)..\Content\**\*.fx"/>
   </ItemGroup>
 
-  <!-- Compile shaders with incremental build support -->
   <Target Name="CompileShaders"
           BeforeTargets="BundleContent;BundleContentDebug"
           Inputs="@(ShaderFiles)"
           Outputs="@(ShaderFiles -> '%(RootDir)%(Directory)%(Filename).fxb')">
 
-    <Message Text="CompileShaders: Found @(ShaderFiles->Count()) shader files" Importance="High" />
-    <Message Text="CompileShaders: FxcCommandLine = $(FxcCommandLine)" Importance="High" />
+    <Error Text="fxc.exe not found in FXC folder." Condition="!Exists('$(FxcDir)fxc.exe')" />
 
-    <Error Text="Unable to find fxc.exe. Install DirectX SDK (June 2010) or ensure fxc.exe is in the FXC folder. See the documentation for more details."
-           Condition="'$(FxcCommandLine)' == '' AND '$(OS)' == 'Windows_NT'" />
-    <Error Text="Unable to find fxc.exe. Install DirectX SDK (June 2010) using 'winetricks dxsdk_jun2010' or ensure fxc.exe is in the FXC folder. See the documentation for more details."
-           Condition="'$(FxcCommandLine)' == '' AND '$(OS)' != 'Windows_NT'" />
-
-    <!-- Compile each shader -->
     <Message Text="Compiling shader: %(ShaderFiles.FullPath)" Importance="High" />
-    <Exec Command="$(FxcCommandLine) /nologo /Vd /T fx_2_0 /Fo &quot;%(ShaderFiles.RootDir)%(ShaderFiles.Directory)%(ShaderFiles.Filename).fxb&quot; &quot;%(ShaderFiles.FullPath)&quot;"
-          Condition="'$(FxcCommandLine)' != '' AND '@(ShaderFiles)' != ''" />
+    <Exec Command="$(FxcExe) /nologo /Vd /T fx_2_0 /Fo &quot;%(ShaderFiles.Filename).fxb&quot; &quot;%(ShaderFiles.Filename)%(ShaderFiles.Extension)&quot;"
+          WorkingDirectory="%(ShaderFiles.RootDir)%(ShaderFiles.Directory)" />
 
-    <!-- Track compiled files for clean/rebuild -->
     <ItemGroup>
       <FileWrites Include="@(ShaderFiles -> '%(RootDir)%(Directory)%(Filename).fxb')"/>
     </ItemGroup>
