@@ -17,6 +17,8 @@ public class FezEditor : Game
 
     public static readonly string Authors = GetAssemblyAuthors();
 
+    public const string Commit = ThisAssembly.Git.Commit;
+
 #if DEBUG
     public const bool IsDebugBuild = true;
 #else
@@ -74,7 +76,7 @@ public class FezEditor : Game
 
     protected override void Initialize()
     {
-        Logger.Information("Version - {0}", Version);
+        Logger.Information("Version - {0} ({1})", Version, Commit);
         Logger.Information("Scripts - {0} entities", ScriptingApi.Entries.Length); // inits collection
         RepackerExtensions.Gd = GraphicsDevice;
 
@@ -119,9 +121,9 @@ public class FezEditor : Game
 
     private static string GetAssemblyVersion()
     {
-        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!;
-        var patch = (version.Build > 0) ? $".{version.Build}" : string.Empty;
-        return $"{version.Major}.{version.Minor:D2}{patch}";
+        return ThisAssembly.Git.BaseVersion.Major + "." +
+               ThisAssembly.Git.BaseVersion.Minor +
+               (ThisAssembly.Git.BaseVersion.Patch != "0" ? "." + ThisAssembly.Git.BaseVersion.Patch : "");
     }
 
     private static string GetAssemblyAuthors()

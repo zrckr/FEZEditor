@@ -45,7 +45,8 @@ public class AboutWindow : DrawableGameComponent
             ImGui.SameLine();
             ImGui.BeginGroup();
             ImGui.NewLine();
-            ImGui.Text($"FEZEditor, version {FezEditor.Version}");
+            ImGui.Text("FEZEditor - a modding tool for FEZ assets");
+            ImGui.Text($"Version {FezEditor.Version} ({FezEditor.Commit})");
             ImGui.Text($"Developed by {FezEditor.Authors}");
             ImGui.Text("Powered by ");
             ImGui.SameLine(0, 0);
