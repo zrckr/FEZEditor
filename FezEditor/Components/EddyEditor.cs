@@ -63,6 +63,8 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     private readonly List<BaseContext> _contexts = new();
 
+    private DefaultContext _defaultContext = null!;
+
     private readonly ScriptBrowser _scriptBrowser;
 
     private bool _showProperties;
@@ -137,7 +139,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         {
             // DefaultContext is instantiated first so its subroot is first in the scene (draws before level geometry).
             // It is added to _contexts last so it has the lowest update priority.
-            var defaultCtx = new DefaultContext(Game, _level, this);
+            _defaultContext = new DefaultContext(Game, _level, this);
             _contexts.Add(new TrileContext(Game, _level, this));
             _contexts.Add(new ArtObjectContext(Game, _level, this));
             _contexts.Add(new BackgroundPlaneContext(Game, _level, this));
@@ -145,15 +147,15 @@ public class EddyEditor : EditorComponent, IEddyEditor
             _contexts.Add(new GomezContext(Game, _level, this));
             _contexts.Add(new VolumeContext(Game, _level, this));
             _contexts.Add(new PathContext(Game, _level, this));
-            _contexts.Add(defaultCtx);
+            _contexts.Add(_defaultContext);
 
-            defaultCtx.Revisualize();
-            foreach (var ctx in _contexts.Where(c => c != defaultCtx))
+            _defaultContext.Revisualize();
+            foreach (var ctx in _contexts.Where(c => c != _defaultContext))
             {
                 ctx.Revisualize();
             }
 
-            defaultCtx.PostRevisualize();
+            _defaultContext.PostRevisualize();
         }
         {
             _cursorActor = Scene.CreateActor();
@@ -192,7 +194,8 @@ public class EddyEditor : EditorComponent, IEddyEditor
         if (w > 0 && h > 0)
         {
             var texture = Scene.Viewport.GetTexture();
-            if (texture == null || texture.Width != w || texture.Height != h)
+            var previewer = Game.Components.OfType<FarawayPreviewer>().FirstOrDefault();
+            if ((previewer == null || !previewer.IsExporting) && (texture == null || texture.Width != w || texture.Height != h))
             {
                 Scene.Viewport.SetSize(w, h);
             }
@@ -317,7 +320,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         base.Dispose();
     }
 
-    private void SwitchToPerspective()
+    internal void SwitchToPerspective()
     {
         if (_viewMode == ViewMode.Perspective)
         {
@@ -335,7 +338,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         Camera.Offset = _savedPerspectiveState.Offset;
     }
 
-    private void SwitchToOrtho(ViewMode mode, float yaw)
+    public void SwitchToOrtho(ViewMode mode, float yaw)
     {
         if (_viewMode == ViewMode.Perspective)
         {
@@ -356,7 +359,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         Camera.Projection = Camera.ProjectionType.Orthographic;
         _cameraActor.Transform.Rotation = Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f);
         _cameraActor.Transform.Position = _level.Size.ToXna() / 2f;
-        Camera.Offset = new Vector3(0f, 0f, 500f);
+        Camera.Offset = new Vector3(0f, 0f, 400f);
         _cameraActor.AddComponent<MapPanControl>();
         var zoom = _cameraActor.AddComponent<MapZoomControl>();
         zoom.Reset();
@@ -524,19 +527,22 @@ public class EddyEditor : EditorComponent, IEddyEditor
             {
                 var visuals = (int)Visuals.Value;
                 var edited = false;
-                edited |= ImGui.CheckboxFlags("Pickable Bounds", ref visuals, (int)EddyVisuals.PickableBounds);
-                edited |= ImGui.CheckboxFlags("Collision Map", ref visuals, (int)EddyVisuals.CollisionMap);
                 edited |= ImGui.CheckboxFlags("Triles", ref visuals, (int)EddyVisuals.Triles);
                 edited |= ImGui.CheckboxFlags("Empty Triles", ref visuals, (int)EddyVisuals.EmptyTriles);
                 edited |= ImGui.CheckboxFlags("Displaced Triles", ref visuals, (int)EddyVisuals.DisplacedTriles);
                 edited |= ImGui.CheckboxFlags("Art Objects", ref visuals, (int)EddyVisuals.ArtObjects);
                 edited |= ImGui.CheckboxFlags("Background Planes", ref visuals, (int)EddyVisuals.BackgroundPlanes);
                 edited |= ImGui.CheckboxFlags("Non-Playable Characters", ref visuals, (int)EddyVisuals.NonPlayableCharacters);
-                edited |= ImGui.CheckboxFlags("Volumes", ref visuals, (int)EddyVisuals.Volumes);
-                edited |= ImGui.CheckboxFlags("Paths", ref visuals, (int)EddyVisuals.Paths);
+                edited |= ImGui.CheckboxFlags("Gomez", ref visuals, (int)EddyVisuals.Gomez);
                 edited |= ImGui.CheckboxFlags("Liquid", ref visuals, (int)EddyVisuals.Liquid);
                 edited |= ImGui.CheckboxFlags("Sky", ref visuals, (int)EddyVisuals.Sky);
-                edited |= ImGui.CheckboxFlags("Gomez", ref visuals, (int)EddyVisuals.Gomez);
+                edited |= ImGui.CheckboxFlags("Rain", ref visuals, (int)EddyVisuals.Rain);
+                ImGui.Separator();
+                edited |= ImGui.CheckboxFlags("Volumes", ref visuals, (int)EddyVisuals.Volumes);
+                edited |= ImGui.CheckboxFlags("Paths", ref visuals, (int)EddyVisuals.Paths);
+                edited |= ImGui.CheckboxFlags("Level Bounds", ref visuals, (int)EddyVisuals.LevelBounds);
+                edited |= ImGui.CheckboxFlags("Collision Map", ref visuals, (int)EddyVisuals.CollisionMap);
+                edited |= ImGui.CheckboxFlags("Pickable Bounds", ref visuals, (int)EddyVisuals.PickableBounds);
                 if (edited) Visuals = (EddyVisuals)visuals;
             }
 
@@ -652,6 +658,14 @@ public class EddyEditor : EditorComponent, IEddyEditor
         _cameraActor.GetComponent<FirstPersonControl>().FocusOn(target, approachDir, placementDist);
     }
 
+    public void ShowFarawayPreviewer()
+    {
+        if (!Game.Components.OfType<FarawayPreviewer>().Any())
+        {
+            Game.AddComponent(new FarawayPreviewer(Game, _level, this));
+        }
+    }
+
     public void ExportAsDiorama()
     {
         FileDialog.Show(FileDialog.Type.SaveFile, files =>
@@ -666,7 +680,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         });
     }
 
-    private enum ViewMode
+    public enum ViewMode
     {
         Perspective,
         Front,

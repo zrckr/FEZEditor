@@ -28,9 +28,19 @@ public class SceneViewport : IDisposable
         return _rendering.RenderTargetGetTexture(_rt);
     }
 
+    public (int Width, int Height) GetSize()
+    {
+        return _rendering.RenderTargetGetSize(_rt);
+    }
+
     public void SetSize(int width, int height)
     {
         _rendering.RenderTargetSetSize(_rt, width, height);
+    }
+
+    public void SetClearColor(Color color)
+    {
+        _rendering.RenderTargetSetClearColor(_rt, color);
     }
 
     public Ray Unproject(Vector2 mousePos, Vector2 viewportMin)

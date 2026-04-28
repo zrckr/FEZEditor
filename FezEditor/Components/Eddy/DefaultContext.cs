@@ -53,6 +53,16 @@ internal class DefaultContext : BaseContext
             {
                 _liquidActor.Visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Liquid);
             }
+
+            if (_rainActor != null)
+            {
+                _rainActor.Visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Rain);
+            }
+
+            if (_boundsActor?.HasComponent<BoundsMesh>() ?? false)
+            {
+                _boundsActor.Visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.LevelBounds);
+            }
         }
 
         if (_skyActor != null)
@@ -462,6 +472,7 @@ internal class DefaultContext : BaseContext
         {
             _boundsActor = CreateSubActor();
             _boundsActor.Name = "Level Bounds";
+            _boundsActor.Visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.LevelBounds);
 
             var mesh = _boundsActor.AddComponent<BoundsMesh>();
             mesh.Size = Level.Size.ToXna();

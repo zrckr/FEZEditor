@@ -195,6 +195,11 @@ public class MenuBar : DrawableGameComponent
                     {
                         eddy.ExportAsDiorama();
                     }
+
+                    if (ImGui.MenuItem("Level Previewer..."))
+                    {
+                        eddy.ShowFarawayPreviewer();
+                    }
                 }
 
                 if (_resourceService.GetModReferencePaths().Count > 0)
