@@ -45,10 +45,8 @@ public class AboutWindow : DrawableGameComponent
             ImGui.SameLine();
             ImGui.BeginGroup();
             ImGui.NewLine();
-            ImGui.Text($"FEZEDITOR v{FezEditor.Version}");
-            ImGui.Text("Developed by ");
-            ImGui.SameLine(0, 0);
-            ImGuiX.Hyperlink("zerocker", "https://github.com/zrckr");
+            ImGui.Text($"FEZEditor, version {FezEditor.Version}");
+            ImGui.Text($"Developed by {FezEditor.Authors}");
             ImGui.Text("Powered by ");
             ImGui.SameLine(0, 0);
             ImGuiX.Hyperlink("FNA", "https://github.com/FNA-XNA/FNA");

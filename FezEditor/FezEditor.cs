@@ -15,6 +15,8 @@ public class FezEditor : Game
 
     public static readonly string Version = GetAssemblyVersion();
 
+    public static readonly string Authors = GetAssemblyAuthors();
+
 #if DEBUG
     public const bool IsDebugBuild = true;
 #else
@@ -120,5 +122,15 @@ public class FezEditor : Game
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!;
         var patch = (version.Build > 0) ? $".{version.Build}" : string.Empty;
         return $"{version.Major}.{version.Minor:D2}{patch}";
+    }
+
+    private static string GetAssemblyAuthors()
+    {
+        var attrs = System.Reflection.Assembly
+            .GetExecutingAssembly()
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyCompanyAttribute), false);
+        return attrs.Length > 0
+            ? ((System.Reflection.AssemblyCompanyAttribute)attrs[0]).Company
+            : string.Empty;
     }
 }
