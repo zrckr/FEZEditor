@@ -69,11 +69,11 @@ public class ResourceService : IDisposable
 
     public void CloseProvider()
     {
-        ProviderReset?.Invoke();
-        ProviderChanged?.Invoke();
         _cache.Clear();
         _provider?.Dispose();
         _provider = null;
+        ProviderReset?.Invoke();
+        ProviderChanged?.Invoke();
         Logger.Information("Provider closed");
     }
 
@@ -299,7 +299,7 @@ public class ResourceService : IDisposable
         _game.Activated -= OnGameActivated;
     }
 
-    public string GetProviderDisplayName(string path)
+    public static string GetProviderDisplayName(string path)
     {
         if (string.IsNullOrEmpty(path))
         {

@@ -12,6 +12,8 @@ public partial class EditorService
 {
     private static readonly ILogger Logger = Logging.Create<EditorService>();
 
+    public event Action? ActiveEditorChanged;
+
     public EditorFlags Flags { get; private set; }
 
     public IEnumerable<EditorComponent> Editors => _editors;
@@ -119,6 +121,7 @@ public partial class EditorService
             };
             _pendingLoad.Add(editor);
             UpdateFlags();
+            ActiveEditorChanged?.Invoke();
             Logger.Information("Opened the {0}", editor);
         }
     }
@@ -154,6 +157,7 @@ public partial class EditorService
             _pendingActiveEditor = null;
         }
 
+        ActiveEditorChanged?.Invoke();
         UpdateFlags();
     }
 
@@ -265,6 +269,7 @@ public partial class EditorService
             {
                 _activeEditor = _editors.Count > 0 ? _editors[^1] : null;
                 _pendingActiveEditor = _activeEditor;
+                ActiveEditorChanged?.Invoke();
             }
         }
 
