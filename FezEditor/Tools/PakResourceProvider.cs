@@ -58,14 +58,7 @@ internal class PakResourceProvider : IResourceProvider
             throw new FileNotFoundException(path);
         }
 
-        var pakPath = StripMusicPrefix(path);
-        using var stream = _pakFile.OpenRead();
-        using var reader = new PakReader(stream);
-
-        var record = reader.ReadFiles().FirstOrDefault(r =>
-            r.Path.Equals(pakPath, StringComparison.OrdinalIgnoreCase)) ?? throw new FileNotFoundException(path);
-
-        return record.Open();
+        return OpenStreamInternal(path);
     }
 
     public T Load<T>(string path) where T : class
@@ -75,15 +68,7 @@ internal class PakResourceProvider : IResourceProvider
             throw new FileNotFoundException(path);
         }
 
-        var pakPath = StripMusicPrefix(path);
-        using var stream = _pakFile.OpenRead();
-        using var reader = new PakReader(stream);
-
-        var record = reader.ReadFiles().FirstOrDefault(r =>
-                         r.Path.Replace('\\', '/').Equals(pakPath, StringComparison.OrdinalIgnoreCase))
-                     ?? throw new FileNotFoundException(path);
-
-        using var xnbStream = record.Open();
+        using var xnbStream = OpenStreamInternal(path);
         var initialPosition = xnbStream.Position;
         try
         {
@@ -133,6 +118,19 @@ internal class PakResourceProvider : IResourceProvider
             var key = string.IsNullOrEmpty(_musicPrefix) ? normalizedPath : $"{_musicPrefix}{normalizedPath}";
             _records[key] = record.FindExtension();
         }
+    }
+
+    private Stream OpenStreamInternal(string path)
+    {
+        var pakPath = StripMusicPrefix(path);
+        using var stream = _pakFile.OpenRead();
+        using var reader = new PakReader(stream);
+
+        var record = reader.ReadFiles().FirstOrDefault(r =>
+                         r.Path.Replace('\\', '/').Equals(pakPath, StringComparison.OrdinalIgnoreCase))
+                     ?? throw new FileNotFoundException(path);
+
+        return record.Open();
     }
 
     private string StripMusicPrefix(string path)
