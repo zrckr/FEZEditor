@@ -24,7 +24,8 @@ public static class RepackerExtensions
 
     public static Texture2D ConvertToTexture2D(RTexture2D texture)
     {
-        var tex2D = new Texture2D(Gd, texture.Width, texture.Height, false, SurfaceFormat.Color);
+        var format = (SurfaceFormat)texture.Format; // formats used by FEZ do overlap - direct conversion is good enough
+        var tex2D = new Texture2D(Gd, texture.Width, texture.Height, false, format);
         var data = new byte[texture.TextureData.Length];
         Buffer.BlockCopy(texture.TextureData, 0, data, 0, texture.TextureData.Length);
         tex2D.SetData(data);
