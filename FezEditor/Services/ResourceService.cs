@@ -148,13 +148,15 @@ public class ResourceService : IDisposable
 
     public Dictionary<int, string> GetTrileSetList(string path)
     {
-        if (_provider!.GetExtension(path) == ".fezts.glb")
+        try
         {
             var trileSet = _provider!.Load<TrileSet>(path);
             return trileSet.Triles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
         }
-
-        return new Dictionary<int, string>();
+        catch
+        {
+            return new Dictionary<int, string>();
+        }
     }
 
     public Dictionary<string, RAnimatedTexture> LoadAnimations(string path)
