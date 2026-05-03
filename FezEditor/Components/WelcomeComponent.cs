@@ -74,7 +74,7 @@ public class WelcomeComponent : EditorComponent
                     ImGui.Indent();
                     foreach (var entry in recentPaths)
                     {
-                        var name = Path.GetFileName(entry.Path.TrimEnd('/', '\\'));
+                        var name = ResourceService.GetProviderDisplayName(entry.Path);
                         if (string.IsNullOrEmpty(name))
                         {
                             name = entry.Path;

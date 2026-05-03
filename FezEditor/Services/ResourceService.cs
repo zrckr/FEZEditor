@@ -298,4 +298,19 @@ public class ResourceService : IDisposable
         _provider?.Dispose();
         _game.Activated -= OnGameActivated;
     }
+
+    public string GetProviderDisplayName(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return string.Empty;
+        }
+
+        var pathParts = path.TrimEnd('/', '\\').Split('/', '\\');
+        if (pathParts.Length > 1 && pathParts[^1].Equals("Assets", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{pathParts[^2]}/{pathParts[^1]}";
+        }
+        return pathParts[^1];
+    }
 }
