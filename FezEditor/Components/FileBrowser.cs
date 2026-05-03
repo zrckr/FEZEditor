@@ -642,7 +642,7 @@ public class FileBrowser : DrawableGameComponent
             [""] = _root
         };
 
-        foreach (var path in _resourceService.Files)
+        foreach (var path in _resourceService.VirtualFiles)
         {
             var segments = path.Split('/');
             var currentPath = "";

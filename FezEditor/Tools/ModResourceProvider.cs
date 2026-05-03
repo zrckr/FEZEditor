@@ -4,13 +4,14 @@ namespace FezEditor.Tools;
 
 internal class ModResourceProvider : IResourceProvider
 {
-    private const string ReferencesPrefix = "References/";
+    private const string ReferencesVirtualPathPrefix = "References/";
 
     public bool IsReadonly => false;
 
     public string Root => _inner.Root;
 
-    public IEnumerable<string> Files => _inner.Files.Concat(_referenceFiles);
+    public IEnumerable<string> Files => _inner.Files.Union(_referenceFiles);
+    public IEnumerable<string> VirtualFiles => _inner.Files.Concat(_referenceVirtualFiles);
 
     public IReadOnlyList<IResourceProvider> References => _references;
 
@@ -20,9 +21,11 @@ internal class ModResourceProvider : IResourceProvider
 
     private readonly List<IResourceProvider> _references = new();
 
-    private Dictionary<string, IResourceProvider> _index = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IResourceProvider> _referenceLookup = new(StringComparer.OrdinalIgnoreCase);
 
-    private List<string> _referenceFiles = new();
+    private readonly List<string> _referenceFiles = new();
+
+    private readonly List<string> _referenceVirtualFiles = new();
 
     public ModResourceProvider(DirectoryInfo dir, AppStorageService storage)
     {
@@ -60,129 +63,139 @@ internal class ModResourceProvider : IResourceProvider
             _references.Add(provider);
         }
 
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
-    private void RebuildIndex()
+    private void RebuildReferenceLookup()
     {
-        var index = new Dictionary<string, IResourceProvider>(StringComparer.OrdinalIgnoreCase);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var refFiles = new List<string>();
+        _referenceLookup.Clear();
+        _referenceFiles.Clear();
+        _referenceVirtualFiles.Clear();
 
         foreach (var reference in _references)
         {
             foreach (var path in reference.Files)
             {
-                index[path] = reference;
-                if (seen.Add(path))
+                if (!_referenceLookup.ContainsKey(path))
                 {
-                    refFiles.Add(ReferencesPrefix + path);
+                    _referenceFiles.Add(path);
+                    _referenceVirtualFiles.Add(ReferencesVirtualPathPrefix + path);
                 }
+                _referenceLookup[path] = reference;
+            }
+        }
+    }
+
+    private bool TryGetProviderForPath(string path, out IResourceProvider provider, out string resolvedPath)
+    {
+        if (path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            resolvedPath = StripReferencesVirtualPrefix(path);
+            if (_referenceLookup.TryGetValue(resolvedPath, out provider!))
+            {
+                return true;
             }
         }
 
-        foreach (var path in _inner.Files)
+        resolvedPath = path;
+
+        if (_inner.Exists(resolvedPath))
         {
-            index[path] = _inner;
+            provider = _inner;
+            return true;
         }
 
-        _index = index;
-        _referenceFiles = refFiles;
+        return _referenceLookup.TryGetValue(resolvedPath, out provider!);
     }
 
     public bool Exists(string path)
     {
-        return _index.ContainsKey(StripReferencesPrefix(path));
+        return TryGetProviderForPath(path, out _, out _);
     }
 
     public string GetExtension(string path)
     {
-        var resolved = StripReferencesPrefix(path);
-        return _index.TryGetValue(resolved, out var rp)
+        return TryGetProviderForPath(path, out var rp, out var resolved)
             ? rp.GetExtension(resolved)
             : string.Empty;
     }
 
     public Stream OpenStream(string path, string extension)
     {
-        var resolved = StripReferencesPrefix(path);
-        return _index.TryGetValue(resolved, out var rp)
+        return TryGetProviderForPath(path, out var rp, out var resolved)
             ? rp.OpenStream(resolved, extension)
             : throw new FileNotFoundException(path);
     }
 
     public T Load<T>(string path) where T : class
     {
-        var resolved = StripReferencesPrefix(path);
-        return _index.TryGetValue(resolved, out var rp)
+        return TryGetProviderForPath(path, out var rp, out var resolved)
             ? rp.Load<T>(resolved)
             : throw new FileNotFoundException(path);
     }
 
     public string GetFullPath(string path)
     {
-        var resolved = StripReferencesPrefix(path);
-        return _index.TryGetValue(resolved, out var rp)
+        return TryGetProviderForPath(path, out var rp, out var resolved)
             ? rp.GetFullPath(resolved)
             : _inner.GetFullPath(resolved);
     }
 
     public DateTime GetLastWriteTimeUtc(string path)
     {
-        var resolved = StripReferencesPrefix(path);
-        return _index.TryGetValue(resolved, out var rp)
+        return TryGetProviderForPath(path, out var rp, out var resolved)
             ? rp.GetLastWriteTimeUtc(resolved)
             : DateTime.MinValue;
     }
 
     public void Save<T>(string path, T asset) where T : class
     {
-        if (path.StartsWith(ReferencesPrefix, StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException();
         }
 
         _inner.Save(path, asset);
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
     public void Move(string path, string newPath)
     {
-        if (path.StartsWith(ReferencesPrefix, StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException();
         }
 
         _inner.Move(path, newPath);
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
     public void Duplicate(string path)
     {
-        if (path.StartsWith(ReferencesPrefix, StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException();
         }
 
         _inner.Duplicate(path);
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
     public void Remove(string path)
     {
-        if (path.StartsWith(ReferencesPrefix, StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException();
         }
 
         _inner.Remove(path);
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
     public void Refresh()
     {
         _inner.Refresh();
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
     public void Dispose()
@@ -199,8 +212,8 @@ internal class ModResourceProvider : IResourceProvider
 
     public void CopyToMod(string path)
     {
-        var relativePath = StripReferencesPrefix(path);
-        if (!_index.TryGetValue(relativePath, out var source))
+        var relativePath = StripReferencesVirtualPrefix(path);
+        if (!_referenceLookup.TryGetValue(relativePath, out var source))
         {
             throw new FileNotFoundException(path);
         }
@@ -221,13 +234,13 @@ internal class ModResourceProvider : IResourceProvider
         }
 
         _inner.Refresh();
-        RebuildIndex();
+        RebuildReferenceLookup();
     }
 
-    private static string StripReferencesPrefix(string path)
+    private static string StripReferencesVirtualPrefix(string path)
     {
-        return path.StartsWith(ReferencesPrefix, StringComparison.OrdinalIgnoreCase)
-            ? path[ReferencesPrefix.Length..]
+        return path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase)
+            ? path[ReferencesVirtualPathPrefix.Length..]
             : path;
     }
 

@@ -28,6 +28,7 @@ public class ResourceService : IDisposable
     public string Root => _provider?.Root ?? string.Empty;
 
     public IEnumerable<string> Files => _provider?.Files ?? Enumerable.Empty<string>();
+    public IEnumerable<string> VirtualFiles => _provider is ModResourceProvider mod ? mod.VirtualFiles : Files;
 
     private IResourceProvider? _provider;
 
