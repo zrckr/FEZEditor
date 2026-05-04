@@ -527,6 +527,53 @@ internal class VolumeContext : BaseContext
         return edited;
     }
 
+    public override void PartialRevisualize(EddyContext context)
+    {
+        if (context != EddyContext.Volume)
+        {
+            return;
+        }
+
+        var presentIds = Level.Volumes.Keys.Where(k => k != InvalidId).ToHashSet();
+        foreach (var id in _volumeActors.Keys.ToList())
+        {
+            if (!presentIds.Contains(id))
+            {
+                Eddy.Scene.DestroyActor(_volumeActors[id]);
+                _volumeActors.Remove(id);
+            }
+        }
+
+        foreach (var (id, instance) in Level.Volumes.Where(kv => kv.Key != InvalidId))
+        {
+            var center = (instance.From.ToXna() + instance.To.ToXna()) / 2f;
+            var size = (instance.To - instance.From).ToXna();
+
+            if (_volumeActors.TryGetValue(id, out var actor))
+            {
+                actor.Transform.Position = center;
+                actor.GetComponent<VolumeMesh>().Size = size;
+            }
+            else
+            {
+                actor = CreateSubActor();
+                actor.Name = $"{id}: Volume";
+                actor.Transform.Position = center;
+                _volumeActors[id] = actor;
+
+                var mesh = actor.AddComponent<VolumeMesh>();
+                mesh.Size = size;
+                mesh.Color = DefaultColor;
+            }
+        }
+
+        _selectedIds.RemoveWhere(id => !Level.Volumes.ContainsKey(id));
+        if (_hoveredId.HasValue && !Level.Volumes.ContainsKey(_hoveredId.Value))
+        {
+            _hoveredId = null;
+        }
+    }
+
     public override void FullVisualize()
     {
         TeardownVisualization();
@@ -590,10 +637,11 @@ internal class VolumeContext : BaseContext
 
             var actor = CreateSubActor();
             actor.Name = $"{id}: Volume";
-            actor.Transform.Position = (instance.From + (instance.To - instance.From) / 2f).ToXna();
+            actor.Transform.Position = (instance.From.ToXna() + instance.To.ToXna()) / 2f;
             _volumeActors[id] = actor;
 
             var mesh = actor.AddComponent<VolumeMesh>();
+            mesh.Size = (instance.To - instance.From).ToXna();
             mesh.Color = DefaultColor;
             _selectedIds.Add(id);
         }

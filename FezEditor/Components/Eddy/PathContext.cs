@@ -314,6 +314,60 @@ internal class PathContext : BaseContext
         dl.AddText(drawPos, ImGui.GetColorU32(ImGuiCol.Text), text);
     }
 
+    public override void PartialRevisualize(EddyContext context)
+    {
+        if (context != EddyContext.Path)
+        {
+            return;
+        }
+
+        var presentKeys = new HashSet<int>();
+        foreach (var id in Level.Paths.Keys.Where(k => k != InvalidId))
+        {
+            presentKeys.Add(id);
+        }
+        foreach (var groupId in Level.Groups.Keys.Where(k => k != InvalidId && Level.Groups[k].Path != null))
+        {
+            presentKeys.Add(-(groupId + 1));
+        }
+
+        foreach (var key in _pathActors.Keys.ToList())
+        {
+            if (!presentKeys.Contains(key))
+            {
+                Eddy.Scene.DestroyActor(_pathActors[key]);
+                _pathActors.Remove(key);
+            }
+        }
+
+        foreach (var (id, path) in Level.Paths.Where(kv => kv.Key != InvalidId))
+        {
+            SyncOrCreatePathActor(id, path, Vector3.Zero);
+        }
+
+        foreach (var (groupId, group) in Level.Groups.Where(kv => kv.Key != InvalidId && kv.Value.Path != null))
+        {
+            SyncOrCreatePathActor(-(groupId + 1), group.Path!, ComputeOffset(groupId, true));
+        }
+
+        var activePath = GetActivePath();
+        _selectedWaypointIndices.RemoveWhere(i => activePath == null || i >= activePath.Segments.Count);
+    }
+
+    private void SyncOrCreatePathActor(int key, MovementPath path, Vector3 offset)
+    {
+        if (_pathActors.TryGetValue(key, out var actor))
+        {
+            var mesh = actor.GetComponent<PathMesh>();
+            mesh.Waypoints = path.Segments.Select(ps => offset + ps.Destination.ToXna()).ToList();
+            mesh.WaypointColors = Enumerable.Repeat(PathColor, mesh.Waypoints.Count).ToList();
+        }
+        else
+        {
+            CreatePathActor(key, path, offset);
+        }
+    }
+
     public override void FullVisualize()
     {
         TeardownVisualization();
