@@ -26,6 +26,18 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
 
     public bool Billboard { get; set; }
 
+    public bool LightMap { get; set; }
+
+    public bool AllowOverbrightness { get; set; }
+
+    public bool PixelatedLightmap { get; set; }
+
+    public bool ClampTexture { get; set; }
+
+    public bool XTextureRepeat { get; set; }
+
+    public bool YTextureRepeat { get; set; }
+
     public Color Color { get; set; } = Color.White;
 
     public float Opacity { get; set; } = 1.0f;
@@ -88,7 +100,8 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
         }
 
         _rendering.MaterialAssignBaseTexture(_material, _texture);
-        _rendering.MaterialSetBlendMode(_material, BlendMode.AlphaBlend);
+        _rendering.MaterialSetBlendMode(_material, ResolveBlendMode());
+        _rendering.MaterialSetSamplerState(_material, ResolveSamplerState());
 
         var surface = MeshSurface.CreateQuad(PlaneSize);
         _rendering.MeshClear(_mesh);
@@ -96,6 +109,27 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
 
         _frameCounter = 0;
         Animated = _frames.Count > 0;
+    }
+
+    private BlendMode ResolveBlendMode()
+    {
+        if (LightMap)
+        {
+            return AllowOverbrightness ? BlendMode.Additive : BlendMode.Maximum;
+        }
+
+        return BlendMode.AlphaBlend;
+    }
+
+    private SamplerState ResolveSamplerState()
+    {
+        var useLinear = LightMap && !PixelatedLightmap;
+        if (!ClampTexture && (XTextureRepeat || YTextureRepeat))
+        {
+            return useLinear ? SamplerState.LinearWrap : SamplerState.PointWrap;
+        }
+
+        return useLinear ? SamplerState.LinearClamp : SamplerState.PointClamp;
     }
 
     public override void Dispose()

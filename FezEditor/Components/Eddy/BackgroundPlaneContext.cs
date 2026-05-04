@@ -719,9 +719,7 @@ internal class BackgroundPlaneContext : BaseContext
                     _bgPlaneActors[id] = actor;
 
                     var mesh = actor.AddComponent<BackgroundPlaneMesh>();
-                    mesh.Camera = Eddy.Camera;
-                    var ao = ResourceService.Load($"Background Planes/{instance.TextureName}");
-                    mesh.Visualize(ao);
+                    SetupVisualization(mesh, instance);
                 }
             }
 
@@ -750,14 +748,7 @@ internal class BackgroundPlaneContext : BaseContext
             _bgPlaneActors[id] = actor;
 
             var mesh = actor.AddComponent<BackgroundPlaneMesh>();
-            mesh.Camera = Eddy.Camera;
-            mesh.Billboard = bgPlane.Billboard;
-            mesh.DoubleSided = bgPlane.Doublesided;
-            mesh.Color = bgPlane.Filter.ToXna();
-            mesh.Opacity = bgPlane.Opacity;
-
-            var asset = ResourceService.Load($"Background Planes/{bgPlane.TextureName}");
-            mesh.Visualize(asset);
+            SetupVisualization(mesh, bgPlane);
         }
 
         #endregion
@@ -831,12 +822,27 @@ internal class BackgroundPlaneContext : BaseContext
             _bgPlaneActors[id] = actor;
 
             var mesh = actor.AddComponent<BackgroundPlaneMesh>();
-            mesh.Camera = Eddy.Camera;
-            var bg = ResourceService.Load($"Background Planes/{instance.TextureName}");
-            mesh.Visualize(bg);
+            SetupVisualization(mesh, instance);
 
             _selectedIds.Add(id);
         }
+    }
+
+    private void SetupVisualization(BackgroundPlaneMesh mesh, BackgroundPlane bgPlane)
+    {
+        var asset = ResourceService.Load($"Background Planes/{bgPlane.TextureName}");
+        mesh.Camera = Eddy.Camera;
+        mesh.Billboard = bgPlane.Billboard;
+        mesh.DoubleSided = bgPlane.Doublesided;
+        mesh.Color = bgPlane.Filter.ToXna();
+        mesh.Opacity = bgPlane.Opacity;
+        mesh.LightMap = bgPlane.LightMap;
+        mesh.AllowOverbrightness = bgPlane.AllowOverbrightness;
+        mesh.PixelatedLightmap = bgPlane.PixelatedLightmap;
+        mesh.ClampTexture = bgPlane.ClampTexture;
+        mesh.XTextureRepeat = bgPlane.XTextureRepeat;
+        mesh.YTextureRepeat = bgPlane.YTextureRepeat;
+        mesh.Visualize(asset);
     }
 
     private int NextAvailableId()
