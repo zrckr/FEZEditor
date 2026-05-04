@@ -1,2 +1,5 @@
 # Add `.editorconfig` and apply code style cleanup
 239d4af1d730e02115f3263099a25b5112187977
+
+# Supersede Codicons font with Lucide
+9fc1b737ebde702f72261255d435ce3b740f5450
