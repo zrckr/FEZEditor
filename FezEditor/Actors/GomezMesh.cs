@@ -12,6 +12,8 @@ public class GomezMesh : ActorComponent, IPickable
 {
     public bool Pickable { get; set; } = true;
 
+    public Color Tint { get; set; } = Color.Transparent;
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;
@@ -91,6 +93,9 @@ public class GomezMesh : ActorComponent, IPickable
 
     public override void Update(GameTime gameTime)
     {
+        _rendering.MaterialShaderSetParam<Vector4>(_frontMaterial, "Tint", Tint.ToVector4());
+        _rendering.MaterialShaderSetParam<Vector4>(_backMaterial, "Tint", Tint.ToVector4());
+
         if (_frontFrames.Count == 0)
         {
             return;

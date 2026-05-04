@@ -11,6 +11,8 @@ public class ArtObjectMesh : ActorComponent, IPickable
 {
     public bool Pickable { get; set; } = true;
 
+    public Color Tint { get; set; } = Color.Transparent;
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;
@@ -20,6 +22,10 @@ public class ArtObjectMesh : ActorComponent, IPickable
     private Texture2D? _texture;
 
     private Vector3 _size;
+
+    private Vector3[] _vertices = [];
+
+    private int[] _indices = [];
 
     internal ArtObjectMesh(Game game, Actor actor) : base(game, actor)
     {
@@ -43,8 +49,15 @@ public class ArtObjectMesh : ActorComponent, IPickable
         _size = ao.Size.ToXna();
 
         var surface = RepackerExtensions.ConvertToMesh(ao.Geometry.Vertices, ao.Geometry.Indices);
+        _vertices = surface.Vertices;
+        _indices = surface.Indices;
         _rendering.MeshClear(_mesh);
         _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
+    }
+
+    public override void Update(GameTime gameTime)
+    {
+        _rendering.MaterialShaderSetParam<Vector4>(_material, "Tint", Tint.ToVector4());
     }
 
     public IEnumerable<BoundingBox> GetBounds()
@@ -56,8 +69,28 @@ public class ArtObjectMesh : ActorComponent, IPickable
     public PickHit? Pick(Ray ray)
     {
         var box = GetBounds().First();
-        var dist = ray.Intersects(box);
-        return dist.HasValue ? new PickHit(dist.Value, 0) : null;
+        if (!ray.Intersects(box).HasValue)
+        {
+            return null;
+        }
+
+        var localRay = Actor.Transform.TransformRay(ray);
+        var minDist = float.MaxValue;
+        for (var i = 0; i + 2 < _indices.Length; i += 3)
+        {
+            var t = localRay.IntersectsTriangle(
+                _vertices[_indices[i]],
+                _vertices[_indices[i + 1]],
+                _vertices[_indices[i + 2]]
+            );
+
+            if (t < minDist)
+            {
+                minDist = t.Value;
+            }
+        }
+
+        return minDist < float.MaxValue ? new PickHit(minDist, 0) : null;
     }
 
     public override void Dispose()

@@ -30,6 +30,14 @@ internal class BackgroundPlaneContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredId = null;
+        foreach (var actor in _bgPlaneActors.Values)
+        {
+            if (actor.TryGetComponent<BackgroundPlaneMesh>(out var mesh) && mesh != null)
+            {
+                mesh.Tint = Color.Transparent;
+            }
+        }
+
         if (Eddy.Visuals.IsDirty)
         {
             var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.BackgroundPlanes);
@@ -101,6 +109,25 @@ internal class BackgroundPlaneContext : BaseContext
             case EddyTool.Pick: UpdatePick(); break;
             default: throw new ArgumentOutOfRangeException();
         }
+
+        #region Apply Object Tint
+
+        foreach (var (id, actor) in _bgPlaneActors)
+        {
+            if (actor.TryGetComponent<BackgroundPlaneMesh>(out var mesh) && mesh != null)
+            {
+                if (_selectedIds.Contains(id))
+                {
+                    mesh.Tint = SelectionColor;
+                }
+                else if (_hoveredId == id)
+                {
+                    mesh.Tint = HoverColor;
+                }
+            }
+        }
+
+        #endregion
 
         if (_hoveredId.HasValue)
         {

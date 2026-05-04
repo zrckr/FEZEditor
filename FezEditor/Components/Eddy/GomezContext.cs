@@ -25,6 +25,11 @@ internal class GomezContext : BaseContext
     protected override void TestConditions()
     {
         _hovered = false;
+        if (_gomezActor != null && _gomezActor.TryGetComponent<GomezMesh>(out var gomezMesh) && gomezMesh != null)
+        {
+            gomezMesh.Tint = Color.Transparent;
+        }
+
         if (Eddy.Visuals.IsDirty)
         {
             var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.Gomez);
@@ -90,6 +95,18 @@ internal class GomezContext : BaseContext
             case EddyTool.Paint:
             case EddyTool.Pick: break;
             default: throw new ArgumentOutOfRangeException();
+        }
+
+        if (_gomezActor != null && _gomezActor.TryGetComponent<GomezMesh>(out var mesh) && mesh != null)
+        {
+            if (_selected)
+            {
+                mesh.Tint = SelectionColor;
+            }
+            else if (_hovered)
+            {
+                mesh.Tint = HoverColor;
+            }
         }
 
         if (_hovered)

@@ -27,4 +27,15 @@ public class Transform : ActorComponent
         _rendering.InstanceSetRotation(Actor.InstanceRid, Rotation);
         _rendering.InstanceSetScale(Actor.InstanceRid, Scale);
     }
+
+    public Ray TransformRay(Ray ray)
+    {
+        var world = Matrix.CreateScale(Scale) *
+                    Matrix.CreateFromQuaternion(Rotation) *
+                    Matrix.CreateTranslation(Position);
+        var invWorld = Matrix.Invert(world);
+        var position = Vector3.Transform(ray.Position, invWorld);
+        var direction = Vector3.TransformNormal(ray.Direction, invWorld);
+        return new Ray(position, direction);
+    }
 }

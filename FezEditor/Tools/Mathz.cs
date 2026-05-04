@@ -159,4 +159,34 @@ public static class Mathz
             MathHelper.ToRadians(euler.X),
             MathHelper.ToRadians(euler.Z));
     }
+
+    public static float? IntersectsTriangle(this Ray ray, Vector3 v0, Vector3 v1, Vector3 v2)
+    {
+        var edge1 = v1 - v0;
+        var edge2 = v2 - v0;
+        var h = Vector3.Cross(ray.Direction, edge2);
+        var a = Vector3.Dot(edge1, h);
+        if (MathF.Abs(a) < float.Epsilon)
+        {
+            return null;
+        }
+
+        var f = 1f / a;
+        var s = ray.Position - v0;
+        var u = f * Vector3.Dot(s, h);
+        if (u is < 0f or > 1f)
+        {
+            return null;
+        }
+
+        var q = Vector3.Cross(s, edge1);
+        var v = f * Vector3.Dot(ray.Direction, q);
+        if (v < 0f || u + v > 1f)
+        {
+            return null;
+        }
+
+        var t = f * Vector3.Dot(edge2, q);
+        return t > float.Epsilon ? t : null;
+    }
 }

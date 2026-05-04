@@ -1,6 +1,7 @@
 #include "BaseEffect.fxh"
 
 float DoubleSided;      // boolean
+float4 Tint;
 
 struct VS_INPUT
 {
@@ -38,7 +39,7 @@ float4 PS(VS_OUTPUT input, float vface : VFACE) : COLOR0
     float alpha = texColor.a * Material_Opacity;
     ApplyAlphaTest(alpha);
 
-    float3 color = texColor.rgb * Material_Diffuse;
+    float3 color = lerp(texColor.rgb * Material_Diffuse, Tint.rgb, Tint.a);
     float3 normal = (DoubleSided != 0.0 && vface < 0.0) ? -input.Normal : input.Normal;
     color *= ComputeLight(normal, 0.0);
     color = lerp(color, Fog_Color, input.Fog);

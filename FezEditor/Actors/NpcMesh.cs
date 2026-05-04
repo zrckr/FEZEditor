@@ -15,6 +15,8 @@ public class NpcMesh : ActorComponent, IPickable
 
     public bool Billboard { get; set; } = true;
 
+    public Color Tint { get; set; } = Color.Transparent;
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;
@@ -74,12 +76,32 @@ public class NpcMesh : ActorComponent, IPickable
     public PickHit? Pick(Ray ray)
     {
         var box = GetBounds().First();
-        var dist = ray.Intersects(box);
-        return dist.HasValue ? new PickHit(dist.Value, 0) : null;
+        if (!ray.Intersects(box).HasValue)
+        {
+            return null;
+        }
+
+        var scale = _animations.TryGetValue(CurrentAnimation.Value, out var data) ? data.Scale : Vector3.One;
+        var hw = scale.X / 2f;
+        var h = scale.Y;
+        var localRay = _transform.TransformRay(ray);
+
+        // Quad corners in local space (matches CreateQuad with pivot Vector3.UnitY / 2f)
+        var v0 = new Vector3(-hw, 0f, 0f);
+        var v1 = new Vector3(hw, 0f, 0f);
+        var v2 = new Vector3(hw, h, 0f);
+        var v3 = new Vector3(-hw, h, 0f);
+
+        var t0 = localRay.IntersectsTriangle(v0, v1, v2);
+        var t1 = localRay.IntersectsTriangle(v0, v2, v3);
+        var t = t0.HasValue && t1.HasValue ? MathF.Min(t0.Value, t1.Value) : t0 ?? t1;
+
+        return t.HasValue ? new PickHit(t.Value, 0) : null;
     }
 
     public override void Update(GameTime gameTime)
     {
+        _rendering.MaterialShaderSetParam<Vector4>(_material, "Tint", Tint.ToVector4());
         if (!_animations.TryGetValue(CurrentAnimation.Value, out var data))
         {
             return;

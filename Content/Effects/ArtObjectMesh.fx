@@ -1,5 +1,7 @@
 #include "BaseEffect.fxh"
 
+float4 Tint;
+
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -32,7 +34,7 @@ float4 PS(VS_OUTPUT input) : COLOR0
 {
     float4 texColor = SAMPLE_TEXTURE(BaseTexture, input.TexCoord);
 
-    float3 color = texColor.rgb;
+    float3 color = lerp(texColor.rgb, Tint.rgb, Tint.a);
     color *= ComputeLight(input.Normal, 0.0);
     color = lerp(color, Fog_Color, input.Fog);
 

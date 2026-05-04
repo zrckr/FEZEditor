@@ -44,6 +44,8 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
 
     public bool Pickable { get; set; } = true;
 
+    public Color Tint { get; set; } = Color.Transparent;
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;
@@ -183,6 +185,7 @@ public class BackgroundPlaneMesh : ActorComponent, IPickable
 
         _rendering.MaterialSetDepthBias(_material, depthBias, SlopeScaleDepthBias);
         _rendering.MaterialSetAlbedo(_material, Color * Opacity);
+        _rendering.MaterialShaderSetParam<Vector4>(_material, "Tint", Tint.ToVector4());
         _rendering.MaterialShaderSetParam(_material, "DoubleSided", DoubleSided ? 1f : 0f);
         _rendering.MaterialSetCullMode(_material, DoubleSided ? CullMode.None : CullMode.CullClockwiseFace);
     }

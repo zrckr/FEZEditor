@@ -32,6 +32,14 @@ internal class ArtObjectContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredId = null;
+        foreach (var actor in _artObjectActors.Values)
+        {
+            if (actor.TryGetComponent<ArtObjectMesh>(out var mesh) && mesh != null)
+            {
+                mesh.Tint = Color.Transparent;
+            }
+        }
+
         if (Eddy.Visuals.IsDirty)
         {
             var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.ArtObjects);
@@ -103,6 +111,25 @@ internal class ArtObjectContext : BaseContext
             case EddyTool.Pick: UpdatePick(); break;
             default: throw new ArgumentOutOfRangeException();
         }
+
+        #region Apply Object Tint
+
+        foreach (var (id, actor) in _artObjectActors)
+        {
+            if (actor.TryGetComponent<ArtObjectMesh>(out var mesh) && mesh != null)
+            {
+                if (_selectedIds.Contains(id))
+                {
+                    mesh.Tint = SelectionColor;
+                }
+                else if (_hoveredId == id)
+                {
+                    mesh.Tint = HoverColor;
+                }
+            }
+        }
+
+        #endregion
 
         if (_hoveredId.HasValue)
         {

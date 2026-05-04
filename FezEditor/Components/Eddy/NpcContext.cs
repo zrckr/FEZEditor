@@ -28,6 +28,14 @@ internal class NpcContext : BaseContext
     protected override void TestConditions()
     {
         _hoveredId = null;
+        foreach (var actor in _npcActors.Values)
+        {
+            if (actor.TryGetComponent<NpcMesh>(out var mesh) && mesh != null)
+            {
+                mesh.Tint = Color.Transparent;
+            }
+        }
+
         if (Eddy.Visuals.IsDirty)
         {
             var visible = Eddy.Visuals.Value.HasFlag(EddyVisuals.NonPlayableCharacters);
@@ -102,6 +110,25 @@ internal class NpcContext : BaseContext
             case EddyTool.Scale: break;
             default: throw new ArgumentOutOfRangeException();
         }
+
+        #region Apply Object Tint
+
+        foreach (var (id, actor) in _npcActors)
+        {
+            if (actor.TryGetComponent<NpcMesh>(out var mesh) && mesh != null)
+            {
+                if (_selectedIds.Contains(id))
+                {
+                    mesh.Tint = SelectionColor;
+                }
+                else if (_hoveredId == id)
+                {
+                    mesh.Tint = HoverColor;
+                }
+            }
+        }
+
+        #endregion
 
         if (_hoveredId.HasValue)
         {
