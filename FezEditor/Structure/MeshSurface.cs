@@ -12,6 +12,14 @@ public class MeshSurface
     public Color[]? Colors;
     public Vector2[]? TexCoords;
 
+    public void Translate(Vector3 translation)
+    {
+        for (var i = 0; i < Vertices.Length; i++)
+        {
+            Vertices[i] += translation;
+        }
+    }
+
     public static MeshSurface CreateTestTriangle()
     {
         return new MeshSurface
@@ -260,9 +268,29 @@ public class MeshSurface
         };
     }
 
-    // Arrow: shaft (cylinder) + cone tip along +Y, rotated to point along axis.
-    // sides = number of lathe segments (use 8 for translate, 4 for scale).
     public static MeshSurface CreateArrow(Vector3 axis, int sides, float shaftLength, float shaftRadius, float tipLength, float tipRadius)
+    {
+        axis = Vector3.Normalize(axis);
+
+        var shaft = CreateCylinderNoCaps(axis, sides, shaftLength, shaftRadius);
+        var tip = CreateCone(axis, sides, tipLength, tipRadius);
+        tip.Translate(axis * shaftLength);
+
+        return CreateMergedMesh([shaft, tip]);
+    }
+
+    public static MeshSurface CreateScaleArrow(Vector3 axis, int sides, float shaftLength, float shaftRadius, float tipWidth)
+    {
+        axis = Vector3.Normalize(axis);
+
+        var shaft = CreateCylinderNoCaps(axis, sides, shaftLength, shaftRadius);
+        var tip = CreateBox(Vector3.One * tipWidth);
+        tip.Translate(axis * (shaftLength + tipWidth * 0.5f));
+
+        return CreateMergedMesh([shaft, tip]);
+    }
+
+    public static MeshSurface CreateCylinderNoCaps(Vector3 axis, int sides, float length, float radius)
     {
         axis = Vector3.Normalize(axis);
 
@@ -270,34 +298,17 @@ public class MeshSurface
         var normals = new List<Vector3>();
         var indices = new List<int>();
 
-        // Build rotation from +Y to axis
-        var up = Vector3.UnitY;
-        Quaternion rotation;
-        var dot = Vector3.Dot(up, axis);
-        if (dot > 0.9999f)
-        {
-            rotation = Quaternion.Identity;
-        }
-        else if (dot < -0.9999f)
-        {
-            rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI);
-        }
-        else
-        {
-            var cross = Vector3.Cross(up, axis);
-            rotation = Quaternion.CreateFromAxisAngle(Vector3.Normalize(cross), MathF.Acos(dot));
-        }
+        var rotation = Mathz.LookRotation(axis);
 
-        // Shaft (cylinder) - no caps, open at both ends
         for (var i = 0; i < sides; i++)
         {
             var angle = 2f * MathF.PI * i / sides;
             var cos = MathF.Cos(angle);
             var sin = MathF.Sin(angle);
             var normal = Vector3.Transform(new Vector3(cos, 0, sin), rotation);
-            vertices.Add(Vector3.Transform(new Vector3(cos * shaftRadius, 0f, sin * shaftRadius), rotation));
+            vertices.Add(Vector3.Transform(new Vector3(cos * radius, 0f, sin * radius), rotation));
             normals.Add(normal);
-            vertices.Add(Vector3.Transform(new Vector3(cos * shaftRadius, shaftLength, sin * shaftRadius), rotation));
+            vertices.Add(Vector3.Transform(new Vector3(cos * radius, length, sin * radius), rotation));
             normals.Add(normal);
         }
 
@@ -311,16 +322,33 @@ public class MeshSurface
             indices.Add(b); indices.Add(d); indices.Add(c);
         }
 
-        // Cone base disc (fill the opening between shaft and cone)
+        return new MeshSurface
+        {
+            Vertices = vertices.ToArray(),
+            Normals = normals.ToArray(),
+            Indices = indices.ToArray()
+        };
+    }
+
+    public static MeshSurface CreateCone(Vector3 axis, int sides, float length, float radius)
+    {
+        axis = Vector3.Normalize(axis);
+
+        var vertices = new List<Vector3>();
+        var normals = new List<Vector3>();
+        var indices = new List<int>();
+
+        var rotation = Mathz.LookRotation(axis);
+
+        // Cone base disc
         var coneBaseStart = vertices.Count;
-        var coneBaseCenter = Vector3.Transform(new Vector3(0, shaftLength, 0), rotation);
         var downNormal = Vector3.Transform(-Vector3.UnitY, rotation);
-        vertices.Add(coneBaseCenter);
+        vertices.Add(Vector3.Zero);
         normals.Add(downNormal);
         for (var i = 0; i < sides; i++)
         {
             var angle = 2f * MathF.PI * i / sides;
-            vertices.Add(Vector3.Transform(new Vector3(MathF.Cos(angle) * tipRadius, shaftLength, MathF.Sin(angle) * tipRadius), rotation));
+            vertices.Add(Vector3.Transform(new Vector3(MathF.Cos(angle) * radius, 0, MathF.Sin(angle) * radius), rotation));
             normals.Add(downNormal);
         }
         for (var i = 0; i < sides; i++)
@@ -331,17 +359,17 @@ public class MeshSurface
         }
 
         // Cone surface
-        var coneTip = Vector3.Transform(new Vector3(0, shaftLength + tipLength, 0), rotation);
+        var coneTip = Vector3.Transform(new Vector3(0, length, 0), rotation);
         for (var i = 0; i < sides; i++)
         {
             var a0 = 2f * MathF.PI * i / sides;
             var a1 = 2f * MathF.PI * (i + 1) / sides;
-            var v0 = Vector3.Transform(new Vector3(MathF.Cos(a0) * tipRadius, shaftLength, MathF.Sin(a0) * tipRadius), rotation);
-            var v1 = Vector3.Transform(new Vector3(MathF.Cos(a1) * tipRadius, shaftLength, MathF.Sin(a1) * tipRadius), rotation);
+            var v0 = Vector3.Transform(new Vector3(MathF.Cos(a0) * radius, 0, MathF.Sin(a0) * radius), rotation);
+            var v1 = Vector3.Transform(new Vector3(MathF.Cos(a1) * radius, 0, MathF.Sin(a1) * radius), rotation);
 
             // Cone normal: perpendicular to slant edge
-            var slant0 = Vector3.Normalize(Vector3.Transform(new Vector3(MathF.Cos(a0), tipRadius / tipLength, MathF.Sin(a0)), rotation));
-            var slant1 = Vector3.Normalize(Vector3.Transform(new Vector3(MathF.Cos(a1), tipRadius / tipLength, MathF.Sin(a1)), rotation));
+            var slant0 = Vector3.Normalize(Vector3.Transform(new Vector3(MathF.Cos(a0), radius / length, MathF.Sin(a0)), rotation));
+            var slant1 = Vector3.Normalize(Vector3.Transform(new Vector3(MathF.Cos(a1), radius / length, MathF.Sin(a1)), rotation));
             var tipNormal = Vector3.Normalize((slant0 + slant1) / 2f);
 
             var baseIdx = vertices.Count;
@@ -436,6 +464,50 @@ public class MeshSurface
                 4, 5, 5, 6, 6, 7, 7, 4,
                 0, 4, 1, 5, 2, 6, 3, 7
             }
+        };
+    }
+
+    public static MeshSurface CreateMergedMesh(MeshSurface[] meshes)
+    {
+        var vertices = new List<Vector3>();
+        var indices = new List<int>();
+        var normals = new List<Vector3>();
+        var colors = new List<Color>();
+        var texCoords = new List<Vector2>();
+
+        var allHaveNormals = meshes.All(mesh => mesh.Normals != null);
+        var allHaveColors = meshes.All(mesh => mesh.Colors != null);
+        var allHaveTexCoords = meshes.All(mesh => mesh.TexCoords != null);
+
+        foreach (var mesh in meshes)
+        {
+            var indexOffset = vertices.Count;
+
+            vertices.AddRange(mesh.Vertices);
+            indices.AddRange(mesh.Indices.Select(index => index + indexOffset));
+            if (allHaveNormals)
+            {
+                normals.AddRange(mesh.Normals!);
+            }
+
+            if (allHaveColors)
+            {
+                colors.AddRange(mesh.Colors!);
+            }
+
+            if (allHaveTexCoords)
+            {
+                texCoords.AddRange(mesh.TexCoords!);
+            }
+        }
+
+        return new MeshSurface()
+        {
+            Vertices = vertices.ToArray(),
+            Indices = indices.ToArray(),
+            Normals = allHaveNormals ? normals.ToArray() : null,
+            Colors = allHaveColors ? colors.ToArray() : null,
+            TexCoords = allHaveTexCoords ? texCoords.ToArray() : null,
         };
     }
 }

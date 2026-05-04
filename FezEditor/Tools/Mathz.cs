@@ -160,6 +160,24 @@ public static class Mathz
             MathHelper.ToRadians(euler.Z));
     }
 
+    public static Quaternion LookRotation(Vector3 forward, Vector3? up = null)
+    {
+        up ??= Vector3.UnitY;
+
+        var dot = Vector3.Dot(up.Value, forward);
+        if (dot > 0.9999f)
+        {
+            return Quaternion.Identity;
+        }
+        if (dot < -0.9999f)
+        {
+            return Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI);
+        }
+
+        var cross = Vector3.Cross(up.Value, forward);
+        return Quaternion.CreateFromAxisAngle(Vector3.Normalize(cross), MathF.Acos(dot));
+    }
+
     public static float? IntersectsTriangle(this Ray ray, Vector3 v0, Vector3 v1, Vector3 v2)
     {
         var edge1 = v1 - v0;

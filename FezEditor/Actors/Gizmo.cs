@@ -50,6 +50,8 @@ public class Gizmo : ActorComponent
 
     private const float ArrowTipRadius = 0.10f;
 
+    private const float ArrowScaleTipWidth = 0.15f;
+
     private const int ArrowSidesTranslate = 8;
 
     private const int ArrowSidesScale = 4;
@@ -127,12 +129,12 @@ public class Gizmo : ActorComponent
         var arrowZ = MeshSurface.CreateArrow(Vector3.UnitZ, ArrowSidesTranslate, ArrowShaftLength, ArrowShaftRadius,
             ArrowTipLength, ArrowTipRadius);
 
-        var scaleArrowX = MeshSurface.CreateArrow(Vector3.UnitX, ArrowSidesScale, ArrowShaftLength, ArrowShaftRadius,
-            ArrowTipLength, ArrowTipRadius);
-        var scaleArrowY = MeshSurface.CreateArrow(Vector3.UnitY, ArrowSidesScale, ArrowShaftLength, ArrowShaftRadius,
-            ArrowTipLength, ArrowTipRadius);
-        var scaleArrowZ = MeshSurface.CreateArrow(Vector3.UnitZ, ArrowSidesScale, ArrowShaftLength, ArrowShaftRadius,
-            ArrowTipLength, ArrowTipRadius);
+        var scaleArrowX = MeshSurface.CreateScaleArrow(Vector3.UnitX, ArrowSidesScale, ArrowShaftLength,
+            ArrowShaftRadius, ArrowScaleTipWidth);
+        var scaleArrowY = MeshSurface.CreateScaleArrow(Vector3.UnitY, ArrowSidesScale, ArrowShaftLength,
+            ArrowShaftRadius, ArrowScaleTipWidth);
+        var scaleArrowZ = MeshSurface.CreateScaleArrow(Vector3.UnitZ, ArrowSidesScale, ArrowShaftLength,
+            ArrowShaftRadius, ArrowScaleTipWidth);
 
         var planeXzMesh = MakePlaneXz(PlaneSize, PlaneDist);
         var planeXyMesh = MakePlaneXy(PlaneSize, PlaneDist);
