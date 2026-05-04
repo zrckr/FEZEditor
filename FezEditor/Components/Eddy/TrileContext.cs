@@ -50,6 +50,10 @@ internal sealed class TrileContext : BaseContext
 
     private byte _paintingPhi; // 0
 
+    private TrileFace? _paintParkingSpot;
+
+    private bool _paintParkingSpotRequested;
+
     private int _hologramTrileId = InvalidId;
 
     private readonly InputService _input;
@@ -85,6 +89,12 @@ internal sealed class TrileContext : BaseContext
             }
         }
 
+        if (!Eddy.Hit.HasValue || _paintOps.Count == 0)
+        {
+            _paintParkingSpot = null;
+            _paintParkingSpotRequested = false;
+        }
+
         if (Eddy.Hit.HasValue && Eddy.Hit.Value.Actor.TryGetComponent<TrilesMesh>(out var mesh) && mesh != null)
         {
             var index = Eddy.Hit.Value.Index;
@@ -94,14 +104,26 @@ internal sealed class TrileContext : BaseContext
             }
 
             var emplacement = mesh.GetEmplacement(index);
-            if (Level.Triles.ContainsKey(emplacement) &&
+            var face = Mathz.DetermineFace(mesh.GetBounds().ElementAt(index), Eddy.Ray, Eddy.Hit.Value.Distance);
+
+            if (_paintParkingSpotRequested)
+            {
+                _paintParkingSpot = new TrileFace
+                {
+                    Id = emplacement,
+                    Face = face
+                };
+                _paintParkingSpotRequested = false;
+            }
+
+            var onParkingSpot = emplacement.Equals(_paintParkingSpot?.Id) && face == _paintParkingSpot?.Face;
+
+            if (Level.Triles.ContainsKey(emplacement) && !onParkingSpot &&
                 Eddy.Tool is EddyTool.Select or EddyTool.Pick or EddyTool.Paint)
             {
-                var box = mesh.GetBounds().ElementAt(index);
-                var distance = Eddy.Hit.Value.Distance;
                 _hoveredCursor.Emplacements.Clear();
                 _hoveredCursor.Emplacements.Add(emplacement);
-                _hoveredCursor.Face = Mathz.DetermineFace(box, Eddy.Ray, distance);
+                _hoveredCursor.Face = face;
                 _hoveredCursor.GroupId = _emplacementGroups.TryGetValue(emplacement, out var gid) ? gid : null;
                 Eddy.HoveredContext = EddyContext.Trile;
                 return;
@@ -839,6 +861,7 @@ internal sealed class TrileContext : BaseContext
                 ChangeTrile(_hoveredCursor.Emplacement!);
                 UpdateCollisionMesh();
             }
+            _paintParkingSpotRequested = true;
         }
 
         #endregion
