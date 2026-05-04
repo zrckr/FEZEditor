@@ -3,6 +3,7 @@ using FezEditor.Actors;
 using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
+using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.Level;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -515,12 +516,12 @@ internal class ArtObjectContext : BaseContext
         }
 
         var containedTrile = (int)settings.ContainedTrile;
-        var actorNames = Enum.GetNames<FEZRepacker.Core.Definitions.Game.Common.ActorType>();
+        var actorNames = Enum.GetNames<ActorType>();
         if (ImGui.Combo("Contained Trile", ref containedTrile, actorNames, actorNames.Length))
         {
             using (Eddy.History.BeginScope("Edit AO Contained Trile"))
             {
-                settings.ContainedTrile = (FEZRepacker.Core.Definitions.Game.Common.ActorType)containedTrile;
+                settings.ContainedTrile = (ActorType)containedTrile;
             }
         }
 
@@ -559,6 +560,244 @@ internal class ArtObjectContext : BaseContext
                 settings.OffCenter = offCenter;
             }
         }
+
+        var spinView = (int)settings.SpinView;
+        var viewpoints = Enum.GetNames<Viewpoint>();
+        if (ImGui.Combo("Spin View", ref spinView, viewpoints, viewpoints.Length))
+        {
+            using (Eddy.History.BeginScope("Edit AO Spin View"))
+            {
+                settings.SpinView = (Viewpoint)spinView;
+            }
+        }
+
+        var rotationCenter = settings.RotationCenter.ToXna();
+        if (ImGuiX.DragFloat3("Rotation Center", ref rotationCenter, 0.01f))
+        {
+            using (Eddy.History.BeginScope("Edit AO Rotation Center"))
+            {
+                settings.RotationCenter = rotationCenter.ToRepacker();
+            }
+        }
+
+        var nextNode = settings.NextNode ?? InvalidId;
+        if (ImGui.InputInt("Next Node", ref nextNode))
+        {
+            using (Eddy.History.BeginScope("Edit AO Next Node"))
+            {
+                settings.NextNode = nextNode == InvalidId ? null : nextNode;
+            }
+        }
+
+        var destinationLevel = settings.DestinationLevel;
+        if (ImGui.InputText("Destination Level", ref destinationLevel, 255))
+        {
+            using (Eddy.History.BeginScope("Edit AO Destination Level"))
+            {
+                settings.DestinationLevel = destinationLevel;
+            }
+        }
+
+        var treasureMapName = settings.TreasureMapName;
+        if (ImGui.InputText("Treasure Map Name", ref treasureMapName, 255))
+        {
+            using (Eddy.History.BeginScope("Edit AO Treasure Map Name"))
+            {
+                settings.TreasureMapName = treasureMapName;
+            }
+        }
+
+        var timeswitchWindBackSpeed = settings.TimeswitchWindBackSpeed;
+        if (ImGui.DragFloat("Timeswitch Wind Back Speed", ref timeswitchWindBackSpeed, 0.01f))
+        {
+            using (Eddy.History.BeginScope("Edit AO Timeswitch Wind Back Speed"))
+            {
+                settings.TimeswitchWindBackSpeed = timeswitchWindBackSpeed;
+            }
+        }
+
+        var vibrationPattern = settings.VibrationPattern.ToList();
+        if (ImGuiX.EditableList("Vibration Pattern", ref vibrationPattern, RenderVibrationMotorItem,
+                () => VibrationMotor.None))
+        {
+            using (Eddy.History.BeginScope("Edit AO Vibration Pattern"))
+            {
+                settings.VibrationPattern =
+                    vibrationPattern.ToArray(); // I don't know why FEZRepacker made this as array
+            }
+        }
+
+        var codePattern = settings.CodePattern.ToList();
+        if (ImGuiX.EditableList("Code Pattern", ref codePattern, RenderCodeInputItem, () => CodeInput.None))
+        {
+            using (Eddy.History.BeginScope("Edit AO Code Pattern"))
+            {
+                settings.CodePattern = codePattern.ToArray(); // Ditto
+            }
+        }
+
+        var invisibleSides = settings.InvisibleSides.ToList();
+        if (ImGuiX.EditableList("Invisible Sides", ref invisibleSides, RenderFaceOrientationItem,
+                () => FaceOrientation.Front))
+        {
+            using (Eddy.History.BeginScope("Edit AO Invisible Sides"))
+            {
+                settings.InvisibleSides = invisibleSides.Distinct().ToArray(); // FEZRepacker should use HashSet here
+            }
+        }
+
+        ImGui.SeparatorText("Segment");
+        {
+            // Destination is recalculated at runtime by MovingGroupsHost from world-space AO positions
+            // Editing it here has no effect.
+            //
+            // var destination = segment.Destination.ToXna();
+            // if (ImGuiX.DragFloat3("Destination", ref destination, 0.01f))
+            // {
+            //     using (Eddy.History.BeginScope("Edit AO Segment Destination"))
+            //     {
+            //         segment.Destination = destination.ToRepacker();
+            //     }
+            // }
+
+            var duration = settings.Segment.Duration;
+            if (ImGuiX.TimeSpanInput("Duration", ref duration))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Duration"))
+                {
+                    settings.Segment.Duration = duration;
+                }
+            }
+
+            var waitTimeOnStart = settings.Segment.WaitTimeOnStart;
+            if (ImGuiX.TimeSpanInput("Wait Time On Start", ref waitTimeOnStart))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Wait Time On Start"))
+                {
+                    settings.Segment.WaitTimeOnStart = waitTimeOnStart;
+                }
+            }
+
+            var waitTimeOnFinish = settings.Segment.WaitTimeOnFinish;
+            if (ImGuiX.TimeSpanInput("Wait Time On Finish", ref waitTimeOnFinish))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Wait Time On Finish"))
+                {
+                    settings.Segment.WaitTimeOnFinish = waitTimeOnFinish;
+                }
+            }
+
+            var acceleration = settings.Segment.Acceleration;
+            if (ImGui.DragFloat("Acceleration", ref acceleration, 0.01f))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Acceleration"))
+                {
+                    settings.Segment.Acceleration = acceleration;
+                }
+            }
+
+            var deceleration = settings.Segment.Deceleration;
+            if (ImGui.DragFloat("Deceleration", ref deceleration, 0.01f))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Deceleration"))
+                {
+                    settings.Segment.Deceleration = deceleration;
+                }
+            }
+
+            var jitterFactor = settings.Segment.JitterFactor;
+            if (ImGui.DragFloat("Jitter Factor", ref jitterFactor, 0.01f))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Jitter Factor"))
+                {
+                    settings.Segment.JitterFactor = jitterFactor;
+                }
+            }
+
+            // Orientation is not used by MovingGroupsHost for connective rail segments.
+            //
+            // var orientation = segment.Orientation.ToXna();
+            // var orientationEuler = orientation.ToEuler();
+            // if (ImGuiX.DragFloat3("Orientation (Euler)", ref orientationEuler, 1f))
+            // {
+            //     using (Eddy.History.BeginScope("Edit AO Segment Orientation"))
+            //     {
+            //         segment.Orientation = orientationEuler.FromEuler().ToRepacker();
+            //     }
+            // }
+
+            var hasCustomData = settings.Segment.CustomData != null;
+            if (ImGui.Checkbox("Custom Camera Data", ref hasCustomData))
+            {
+                using (Eddy.History.BeginScope("Edit AO Segment Custom Data"))
+                {
+                    settings.Segment.CustomData = hasCustomData ? new CameraNodeData() : null;
+                }
+            }
+
+            if (settings.Segment.CustomData is { } customData)
+            {
+                var perspective = customData.Perspective;
+                if (ImGui.Checkbox("Perspective##cd", ref perspective))
+                {
+                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Perspective"))
+                    {
+                        customData.Perspective = perspective;
+                    }
+                }
+
+                var pixelsPerTrixel = customData.PixelsPerTrixel;
+                if (ImGui.InputInt("Pixels Per Trixel##cd", ref pixelsPerTrixel))
+                {
+                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Pixels Per Trixel"))
+                    {
+                        customData.PixelsPerTrixel = pixelsPerTrixel;
+                    }
+                }
+
+                var soundName = customData.SoundName;
+                if (ImGui.InputText("Sound Name##cd", ref soundName, 255))
+                {
+                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Sound Name"))
+                    {
+                        customData.SoundName = soundName;
+                    }
+                }
+            }
+        }
+    }
+
+    private static bool RenderVibrationMotorItem(int index, ref VibrationMotor item)
+    {
+        ImGui.TextDisabled(index + ":");
+        ImGui.SameLine();
+        var motor = (int)item;
+        var motors = Enum.GetNames<VibrationMotor>();
+        var edited = ImGui.Combo("##vm" + index, ref motor, motors, motors.Length);
+        item = (VibrationMotor)motor;
+        return edited;
+    }
+
+    private static bool RenderCodeInputItem(int index, ref CodeInput item)
+    {
+        ImGui.TextDisabled(index + ":");
+        ImGui.SameLine();
+        var input = (int)item;
+        var inputs = Enum.GetNames<CodeInput>();
+        var edited = ImGui.Combo("##ci" + index, ref input, inputs, inputs.Length);
+        item = (CodeInput)input;
+        return edited;
+    }
+
+    private static bool RenderFaceOrientationItem(int index, ref FaceOrientation item)
+    {
+        ImGui.TextDisabled(index + ":");
+        ImGui.SameLine();
+        var face = (int)item;
+        var faces = Enum.GetNames<FaceOrientation>();
+        var edited = ImGui.Combo("##fo" + index, ref face, faces, faces.Length);
+        item = (FaceOrientation)face;
+        return edited;
     }
 
     public override void Revisualize(bool partial = false)

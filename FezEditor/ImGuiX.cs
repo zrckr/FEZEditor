@@ -477,8 +477,6 @@ public static class ImGuiX
     public static bool TimeSpanInput(string label, ref TimeSpan timeSpan)
     {
         const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
-        var hash = timeSpan.GetHashCode();
-
         var hours = timeSpan.Hours;
         var minutes = timeSpan.Minutes;
         var seconds = timeSpan.Seconds;
@@ -488,10 +486,10 @@ public static class ImGuiX
         ImGui.Text(label);
         ImGui.SameLine();
 
-        var header = $"{timeSpan.ToString("g", CultureInfo.InvariantCulture)}##Header_{hash}";
+        var header = $"{timeSpan.ToString("g", CultureInfo.InvariantCulture)}##{label}";
         if (ImGui.CollapsingHeader(header))
         {
-            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            if (BeginChild($"##Child_{label}", Vector2.Zero, flags))
             {
                 if (ImGui.InputInt("Hours", ref hours))
                 {
@@ -528,7 +526,6 @@ public static class ImGuiX
     public static bool DateTimeInput(string label, ref DateTime dateTime)
     {
         const ImGuiChildFlags flags = ImGuiChildFlags.Border | ImGuiChildFlags.AutoResizeY;
-        var hash = dateTime.GetHashCode();
         var year = dateTime.Year;
         var month = dateTime.Month;
         var day = dateTime.Day;
@@ -540,10 +537,10 @@ public static class ImGuiX
         ImGui.Text(label);
         ImGui.SameLine();
 
-        var header = $"{dateTime.ToString("s", CultureInfo.InvariantCulture)}##Header_{hash}";
+        var header = $"{dateTime.ToString("s", CultureInfo.InvariantCulture)}##{label}";
         if (ImGui.CollapsingHeader(header))
         {
-            if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
+            if (BeginChild($"##Child_{label}", Vector2.Zero, flags))
             {
                 if (ImGui.InputInt("Year", ref year))
                 {
