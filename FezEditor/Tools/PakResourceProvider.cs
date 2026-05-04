@@ -7,7 +7,7 @@ internal class PakResourceProvider : IResourceProvider
 {
     public bool IsReadonly => true;
 
-    public string Root => _pakFile.FullName;
+    public string RootPath => _pakFile.FullName;
 
     public IEnumerable<string> Files => _records.Keys;
 

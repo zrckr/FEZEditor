@@ -94,7 +94,7 @@ public partial class EditorService
             }
         }
 
-        _storageService.AddRecentFile(_resourceService.Root, path);
+        _storageService.AddRecentFile(_resourceService.RootPath, path);
         var asset = _resourceService.Load(path);
         var newEditor = CreateEditorFor(asset, path);
 

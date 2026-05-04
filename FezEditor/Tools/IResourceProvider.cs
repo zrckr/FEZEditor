@@ -4,7 +4,7 @@ public interface IResourceProvider : IDisposable
 {
     bool IsReadonly { get; }
 
-    string Root { get; }
+    string RootPath { get; }
 
     IEnumerable<string> Files { get; }
 

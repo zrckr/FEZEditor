@@ -557,7 +557,7 @@ public class FileBrowser : DrawableGameComponent
     {
         var options = new FileDialog.Options
         {
-            DefaultLocation = _resourceService.GetFullPath(string.Empty),
+            DefaultLocation = _resourceService.RootPath,
             Title = "Move to folder"
         };
 

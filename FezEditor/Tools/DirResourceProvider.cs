@@ -8,7 +8,7 @@ internal class DirResourceProvider : IResourceProvider
 {
     public bool IsReadonly => false;
 
-    public string Root => _directory.FullName;
+    public string RootPath => _directory.FullName;
 
     public IEnumerable<string> Files => _files.Keys;
 

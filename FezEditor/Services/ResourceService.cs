@@ -25,7 +25,7 @@ public class ResourceService : IDisposable
 
     public bool IsReadonly => _provider?.IsReadonly ?? true;
 
-    public string Root => _provider?.Root ?? string.Empty;
+    public string RootPath => _provider?.RootPath ?? string.Empty;
 
     public IEnumerable<string> Files => _provider?.Files ?? Enumerable.Empty<string>();
     public IEnumerable<string> VirtualFiles => _provider is ModResourceProvider mod ? mod.VirtualFiles : Files;
@@ -62,7 +62,7 @@ public class ResourceService : IDisposable
         ProviderChanged?.Invoke();
         Logger.Information("Opened {0} at {1} with {2} file(s)",
             provider.GetType().Name,
-            _provider.GetFullPath(string.Empty),
+            _provider.RootPath,
             provider.Files.Count()
         );
     }
@@ -104,8 +104,7 @@ public class ResourceService : IDisposable
 
     public string GetRelativePath(string absolutePath)
     {
-        var root = GetFullPath(string.Empty);
-        return absolutePath.WithoutBaseDirectory(root).Replace('\\', '/');
+        return absolutePath.WithoutBaseDirectory(RootPath).Replace('\\', '/');
     }
 
     public object Load(string path)
@@ -265,7 +264,7 @@ public class ResourceService : IDisposable
         if (_provider is ModResourceProvider mod)
         {
             return mod.References
-                .Select(r => r.GetFullPath(string.Empty))
+                .Select(r => r.RootPath)
                 .ToList();
         }
 

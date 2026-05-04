@@ -8,7 +8,7 @@ internal class ModResourceProvider : IResourceProvider
 
     public bool IsReadonly => false;
 
-    public string Root => _inner.Root;
+    public string RootPath => _inner.RootPath;
 
     public IEnumerable<string> Files => _inner.Files.Union(_referenceFiles);
     public IEnumerable<string> VirtualFiles => _inner.Files.Concat(_referenceVirtualFiles);
@@ -42,8 +42,7 @@ internal class ModResourceProvider : IResourceProvider
     public void UpdateReferences(IEnumerable<string> paths)
     {
         var validPaths = SortPakPaths(paths.Where(p => File.Exists(p) || Directory.Exists(p))).ToList();
-        var rootPath = _inner.GetFullPath(string.Empty);
-        _storage.SetReferenceProviders(rootPath, validPaths);
+        _storage.SetReferenceProviders(_inner.RootPath, validPaths);
         LoadReferences(validPaths);
     }
 

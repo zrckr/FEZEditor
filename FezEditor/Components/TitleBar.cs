@@ -26,14 +26,14 @@ public class TitleBar : GameComponent
         var windowTitle = MainTitle;
         if (!_resourceService.HasNoProvider)
         {
-            var resourceName = ResourceService.GetProviderDisplayName(_resourceService.Root);
-            windowTitle = $"{resourceName} - {windowTitle}";
+            var resourceName = ResourceService.GetProviderDisplayName(_resourceService.RootPath);
+            windowTitle = $"{windowTitle} - {resourceName}";
         }
 
         if (_editorService.ActiveEditor != null)
         {
             var fileName = Path.GetFileName(_editorService.ActiveEditor.Title);
-            windowTitle = $"{fileName} - {windowTitle}";
+            windowTitle = $"{windowTitle} - {fileName}";
         }
 
         Game.Window.Title = windowTitle;

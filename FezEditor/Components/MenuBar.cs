@@ -54,7 +54,7 @@ public class MenuBar : DrawableGameComponent
     {
         if (!_resourceService.HasNoProvider)
         {
-            _storageService.PruneRecentFiles(_resourceService.Root, _resourceService.Exists);
+            _storageService.PruneRecentFiles(_resourceService.RootPath, _resourceService.Exists);
         }
     }
 
@@ -97,7 +97,7 @@ public class MenuBar : DrawableGameComponent
             {
                 if (!_resourceService.HasNoProvider)
                 {
-                    _storageService.RecentFiles.TryGetValue(_resourceService.Root, out var recentFiles);
+                    _storageService.RecentFiles.TryGetValue(_resourceService.RootPath, out var recentFiles);
                     if (ImGui.BeginMenu("Open Recent", recentFiles?.Count > 0))
                     {
                         foreach (var path in recentFiles!.ToArray())
