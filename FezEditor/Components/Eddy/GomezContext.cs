@@ -153,7 +153,7 @@ internal class GomezContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate Gomez");
+            _translateScope = Eddy.History.BeginScope("Translate Gomez", EddyContext.Gomez);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -173,7 +173,7 @@ internal class GomezContext : BaseContext
         var origin = Level.StartingFace.Id.ToXna().ToVector3() + Vector3.Up;
         if (Eddy.Gizmo.Rotate(origin))
         {
-            using (Eddy.History.BeginScope("Rotate Gomez"))
+            using (Eddy.History.BeginScope("Rotate Gomez", EddyContext.Gomez))
             {
                 var index = Array.IndexOf(FaceExtensions.NaturalOrder, Level.StartingFace.Face);
                 Level.StartingFace.Face = FaceExtensions.NaturalOrder[(index + 1) % 4];
@@ -215,7 +215,7 @@ internal class GomezContext : BaseContext
         var empValues = new[] { emplacement.X, emplacement.Y, emplacement.Z };
         if (ImGui.InputInt3("Emplacement", ref empValues[0]))
         {
-            using (Eddy.History.BeginScope("Edit Gomez Position"))
+            using (Eddy.History.BeginScope("Edit Gomez Position", EddyContext.Gomez))
             {
                 Level.StartingFace.Id = new TrileEmplacement(empValues[0], empValues[1], empValues[2]);
             }
@@ -225,7 +225,7 @@ internal class GomezContext : BaseContext
         var faces = FaceExtensions.NaturalOrder.Select(fo => fo.ToString()).ToArray();
         if (ImGui.Combo("Face", ref face, faces, faces.Length))
         {
-            using (Eddy.History.BeginScope("Edit Gomez Rotation"))
+            using (Eddy.History.BeginScope("Edit Gomez Rotation", EddyContext.Gomez))
             {
                 Level.StartingFace.Face = FaceExtensions.NaturalOrder[face];
             }

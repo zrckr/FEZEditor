@@ -149,7 +149,7 @@ internal class ArtObjectContext : BaseContext
 
         if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
-            using (Eddy.History.BeginScope("Delete Art Objects"))
+            using (Eddy.History.BeginScope("Delete Art Objects", EddyContext.ArtObject))
             {
                 RemoveSelected();
             }
@@ -165,7 +165,7 @@ internal class ArtObjectContext : BaseContext
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 BuildClipboard();
-                using (Eddy.History.BeginScope("Cut Art Objects"))
+                using (Eddy.History.BeginScope("Cut Art Objects", EddyContext.ArtObject))
                 {
                     RemoveSelected();
                 }
@@ -173,7 +173,7 @@ internal class ArtObjectContext : BaseContext
 
             if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
-                using (Eddy.History.BeginScope("Paste Art Objects"))
+                using (Eddy.History.BeginScope("Paste Art Objects", EddyContext.ArtObject))
                 {
                     PasteClipboard();
                 }
@@ -220,7 +220,7 @@ internal class ArtObjectContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate Art Object");
+            _translateScope = Eddy.History.BeginScope("Translate Art Object", EddyContext.ArtObject);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -256,7 +256,7 @@ internal class ArtObjectContext : BaseContext
 
         if (Eddy.Gizmo.Rotate(centroid))
         {
-            using (Eddy.History.BeginScope("Rotate Art Object(s)"))
+            using (Eddy.History.BeginScope("Rotate Art Object(s)", EddyContext.ArtObject))
             {
                 var step = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathHelper.PiOver2);
                 foreach (var id in _selectedIds)
@@ -307,7 +307,7 @@ internal class ArtObjectContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _scaleScope?.Dispose();
-            _scaleScope = Eddy.History.BeginScope("Scale Art Object");
+            _scaleScope = Eddy.History.BeginScope("Scale Art Object", EddyContext.ArtObject);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -318,7 +318,7 @@ internal class ArtObjectContext : BaseContext
 
         if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedIds.Count > 0 && _scaleScope == null)
         {
-            using (Eddy.History.BeginScope("Reset Art Object Scale"))
+            using (Eddy.History.BeginScope("Reset Art Object Scale", EddyContext.ArtObject))
             {
                 foreach (var id in _selectedIds)
                 {
@@ -385,7 +385,7 @@ internal class ArtObjectContext : BaseContext
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && hoveredEmp != null && !string.IsNullOrEmpty(entry))
         {
-            using (Eddy.History.BeginScope("Place Art Object"))
+            using (Eddy.History.BeginScope("Place Art Object", EddyContext.ArtObject))
             {
                 var id = NextAvailableId();
                 var position = new Vector3(hoveredEmp.X, hoveredEmp.Y, hoveredEmp.Z);
@@ -464,7 +464,7 @@ internal class ArtObjectContext : BaseContext
         var position = instance.Position.ToXna();
         if (ImGuiX.InputFloat3("Position", ref position))
         {
-            using (Eddy.History.BeginScope("Edit AO Position"))
+            using (Eddy.History.BeginScope("Edit AO Position", EddyContext.ArtObject))
             {
                 instance.Position = position.ToRepacker();
                 if (_artObjectActors.TryGetValue(id, out var actor))
@@ -478,7 +478,7 @@ internal class ArtObjectContext : BaseContext
         var euler = rotation.ToEuler();
         if (ImGuiX.DragFloat3("Rotation (Euler)", ref euler, 1f))
         {
-            using (Eddy.History.BeginScope("Edit AO Rotation"))
+            using (Eddy.History.BeginScope("Edit AO Rotation", EddyContext.ArtObject))
             {
                 var newRotation = euler.FromEuler();
                 instance.Rotation = newRotation.ToRepacker();
@@ -492,7 +492,7 @@ internal class ArtObjectContext : BaseContext
         var scale = instance.Scale.ToXna();
         if (ImGuiX.DragFloat3("Scale", ref scale, 0.01f))
         {
-            using (Eddy.History.BeginScope("Edit AO Scale"))
+            using (Eddy.History.BeginScope("Edit AO Scale", EddyContext.ArtObject))
             {
                 instance.Scale = scale.ToRepacker();
                 if (_artObjectActors.TryGetValue(id, out var actor))
@@ -509,7 +509,7 @@ internal class ArtObjectContext : BaseContext
         var inactive = settings.Inactive;
         if (ImGui.Checkbox("Inactive", ref inactive))
         {
-            using (Eddy.History.BeginScope("Edit AO Inactive"))
+            using (Eddy.History.BeginScope("Edit AO Inactive", EddyContext.ArtObject))
             {
                 settings.Inactive = inactive;
             }
@@ -519,7 +519,7 @@ internal class ArtObjectContext : BaseContext
         var actorNames = Enum.GetNames<ActorType>();
         if (ImGui.Combo("Contained Trile", ref containedTrile, actorNames, actorNames.Length))
         {
-            using (Eddy.History.BeginScope("Edit AO Contained Trile"))
+            using (Eddy.History.BeginScope("Edit AO Contained Trile", EddyContext.ArtObject))
             {
                 settings.ContainedTrile = (ActorType)containedTrile;
             }
@@ -528,7 +528,7 @@ internal class ArtObjectContext : BaseContext
         var attachedGroup = settings.AttachedGroup ?? InvalidId;
         if (ImGui.InputInt("Attached Group", ref attachedGroup))
         {
-            using (Eddy.History.BeginScope("Edit AO Attached Group"))
+            using (Eddy.History.BeginScope("Edit AO Attached Group", EddyContext.ArtObject))
             {
                 settings.AttachedGroup = attachedGroup == InvalidId ? null : attachedGroup;
             }
@@ -537,7 +537,7 @@ internal class ArtObjectContext : BaseContext
         var spinEvery = settings.SpinEvery;
         if (ImGui.DragFloat("Spin Every", ref spinEvery, 0.1f))
         {
-            using (Eddy.History.BeginScope("Edit AO Spin Every"))
+            using (Eddy.History.BeginScope("Edit AO Spin Every", EddyContext.ArtObject))
             {
                 settings.SpinEvery = spinEvery;
             }
@@ -546,7 +546,7 @@ internal class ArtObjectContext : BaseContext
         var spinOffset = settings.SpinOffset;
         if (ImGui.DragFloat("Spin Offset", ref spinOffset, 0.1f))
         {
-            using (Eddy.History.BeginScope("Edit AO Spin Offset"))
+            using (Eddy.History.BeginScope("Edit AO Spin Offset", EddyContext.ArtObject))
             {
                 settings.SpinOffset = spinOffset;
             }
@@ -555,7 +555,7 @@ internal class ArtObjectContext : BaseContext
         var offCenter = settings.OffCenter;
         if (ImGui.Checkbox("Off Center", ref offCenter))
         {
-            using (Eddy.History.BeginScope("Edit AO Off Center"))
+            using (Eddy.History.BeginScope("Edit AO Off Center", EddyContext.ArtObject))
             {
                 settings.OffCenter = offCenter;
             }
@@ -565,7 +565,7 @@ internal class ArtObjectContext : BaseContext
         var viewpoints = Enum.GetNames<Viewpoint>();
         if (ImGui.Combo("Spin View", ref spinView, viewpoints, viewpoints.Length))
         {
-            using (Eddy.History.BeginScope("Edit AO Spin View"))
+            using (Eddy.History.BeginScope("Edit AO Spin View", EddyContext.ArtObject))
             {
                 settings.SpinView = (Viewpoint)spinView;
             }
@@ -574,7 +574,7 @@ internal class ArtObjectContext : BaseContext
         var rotationCenter = settings.RotationCenter.ToXna();
         if (ImGuiX.DragFloat3("Rotation Center", ref rotationCenter, 0.01f))
         {
-            using (Eddy.History.BeginScope("Edit AO Rotation Center"))
+            using (Eddy.History.BeginScope("Edit AO Rotation Center", EddyContext.ArtObject))
             {
                 settings.RotationCenter = rotationCenter.ToRepacker();
             }
@@ -583,7 +583,7 @@ internal class ArtObjectContext : BaseContext
         var nextNode = settings.NextNode ?? InvalidId;
         if (ImGui.InputInt("Next Node", ref nextNode))
         {
-            using (Eddy.History.BeginScope("Edit AO Next Node"))
+            using (Eddy.History.BeginScope("Edit AO Next Node", EddyContext.ArtObject))
             {
                 settings.NextNode = nextNode == InvalidId ? null : nextNode;
             }
@@ -592,7 +592,7 @@ internal class ArtObjectContext : BaseContext
         var destinationLevel = settings.DestinationLevel;
         if (ImGui.InputText("Destination Level", ref destinationLevel, 255))
         {
-            using (Eddy.History.BeginScope("Edit AO Destination Level"))
+            using (Eddy.History.BeginScope("Edit AO Destination Level", EddyContext.ArtObject))
             {
                 settings.DestinationLevel = destinationLevel;
             }
@@ -601,7 +601,7 @@ internal class ArtObjectContext : BaseContext
         var treasureMapName = settings.TreasureMapName;
         if (ImGui.InputText("Treasure Map Name", ref treasureMapName, 255))
         {
-            using (Eddy.History.BeginScope("Edit AO Treasure Map Name"))
+            using (Eddy.History.BeginScope("Edit AO Treasure Map Name", EddyContext.ArtObject))
             {
                 settings.TreasureMapName = treasureMapName;
             }
@@ -610,7 +610,7 @@ internal class ArtObjectContext : BaseContext
         var timeswitchWindBackSpeed = settings.TimeswitchWindBackSpeed;
         if (ImGui.DragFloat("Timeswitch Wind Back Speed", ref timeswitchWindBackSpeed, 0.01f))
         {
-            using (Eddy.History.BeginScope("Edit AO Timeswitch Wind Back Speed"))
+            using (Eddy.History.BeginScope("Edit AO Timeswitch Wind Back Speed", EddyContext.ArtObject))
             {
                 settings.TimeswitchWindBackSpeed = timeswitchWindBackSpeed;
             }
@@ -620,7 +620,7 @@ internal class ArtObjectContext : BaseContext
         if (ImGuiX.EditableList("Vibration Pattern", ref vibrationPattern, RenderVibrationMotorItem,
                 () => VibrationMotor.None))
         {
-            using (Eddy.History.BeginScope("Edit AO Vibration Pattern"))
+            using (Eddy.History.BeginScope("Edit AO Vibration Pattern", EddyContext.ArtObject))
             {
                 settings.VibrationPattern =
                     vibrationPattern.ToArray(); // I don't know why FEZRepacker made this as array
@@ -630,7 +630,7 @@ internal class ArtObjectContext : BaseContext
         var codePattern = settings.CodePattern.ToList();
         if (ImGuiX.EditableList("Code Pattern", ref codePattern, RenderCodeInputItem, () => CodeInput.None))
         {
-            using (Eddy.History.BeginScope("Edit AO Code Pattern"))
+            using (Eddy.History.BeginScope("Edit AO Code Pattern", EddyContext.ArtObject))
             {
                 settings.CodePattern = codePattern.ToArray(); // Ditto
             }
@@ -640,7 +640,7 @@ internal class ArtObjectContext : BaseContext
         if (ImGuiX.EditableList("Invisible Sides", ref invisibleSides, RenderFaceOrientationItem,
                 () => FaceOrientation.Front))
         {
-            using (Eddy.History.BeginScope("Edit AO Invisible Sides"))
+            using (Eddy.History.BeginScope("Edit AO Invisible Sides", EddyContext.ArtObject))
             {
                 settings.InvisibleSides = invisibleSides.Distinct().ToArray(); // FEZRepacker should use HashSet here
             }
@@ -654,7 +654,7 @@ internal class ArtObjectContext : BaseContext
             // var destination = segment.Destination.ToXna();
             // if (ImGuiX.DragFloat3("Destination", ref destination, 0.01f))
             // {
-            //     using (Eddy.History.BeginScope("Edit AO Segment Destination"))
+            //     using (Eddy.History.BeginScope("Edit AO Segment Destination", EddyContext.ArtObject))
             //     {
             //         segment.Destination = destination.ToRepacker();
             //     }
@@ -663,7 +663,7 @@ internal class ArtObjectContext : BaseContext
             var duration = settings.Segment.Duration;
             if (ImGuiX.TimeSpanInput("Duration", ref duration))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Duration"))
+                using (Eddy.History.BeginScope("Edit AO Segment Duration", EddyContext.ArtObject))
                 {
                     settings.Segment.Duration = duration;
                 }
@@ -672,7 +672,7 @@ internal class ArtObjectContext : BaseContext
             var waitTimeOnStart = settings.Segment.WaitTimeOnStart;
             if (ImGuiX.TimeSpanInput("Wait Time On Start", ref waitTimeOnStart))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Wait Time On Start"))
+                using (Eddy.History.BeginScope("Edit AO Segment Wait Time On Start", EddyContext.ArtObject))
                 {
                     settings.Segment.WaitTimeOnStart = waitTimeOnStart;
                 }
@@ -681,7 +681,7 @@ internal class ArtObjectContext : BaseContext
             var waitTimeOnFinish = settings.Segment.WaitTimeOnFinish;
             if (ImGuiX.TimeSpanInput("Wait Time On Finish", ref waitTimeOnFinish))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Wait Time On Finish"))
+                using (Eddy.History.BeginScope("Edit AO Segment Wait Time On Finish", EddyContext.ArtObject))
                 {
                     settings.Segment.WaitTimeOnFinish = waitTimeOnFinish;
                 }
@@ -690,7 +690,7 @@ internal class ArtObjectContext : BaseContext
             var acceleration = settings.Segment.Acceleration;
             if (ImGui.DragFloat("Acceleration", ref acceleration, 0.01f))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Acceleration"))
+                using (Eddy.History.BeginScope("Edit AO Segment Acceleration", EddyContext.ArtObject))
                 {
                     settings.Segment.Acceleration = acceleration;
                 }
@@ -699,7 +699,7 @@ internal class ArtObjectContext : BaseContext
             var deceleration = settings.Segment.Deceleration;
             if (ImGui.DragFloat("Deceleration", ref deceleration, 0.01f))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Deceleration"))
+                using (Eddy.History.BeginScope("Edit AO Segment Deceleration", EddyContext.ArtObject))
                 {
                     settings.Segment.Deceleration = deceleration;
                 }
@@ -708,7 +708,7 @@ internal class ArtObjectContext : BaseContext
             var jitterFactor = settings.Segment.JitterFactor;
             if (ImGui.DragFloat("Jitter Factor", ref jitterFactor, 0.01f))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Jitter Factor"))
+                using (Eddy.History.BeginScope("Edit AO Segment Jitter Factor", EddyContext.ArtObject))
                 {
                     settings.Segment.JitterFactor = jitterFactor;
                 }
@@ -720,7 +720,7 @@ internal class ArtObjectContext : BaseContext
             // var orientationEuler = orientation.ToEuler();
             // if (ImGuiX.DragFloat3("Orientation (Euler)", ref orientationEuler, 1f))
             // {
-            //     using (Eddy.History.BeginScope("Edit AO Segment Orientation"))
+            //     using (Eddy.History.BeginScope("Edit AO Segment Orientation", EddyContext.ArtObject))
             //     {
             //         segment.Orientation = orientationEuler.FromEuler().ToRepacker();
             //     }
@@ -729,7 +729,7 @@ internal class ArtObjectContext : BaseContext
             var hasCustomData = settings.Segment.CustomData != null;
             if (ImGui.Checkbox("Custom Camera Data", ref hasCustomData))
             {
-                using (Eddy.History.BeginScope("Edit AO Segment Custom Data"))
+                using (Eddy.History.BeginScope("Edit AO Segment Custom Data", EddyContext.ArtObject))
                 {
                     settings.Segment.CustomData = hasCustomData ? new CameraNodeData() : null;
                 }
@@ -740,7 +740,7 @@ internal class ArtObjectContext : BaseContext
                 var perspective = customData.Perspective;
                 if (ImGui.Checkbox("Perspective##cd", ref perspective))
                 {
-                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Perspective"))
+                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Perspective", EddyContext.ArtObject))
                     {
                         customData.Perspective = perspective;
                     }
@@ -749,7 +749,7 @@ internal class ArtObjectContext : BaseContext
                 var pixelsPerTrixel = customData.PixelsPerTrixel;
                 if (ImGui.InputInt("Pixels Per Trixel##cd", ref pixelsPerTrixel))
                 {
-                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Pixels Per Trixel"))
+                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Pixels Per Trixel", EddyContext.ArtObject))
                     {
                         customData.PixelsPerTrixel = pixelsPerTrixel;
                     }
@@ -758,7 +758,7 @@ internal class ArtObjectContext : BaseContext
                 var soundName = customData.SoundName;
                 if (ImGui.InputText("Sound Name##cd", ref soundName, 255))
                 {
-                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Sound Name"))
+                    using (Eddy.History.BeginScope("Edit AO Segment Custom Data Sound Name", EddyContext.ArtObject))
                     {
                         customData.SoundName = soundName;
                     }

@@ -35,7 +35,7 @@ public class JadeEditor : EditorComponent
     {
         _mapTree = mapTree;
         History.Track(mapTree);
-        History.StateChanged += () => RebuildSceneSubTree(_mapTree, _mapTree.Root);
+        History.StateChanged += _ => RebuildSceneSubTree(_mapTree, _mapTree.Root);
         Game.AddComponent(_confirm = new ConfirmWindow(game));
     }
 

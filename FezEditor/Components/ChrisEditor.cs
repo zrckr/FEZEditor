@@ -69,7 +69,7 @@ public class ChrisEditor : EditorComponent
     private ChrisEditor(Game game, string title, IContext context) : base(game, title)
     {
         _context = context;
-        History.StateChanged += () => RevisualizeSubject(false);
+        History.StateChanged += _ => RevisualizeSubject(false);
         Game.AddComponent(_confirm = new ConfirmWindow(game));
     }
 

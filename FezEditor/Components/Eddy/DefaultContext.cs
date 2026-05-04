@@ -96,7 +96,7 @@ internal class DefaultContext : BaseContext
         var name = Level.Name;
         if (ImGui.InputText("Name", ref name, 255))
         {
-            using (Eddy.History.BeginScope("Edit Level Name"))
+            using (Eddy.History.BeginScope("Edit Level Name", EddyContext.Default))
             {
                 Level.Name = name;
             }
@@ -105,7 +105,7 @@ internal class DefaultContext : BaseContext
         var size = Level.Size.ToXna();
         if (ImGuiX.InputFloat3("Size", ref size))
         {
-            using (Eddy.History.BeginScope("Edit Level Size"))
+            using (Eddy.History.BeginScope("Edit Level Size", EddyContext.Default))
             {
                 Level.Size = size.ToRepacker();
             }
@@ -114,7 +114,7 @@ internal class DefaultContext : BaseContext
         var sequenceSamplesPath = Level.SequenceSamplesPath;
         if (ImGui.InputText("Sequence Samples Path", ref sequenceSamplesPath, 255))
         {
-            using (Eddy.History.BeginScope("Edit Level Sequence Samples Path"))
+            using (Eddy.History.BeginScope("Edit Level Sequence Samples Path", EddyContext.Default))
             {
                 Level.SequenceSamplesPath = sequenceSamplesPath;
             }
@@ -123,7 +123,7 @@ internal class DefaultContext : BaseContext
         var flat = Level.Flat;
         if (ImGui.Checkbox("Flat", ref flat))
         {
-            using (Eddy.History.BeginScope("Edit Level Flat"))
+            using (Eddy.History.BeginScope("Edit Level Flat", EddyContext.Default))
             {
                 Level.Flat = flat;
             }
@@ -132,7 +132,7 @@ internal class DefaultContext : BaseContext
         var skipPostProcess = Level.SkipPostProcess;
         if (ImGui.Checkbox("Skip Post Process", ref skipPostProcess))
         {
-            using (Eddy.History.BeginScope("Edit Level Skip Post Process"))
+            using (Eddy.History.BeginScope("Edit Level Skip Post Process", EddyContext.Default))
             {
                 Level.SkipPostProcess = skipPostProcess;
             }
@@ -141,7 +141,7 @@ internal class DefaultContext : BaseContext
         var baseDiffuse = Level.BaseDiffuse;
         if (ImGui.InputFloat("Base Diffuse", ref baseDiffuse))
         {
-            using (Eddy.History.BeginScope("Edit Level Base Diffuse"))
+            using (Eddy.History.BeginScope("Edit Level Base Diffuse", EddyContext.Default))
             {
                 Level.BaseDiffuse = baseDiffuse;
             }
@@ -150,7 +150,7 @@ internal class DefaultContext : BaseContext
         var baseAmbient = Level.BaseAmbient;
         if (ImGui.InputFloat("Base Ambient", ref baseAmbient))
         {
-            using (Eddy.History.BeginScope("Edit Level Base Ambient"))
+            using (Eddy.History.BeginScope("Edit Level Base Ambient", EddyContext.Default))
             {
                 Level.BaseAmbient = baseAmbient;
             }
@@ -159,7 +159,7 @@ internal class DefaultContext : BaseContext
         var gomezHaloName = Level.GomezHaloName;
         if (ImGui.InputText("Gomez Halo Name", ref gomezHaloName, 255))
         {
-            using (Eddy.History.BeginScope("Edit Level Gomez Halo Name"))
+            using (Eddy.History.BeginScope("Edit Level Gomez Halo Name", EddyContext.Default))
             {
                 Level.GomezHaloName = gomezHaloName;
             }
@@ -168,7 +168,7 @@ internal class DefaultContext : BaseContext
         var haloFiltering = Level.HaloFiltering;
         if (ImGui.Checkbox("Halo Filtering", ref haloFiltering))
         {
-            using (Eddy.History.BeginScope("Edit Level Halo Filtering"))
+            using (Eddy.History.BeginScope("Edit Level Halo Filtering", EddyContext.Default))
             {
                 Level.HaloFiltering = haloFiltering;
             }
@@ -177,7 +177,7 @@ internal class DefaultContext : BaseContext
         var blinkingAlpha = Level.BlinkingAlpha;
         if (ImGui.Checkbox("Blinking Alpha", ref blinkingAlpha))
         {
-            using (Eddy.History.BeginScope("Edit Level Blinking Alpha"))
+            using (Eddy.History.BeginScope("Edit Level Blinking Alpha", EddyContext.Default))
             {
                 Level.BlinkingAlpha = blinkingAlpha;
             }
@@ -186,7 +186,7 @@ internal class DefaultContext : BaseContext
         var loops = Level.Loops;
         if (ImGui.Checkbox("Loops", ref loops))
         {
-            using (Eddy.History.BeginScope("Edit Level Loops"))
+            using (Eddy.History.BeginScope("Edit Level Loops", EddyContext.Default))
             {
                 Level.Loops = loops;
             }
@@ -197,7 +197,7 @@ internal class DefaultContext : BaseContext
 
         if (ImGui.Combo("Water Type", ref waterType, waterTypes, waterTypes.Length))
         {
-            using (Eddy.History.BeginScope("Edit Level Water Type"))
+            using (Eddy.History.BeginScope("Edit Level Water Type", EddyContext.Default))
             {
                 Level.WaterType = (LiquidType)waterType;
             }
@@ -206,7 +206,7 @@ internal class DefaultContext : BaseContext
         var waterHeight = Level.WaterHeight;
         if (ImGui.DragFloat("Water Height", ref waterHeight))
         {
-            using (Eddy.History.BeginScope("Edit Level Water Height"))
+            using (Eddy.History.BeginScope("Edit Level Water Height", EddyContext.Default))
             {
                 Level.WaterHeight = waterHeight;
             }
@@ -232,7 +232,7 @@ internal class DefaultContext : BaseContext
                 }
 
                 var picked = Path.GetFileName(files[0]).Replace(".fezsky.json", "");
-                using (Eddy.History.BeginScope("Edit Level Sky Name"))
+                using (Eddy.History.BeginScope("Edit Level Sky Name", EddyContext.Default))
                 {
                     Level.SkyName = picked;
                 }
@@ -242,7 +242,7 @@ internal class DefaultContext : BaseContext
         var songName = Level.SongName;
         if (ImGui.InputText("Song Name", ref songName, 255))
         {
-            using (Eddy.History.BeginScope("Edit Level Song Name"))
+            using (Eddy.History.BeginScope("Edit Level Song Name", EddyContext.Default))
             {
                 Level.SongName = songName;
             }
@@ -251,7 +251,7 @@ internal class DefaultContext : BaseContext
         var fapFadeOutStart = Level.FAPFadeOutStart;
         if (ImGui.InputInt("FAP Fade Out Start", ref fapFadeOutStart))
         {
-            using (Eddy.History.BeginScope("Edit Level FAP Fade Out Start"))
+            using (Eddy.History.BeginScope("Edit Level FAP Fade Out Start", EddyContext.Default))
             {
                 Level.FAPFadeOutStart = fapFadeOutStart;
             }
@@ -260,7 +260,7 @@ internal class DefaultContext : BaseContext
         var fapFadeOutLength = Level.FAPFadeOutLength;
         if (ImGui.InputInt("FAP Fade Out Length", ref fapFadeOutLength))
         {
-            using (Eddy.History.BeginScope("Edit Level FAP Fade Out Length"))
+            using (Eddy.History.BeginScope("Edit Level FAP Fade Out Length", EddyContext.Default))
             {
                 Level.FAPFadeOutLength = fapFadeOutLength;
             }
@@ -269,7 +269,7 @@ internal class DefaultContext : BaseContext
         var descending = Level.Descending;
         if (ImGui.Checkbox("Descending", ref descending))
         {
-            using (Eddy.History.BeginScope("Edit Level Descending"))
+            using (Eddy.History.BeginScope("Edit Level Descending", EddyContext.Default))
             {
                 Level.Descending = descending;
             }
@@ -278,7 +278,7 @@ internal class DefaultContext : BaseContext
         var rainy = Level.Rainy;
         if (ImGui.Checkbox("Rainy", ref rainy))
         {
-            using (Eddy.History.BeginScope("Edit Level Rainy"))
+            using (Eddy.History.BeginScope("Edit Level Rainy", EddyContext.Default))
             {
                 Level.Rainy = rainy;
             }
@@ -287,7 +287,7 @@ internal class DefaultContext : BaseContext
         var lowPass = Level.LowPass;
         if (ImGui.Checkbox("Low Pass", ref lowPass))
         {
-            using (Eddy.History.BeginScope("Edit Level Low Pass"))
+            using (Eddy.History.BeginScope("Edit Level Low Pass", EddyContext.Default))
             {
                 Level.LowPass = lowPass;
             }
@@ -296,7 +296,7 @@ internal class DefaultContext : BaseContext
         var mutedLoops = Level.MutedLoops;
         if (ImGuiX.EditableList("Muted Loops", ref mutedLoops, RenderLoops, () => ""))
         {
-            using (Eddy.History.BeginScope("Edit Level Muted Loops"))
+            using (Eddy.History.BeginScope("Edit Level Muted Loops", EddyContext.Default))
             {
                 Level.MutedLoops = mutedLoops;
             }
@@ -305,7 +305,7 @@ internal class DefaultContext : BaseContext
         var ambienceTracks = Level.AmbienceTracks;
         if (ImGuiX.EditableList("Ambience Tracks", ref ambienceTracks, RenderTracks, () => new AmbienceTrack()))
         {
-            using (Eddy.History.BeginScope("Edit Level Ambience Tracks"))
+            using (Eddy.History.BeginScope("Edit Level Ambience Tracks", EddyContext.Default))
             {
                 Level.AmbienceTracks = ambienceTracks;
             }
@@ -316,7 +316,7 @@ internal class DefaultContext : BaseContext
 
         if (ImGui.Combo("Node Type", ref nodeType, nodeTypes, nodeTypes.Length))
         {
-            using (Eddy.History.BeginScope("Edit Level Node Type"))
+            using (Eddy.History.BeginScope("Edit Level Node Type", EddyContext.Default))
             {
                 Level.NodeType = (LevelNodeType)nodeType;
             }
@@ -325,7 +325,7 @@ internal class DefaultContext : BaseContext
         var quantum = Level.Quantum;
         if (ImGui.Checkbox("Quantum", ref quantum))
         {
-            using (Eddy.History.BeginScope("Edit Level Quantum"))
+            using (Eddy.History.BeginScope("Edit Level Quantum", EddyContext.Default))
             {
                 Level.Quantum = quantum;
             }

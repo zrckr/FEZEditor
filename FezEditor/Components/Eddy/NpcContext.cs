@@ -148,7 +148,7 @@ internal class NpcContext : BaseContext
 
         if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
-            using (Eddy.History.BeginScope("Delete NPCs"))
+            using (Eddy.History.BeginScope("Delete NPCs", EddyContext.NonPlayableCharacter))
             {
                 RemoveSelected();
             }
@@ -164,7 +164,7 @@ internal class NpcContext : BaseContext
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 BuildClipboard();
-                using (Eddy.History.BeginScope("Cut NPCs"))
+                using (Eddy.History.BeginScope("Cut NPCs", EddyContext.NonPlayableCharacter))
                 {
                     RemoveSelected();
                 }
@@ -172,7 +172,7 @@ internal class NpcContext : BaseContext
 
             if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
-                using (Eddy.History.BeginScope("Paste NPCs"))
+                using (Eddy.History.BeginScope("Paste NPCs", EddyContext.NonPlayableCharacter))
                 {
                     PasteClipboard();
                 }
@@ -219,7 +219,7 @@ internal class NpcContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate NPC");
+            _translateScope = Eddy.History.BeginScope("Translate NPC", EddyContext.NonPlayableCharacter);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -296,7 +296,7 @@ internal class NpcContext : BaseContext
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && hoveredEmp != null && !string.IsNullOrEmpty(entry))
         {
-            using (Eddy.History.BeginScope("Place NPC"))
+            using (Eddy.History.BeginScope("Place NPC", EddyContext.NonPlayableCharacter))
             {
                 var id = NextAvailableId();
                 var position = new Vector3(hoveredEmp.X, hoveredEmp.Y, hoveredEmp.Z);
@@ -373,7 +373,7 @@ internal class NpcContext : BaseContext
         var position = instance.Position.ToXna();
         if (ImGuiX.InputFloat3("Position", ref position))
         {
-            using (Eddy.History.BeginScope("Edit BG Position"))
+            using (Eddy.History.BeginScope("Edit BG Position", EddyContext.NonPlayableCharacter))
             {
                 instance.Position = position.ToRepacker();
                 if (_npcActors.TryGetValue(id, out var actor))
@@ -386,7 +386,7 @@ internal class NpcContext : BaseContext
         var destinationOffset = instance.DestinationOffset.ToXna();
         if (ImGuiX.DragFloat3("Destination Offset", ref destinationOffset))
         {
-            using (Eddy.History.BeginScope("Edit NPC Destination Offset"))
+            using (Eddy.History.BeginScope("Edit NPC Destination Offset", EddyContext.NonPlayableCharacter))
             {
                 instance.DestinationOffset = destinationOffset.ToRepacker();
             }
@@ -395,7 +395,7 @@ internal class NpcContext : BaseContext
         var walkSpeed = instance.WalkSpeed;
         if (ImGui.InputFloat("Walk Speed", ref walkSpeed))
         {
-            using (Eddy.History.BeginScope("Edit NPC Walk Speed"))
+            using (Eddy.History.BeginScope("Edit NPC Walk Speed", EddyContext.NonPlayableCharacter))
             {
                 instance.WalkSpeed = walkSpeed;
             }
@@ -404,7 +404,7 @@ internal class NpcContext : BaseContext
         var randomizeSpeech = instance.RandomizeSpeech;
         if (ImGui.Checkbox("Randomize Speech", ref randomizeSpeech))
         {
-            using (Eddy.History.BeginScope("Edit NPC Randomize Speech"))
+            using (Eddy.History.BeginScope("Edit NPC Randomize Speech", EddyContext.NonPlayableCharacter))
             {
                 instance.RandomizeSpeech = randomizeSpeech;
             }
@@ -413,7 +413,7 @@ internal class NpcContext : BaseContext
         var sayFirstSpeechLineOnce = instance.SayFirstSpeechLineOnce;
         if (ImGui.Checkbox("Say First Speech Line Once", ref sayFirstSpeechLineOnce))
         {
-            using (Eddy.History.BeginScope("Edit NPC Say First Speech Line Once"))
+            using (Eddy.History.BeginScope("Edit NPC Say First Speech Line Once", EddyContext.NonPlayableCharacter))
             {
                 instance.SayFirstSpeechLineOnce = sayFirstSpeechLineOnce;
             }
@@ -422,7 +422,7 @@ internal class NpcContext : BaseContext
         var avoidsGomez = instance.AvoidsGomez;
         if (ImGui.Checkbox("Avoids Gomez", ref avoidsGomez))
         {
-            using (Eddy.History.BeginScope("Edit NPC Avoids Gomez"))
+            using (Eddy.History.BeginScope("Edit NPC Avoids Gomez", EddyContext.NonPlayableCharacter))
             {
                 instance.AvoidsGomez = avoidsGomez;
             }
@@ -433,7 +433,7 @@ internal class NpcContext : BaseContext
 
         if (ImGui.Combo("Actor Type", ref actorType, actors, actors.Length))
         {
-            using (Eddy.History.BeginScope("Edit NPC Actor Type"))
+            using (Eddy.History.BeginScope("Edit NPC Actor Type", EddyContext.NonPlayableCharacter))
             {
                 instance.ActorType = (ActorType)actorType;
             }
@@ -442,7 +442,7 @@ internal class NpcContext : BaseContext
         var speech = instance.Speech;
         if (ImGuiX.EditableList("Speech", ref speech, RenderSpeechLine, () => new SpeechLine()))
         {
-            using (Eddy.History.BeginScope("Edit NPC Speech"))
+            using (Eddy.History.BeginScope("Edit NPC Speech", EddyContext.NonPlayableCharacter))
             {
                 instance.Speech = speech;
             }
@@ -451,7 +451,7 @@ internal class NpcContext : BaseContext
         var actions = instance.Actions.ToDictionary(a => (int)a.Key, a => a.Value);
         if (ImGuiX.EditableDict("Actions", ref actions, RenderNpcActionContent, RenderNewContent, () => new NpcActionContent()))
         {
-            using (Eddy.History.BeginScope("Edit NPC Actions"))
+            using (Eddy.History.BeginScope("Edit NPC Actions", EddyContext.NonPlayableCharacter))
             {
                 instance.Actions = actions.ToDictionary(a => (NpcAction)a.Key, a => a.Value);
             }

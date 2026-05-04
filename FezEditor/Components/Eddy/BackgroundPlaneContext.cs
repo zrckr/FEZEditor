@@ -147,7 +147,7 @@ internal class BackgroundPlaneContext : BaseContext
 
         if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
-            using (Eddy.History.BeginScope("Delete Background Planes"))
+            using (Eddy.History.BeginScope("Delete Background Planes", EddyContext.BackgroundPlane))
             {
                 RemoveSelected();
             }
@@ -163,7 +163,7 @@ internal class BackgroundPlaneContext : BaseContext
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 BuildClipboard();
-                using (Eddy.History.BeginScope("Cut Background Planes"))
+                using (Eddy.History.BeginScope("Cut Background Planes", EddyContext.BackgroundPlane))
                 {
                     RemoveSelected();
                 }
@@ -171,7 +171,7 @@ internal class BackgroundPlaneContext : BaseContext
 
             if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
-                using (Eddy.History.BeginScope("Paste Background Planes"))
+                using (Eddy.History.BeginScope("Paste Background Planes", EddyContext.BackgroundPlane))
                 {
                     PasteClipboard();
                 }
@@ -218,7 +218,7 @@ internal class BackgroundPlaneContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate Background Plane");
+            _translateScope = Eddy.History.BeginScope("Translate Background Plane", EddyContext.BackgroundPlane);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -255,7 +255,7 @@ internal class BackgroundPlaneContext : BaseContext
 
         if (Eddy.Gizmo.Rotate(centroid))
         {
-            using (Eddy.History.BeginScope("Rotate Background Plane(s)"))
+            using (Eddy.History.BeginScope("Rotate Background Plane(s)", EddyContext.BackgroundPlane))
             {
                 var step = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathHelper.PiOver2);
                 foreach (var id in _selectedIds)
@@ -306,7 +306,7 @@ internal class BackgroundPlaneContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _scaleScope?.Dispose();
-            _scaleScope = Eddy.History.BeginScope("Scale Background Plane");
+            _scaleScope = Eddy.History.BeginScope("Scale Background Plane", EddyContext.BackgroundPlane);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -317,7 +317,7 @@ internal class BackgroundPlaneContext : BaseContext
 
         if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedIds.Count > 0 && _scaleScope == null)
         {
-            using (Eddy.History.BeginScope("Reset Background Plane Scale"))
+            using (Eddy.History.BeginScope("Reset Background Plane Scale", EddyContext.BackgroundPlane))
             {
                 foreach (var id in _selectedIds)
                 {
@@ -385,7 +385,7 @@ internal class BackgroundPlaneContext : BaseContext
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && hoveredEmp != null && !string.IsNullOrEmpty(entry))
         {
-            using (Eddy.History.BeginScope("Place Background Plane"))
+            using (Eddy.History.BeginScope("Place Background Plane", EddyContext.BackgroundPlane))
             {
                 var id = NextAvailableId();
                 var position = new Vector3(hoveredEmp.X, hoveredEmp.Y, hoveredEmp.Z);
@@ -464,7 +464,7 @@ internal class BackgroundPlaneContext : BaseContext
         var position = instance.Position.ToXna();
         if (ImGuiX.InputFloat3("Position", ref position))
         {
-            using (Eddy.History.BeginScope("Edit BG Position"))
+            using (Eddy.History.BeginScope("Edit BG Position", EddyContext.BackgroundPlane))
             {
                 instance.Position = position.ToRepacker();
                 if (_bgPlaneActors.TryGetValue(id, out var actor))
@@ -478,7 +478,7 @@ internal class BackgroundPlaneContext : BaseContext
         var euler = rotation.ToEuler();
         if (ImGuiX.DragFloat3("Rotation (Euler)", ref euler, 1f))
         {
-            using (Eddy.History.BeginScope("Edit BG Rotation"))
+            using (Eddy.History.BeginScope("Edit BG Rotation", EddyContext.BackgroundPlane))
             {
                 var newRotation = euler.FromEuler();
                 instance.Rotation = newRotation.ToRepacker();
@@ -492,7 +492,7 @@ internal class BackgroundPlaneContext : BaseContext
         var scale = instance.Scale.ToXna();
         if (ImGuiX.DragFloat3("Scale", ref scale, 0.01f))
         {
-            using (Eddy.History.BeginScope("Edit BG Scale"))
+            using (Eddy.History.BeginScope("Edit BG Scale", EddyContext.BackgroundPlane))
             {
                 instance.Scale = scale.ToRepacker();
                 if (_bgPlaneActors.TryGetValue(id, out var actor))
@@ -505,7 +505,7 @@ internal class BackgroundPlaneContext : BaseContext
         var size = instance.Size.ToXna();
         if (ImGuiX.DragFloat3("Size", ref size, 0.01f))
         {
-            using (Eddy.History.BeginScope("Edit BG Size"))
+            using (Eddy.History.BeginScope("Edit BG Size", EddyContext.BackgroundPlane))
             {
                 instance.Size = size.ToRepacker();
             }
@@ -514,7 +514,7 @@ internal class BackgroundPlaneContext : BaseContext
         var lightMap = instance.LightMap;
         if (ImGui.Checkbox("Light Map", ref lightMap))
         {
-            using (Eddy.History.BeginScope("Edit BG Light Map"))
+            using (Eddy.History.BeginScope("Edit BG Light Map", EddyContext.BackgroundPlane))
             {
                 instance.LightMap = lightMap;
             }
@@ -523,7 +523,7 @@ internal class BackgroundPlaneContext : BaseContext
         var allowOverbrightness = instance.AllowOverbrightness;
         if (ImGui.Checkbox("Allow Overbrightness", ref allowOverbrightness))
         {
-            using (Eddy.History.BeginScope("Edit BG Allow Overbrightness"))
+            using (Eddy.History.BeginScope("Edit BG Allow Overbrightness", EddyContext.BackgroundPlane))
             {
                 instance.AllowOverbrightness = allowOverbrightness;
             }
@@ -532,7 +532,7 @@ internal class BackgroundPlaneContext : BaseContext
         var filter = instance.Filter.ToXna();
         if (ImGuiX.ColorEdit4("Filter", ref filter))
         {
-            using (Eddy.History.BeginScope("Edit BG Filter"))
+            using (Eddy.History.BeginScope("Edit BG Filter", EddyContext.BackgroundPlane))
             {
                 instance.Filter = filter.ToRepacker();
             }
@@ -546,7 +546,7 @@ internal class BackgroundPlaneContext : BaseContext
         var doublesided = instance.Doublesided;
         if (ImGui.Checkbox("Double Sided", ref doublesided))
         {
-            using (Eddy.History.BeginScope("Edit BG Double Sided"))
+            using (Eddy.History.BeginScope("Edit BG Double Sided", EddyContext.BackgroundPlane))
             {
                 instance.Doublesided = doublesided;
             }
@@ -555,7 +555,7 @@ internal class BackgroundPlaneContext : BaseContext
         var opacity = instance.Opacity;
         if (ImGui.InputFloat("Opacity", ref opacity))
         {
-            using (Eddy.History.BeginScope("Edit BG Opacity"))
+            using (Eddy.History.BeginScope("Edit BG Opacity", EddyContext.BackgroundPlane))
             {
                 instance.Opacity = opacity;
             }
@@ -564,7 +564,7 @@ internal class BackgroundPlaneContext : BaseContext
         var attachedGroup = instance.AttachedGroup ?? InvalidId;
         if (ImGui.InputInt("Attached Group", ref attachedGroup))
         {
-            using (Eddy.History.BeginScope("Edit BG Attached Group"))
+            using (Eddy.History.BeginScope("Edit BG Attached Group", EddyContext.BackgroundPlane))
             {
                 instance.AttachedGroup = attachedGroup == InvalidId ? null : attachedGroup;
             }
@@ -573,7 +573,7 @@ internal class BackgroundPlaneContext : BaseContext
         var billboard = instance.Billboard;
         if (ImGui.Checkbox("Billboard", ref billboard))
         {
-            using (Eddy.History.BeginScope("Edit BG Billboard"))
+            using (Eddy.History.BeginScope("Edit BG Billboard", EddyContext.BackgroundPlane))
             {
                 instance.Billboard = billboard;
             }
@@ -582,7 +582,7 @@ internal class BackgroundPlaneContext : BaseContext
         var syncWithSamples = instance.SyncWithSamples;
         if (ImGui.Checkbox("Sync With Samples", ref syncWithSamples))
         {
-            using (Eddy.History.BeginScope("Edit BG Sync With Samples"))
+            using (Eddy.History.BeginScope("Edit BG Sync With Samples", EddyContext.BackgroundPlane))
             {
                 instance.SyncWithSamples = syncWithSamples;
             }
@@ -591,7 +591,7 @@ internal class BackgroundPlaneContext : BaseContext
         var crosshatch = instance.Crosshatch;
         if (ImGui.Checkbox("Crosshatch", ref crosshatch))
         {
-            using (Eddy.History.BeginScope("Edit BG Crosshatch"))
+            using (Eddy.History.BeginScope("Edit BG Crosshatch", EddyContext.BackgroundPlane))
             {
                 instance.Crosshatch = crosshatch;
             }
@@ -600,7 +600,7 @@ internal class BackgroundPlaneContext : BaseContext
         var alwaysOnTop = instance.AlwaysOnTop;
         if (ImGui.Checkbox("Always On Top", ref alwaysOnTop))
         {
-            using (Eddy.History.BeginScope("Edit BG Always On Top"))
+            using (Eddy.History.BeginScope("Edit BG Always On Top", EddyContext.BackgroundPlane))
             {
                 instance.AlwaysOnTop = alwaysOnTop;
             }
@@ -609,7 +609,7 @@ internal class BackgroundPlaneContext : BaseContext
         var fullbright = instance.Fullbright;
         if (ImGui.Checkbox("Fullbright", ref fullbright))
         {
-            using (Eddy.History.BeginScope("Edit BG Fullbright"))
+            using (Eddy.History.BeginScope("Edit BG Fullbright", EddyContext.BackgroundPlane))
             {
                 instance.Fullbright = fullbright;
             }
@@ -618,7 +618,7 @@ internal class BackgroundPlaneContext : BaseContext
         var pixelatedLightmap = instance.PixelatedLightmap;
         if (ImGui.Checkbox("Pixelated Lightmap", ref pixelatedLightmap))
         {
-            using (Eddy.History.BeginScope("Edit BG Pixelated Lightmap"))
+            using (Eddy.History.BeginScope("Edit BG Pixelated Lightmap", EddyContext.BackgroundPlane))
             {
                 instance.PixelatedLightmap = pixelatedLightmap;
             }
@@ -627,7 +627,7 @@ internal class BackgroundPlaneContext : BaseContext
         var xTextureRepeat = instance.XTextureRepeat;
         if (ImGui.Checkbox("Xtexture Repeat", ref xTextureRepeat))
         {
-            using (Eddy.History.BeginScope("Edit BG Xtexture Repeat"))
+            using (Eddy.History.BeginScope("Edit BG Xtexture Repeat", EddyContext.BackgroundPlane))
             {
                 instance.XTextureRepeat = xTextureRepeat;
             }
@@ -636,7 +636,7 @@ internal class BackgroundPlaneContext : BaseContext
         var yTextureRepeat = instance.YTextureRepeat;
         if (ImGui.Checkbox("Ytexture Repeat", ref yTextureRepeat))
         {
-            using (Eddy.History.BeginScope("Edit BG Ytexture Repeat"))
+            using (Eddy.History.BeginScope("Edit BG Ytexture Repeat", EddyContext.BackgroundPlane))
             {
                 instance.YTextureRepeat = yTextureRepeat;
             }
@@ -645,7 +645,7 @@ internal class BackgroundPlaneContext : BaseContext
         var clampTexture = instance.ClampTexture;
         if (ImGui.Checkbox("Clamp Texture", ref clampTexture))
         {
-            using (Eddy.History.BeginScope("Edit BG Clamp Texture"))
+            using (Eddy.History.BeginScope("Edit BG Clamp Texture", EddyContext.BackgroundPlane))
             {
                 instance.ClampTexture = clampTexture;
             }
@@ -655,7 +655,7 @@ internal class BackgroundPlaneContext : BaseContext
         var actors = Enum.GetNames<ActorType>();
         if (ImGui.Combo("Actor Type", ref actorType, actors, actors.Length))
         {
-            using (Eddy.History.BeginScope("Edit BG Actor Type"))
+            using (Eddy.History.BeginScope("Edit BG Actor Type", EddyContext.BackgroundPlane))
             {
                 instance.ActorType = (ActorType)actorType;
             }
@@ -664,7 +664,7 @@ internal class BackgroundPlaneContext : BaseContext
         var attachedPlane = instance.AttachedPlane ?? InvalidId;
         if (ImGui.InputInt("Attached Plane", ref attachedPlane))
         {
-            using (Eddy.History.BeginScope("Edit BG Attached Plane"))
+            using (Eddy.History.BeginScope("Edit BG Attached Plane", EddyContext.BackgroundPlane))
             {
                 instance.AttachedPlane = attachedPlane == InvalidId ? null : attachedPlane;
             }
@@ -673,7 +673,7 @@ internal class BackgroundPlaneContext : BaseContext
         var parallaxFactor = instance.ParallaxFactor;
         if (ImGui.InputFloat("Parallax Factor", ref parallaxFactor))
         {
-            using (Eddy.History.BeginScope("Edit BG Parallax Factor"))
+            using (Eddy.History.BeginScope("Edit BG Parallax Factor", EddyContext.BackgroundPlane))
             {
                 instance.ParallaxFactor = parallaxFactor;
             }

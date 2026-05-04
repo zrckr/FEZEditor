@@ -93,7 +93,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         _scriptBrowser = new ScriptBrowser(game, level, this);
         History.RegisterConverter(new TrileEmplacementConverter());
         History.Track(level);
-        History.StateChanged += () => _revisualizeContext = SelectedContext;
+        History.StateChanged += tag => _revisualizeContext = tag is EddyContext ctx ? ctx : SelectedContext;
     }
 
     public override void Update(GameTime gameTime)

@@ -73,7 +73,7 @@ internal class ScriptBrowser : IDisposable
         }
 
         _eddy.InstanceBrowser.Consume();
-        using (_eddy.History.BeginScope("Pick Entity Identifier"))
+        using (_eddy.History.BeginScope("Pick Entity Identifier", EddyContext.Script))
         {
             _pickTarget.Identifier = selection.id;
         }
@@ -258,7 +258,7 @@ internal class ScriptBrowser : IDisposable
         var name = _script!.Name;
         if (ImGui.InputText("##Name", ref name, 255))
         {
-            using (_eddy.History.BeginScope("Edit Script Name"))
+            using (_eddy.History.BeginScope("Edit Script Name", EddyContext.Script))
             {
                 _script.Name = name;
             }
@@ -269,7 +269,7 @@ internal class ScriptBrowser : IDisposable
         var hasTimeout = _script.Timeout.HasValue;
         if (ImGui.Checkbox("Timeout##hdr", ref hasTimeout))
         {
-            using (_eddy.History.BeginScope("Edit Script Timeout Flag"))
+            using (_eddy.History.BeginScope("Edit Script Timeout Flag", EddyContext.Script))
             {
                 _script.Timeout = hasTimeout ? TimeSpan.Zero : null;
             }
@@ -281,7 +281,7 @@ internal class ScriptBrowser : IDisposable
         var timeout = (float)(_script.Timeout?.TotalSeconds ?? 0d);
         if (ImGui.InputFloat("s##timeout", ref timeout, 0f, 0f, "%.1f"))
         {
-            using (_eddy.History.BeginScope("Edit Script Timeout Value"))
+            using (_eddy.History.BeginScope("Edit Script Timeout Value", EddyContext.Script))
             {
                 _script.Timeout = TimeSpan.FromSeconds(timeout);
             }
@@ -294,7 +294,7 @@ internal class ScriptBrowser : IDisposable
         var oneTime = _script.OneTime;
         if (ImGui.Checkbox("One-Time##hdr", ref oneTime))
         {
-            using (_eddy.History.BeginScope("Edit Script OneTime"))
+            using (_eddy.History.BeginScope("Edit Script OneTime", EddyContext.Script))
             {
                 _script.OneTime = oneTime;
             }
@@ -305,7 +305,7 @@ internal class ScriptBrowser : IDisposable
         var levelWideOnly = _script.LevelWideOneTime;
         if (ImGui.Checkbox("Level-Wide##hdr", ref levelWideOnly))
         {
-            using (_eddy.History.BeginScope("Edit Script LevelWideOneTime"))
+            using (_eddy.History.BeginScope("Edit Script LevelWideOneTime", EddyContext.Script))
             {
                 _script.LevelWideOneTime = levelWideOnly;
             }
@@ -318,7 +318,7 @@ internal class ScriptBrowser : IDisposable
         var disabled = _script.Disabled;
         if (ImGui.Checkbox("Disabled##hdr", ref disabled))
         {
-            using (_eddy.History.BeginScope("Edit Script Disabled"))
+            using (_eddy.History.BeginScope("Edit Script Disabled", EddyContext.Script))
             {
                 _script.Disabled = disabled;
             }
@@ -329,7 +329,7 @@ internal class ScriptBrowser : IDisposable
         var triggerless = _script.Triggerless;
         if (ImGui.Checkbox("Triggerless##hdr", ref triggerless))
         {
-            using (_eddy.History.BeginScope("Edit Script Triggerless"))
+            using (_eddy.History.BeginScope("Edit Script Triggerless", EddyContext.Script))
             {
                 _script.Triggerless = triggerless;
             }
@@ -340,7 +340,7 @@ internal class ScriptBrowser : IDisposable
         var ignoreEndTriggers = _script.IgnoreEndTriggers;
         if (ImGui.Checkbox("Ignore End-Triggers##hdr", ref ignoreEndTriggers))
         {
-            using (_eddy.History.BeginScope("Edit Script Ignore End-Triggers"))
+            using (_eddy.History.BeginScope("Edit Script Ignore End-Triggers", EddyContext.Script))
             {
                 _script.IgnoreEndTriggers = ignoreEndTriggers;
             }
@@ -351,7 +351,7 @@ internal class ScriptBrowser : IDisposable
         var isWinCondition = _script.IsWinCondition;
         if (ImGui.Checkbox("Completion Condition##hdr", ref isWinCondition))
         {
-            using (_eddy.History.BeginScope("Edit Script Completion Condition"))
+            using (_eddy.History.BeginScope("Edit Script Completion Condition", EddyContext.Script))
             {
                 _script.IsWinCondition = isWinCondition;
             }
@@ -370,7 +370,7 @@ internal class ScriptBrowser : IDisposable
 
         if (ImGui.Combo("Entity Type", ref typeIdx, typeNames, typeNames.Length))
         {
-            using (_eddy.History.BeginScope($"Change {scopeLabel} Entity Type"))
+            using (_eddy.History.BeginScope($"Change {scopeLabel} Entity Type", EddyContext.Script))
             {
                 entity.Type = typeNames[typeIdx];
                 dependentField = "";
@@ -388,7 +388,7 @@ internal class ScriptBrowser : IDisposable
             var id = entity.Identifier ?? 0;
             if (ImGui.InputInt("Identifier", ref id))
             {
-                using (_eddy.History.BeginScope($"Change {scopeLabel} Entity Identifier"))
+                using (_eddy.History.BeginScope($"Change {scopeLabel} Entity Identifier", EddyContext.Script))
                 {
                     entity.Identifier = id;
                 }
@@ -425,7 +425,7 @@ internal class ScriptBrowser : IDisposable
 
         if (ImGui.Button($"{Lucide.Plus} Add"))
         {
-            using (_eddy.History.BeginScope("Add Trigger"))
+            using (_eddy.History.BeginScope("Add Trigger", EddyContext.Script))
             {
                 _script!.Triggers.Add(new ScriptTrigger());
                 _triggerIndex = _script.Triggers.Count - 1;
@@ -436,7 +436,7 @@ internal class ScriptBrowser : IDisposable
         ImGui.BeginDisabled(_triggerIndex == -1);
         if (ImGui.Button($"{Lucide.Copy} Clone"))
         {
-            using (_eddy.History.BeginScope("Clone Trigger"))
+            using (_eddy.History.BeginScope("Clone Trigger", EddyContext.Script))
             {
                 var clone = JsonSerializer.Deserialize<ScriptTrigger>(
                     JsonSerializer.Serialize(_script!.Triggers[_triggerIndex]))!;
@@ -448,7 +448,7 @@ internal class ScriptBrowser : IDisposable
         ImGui.SameLine();
         if (ImGui.Button($"{Lucide.Trash2} Remove"))
         {
-            using (_eddy.History.BeginScope("Remove Trigger"))
+            using (_eddy.History.BeginScope("Remove Trigger", EddyContext.Script))
             {
                 _script!.Triggers.RemoveAt(_triggerIndex);
                 _triggerIndex = -1;
@@ -516,7 +516,7 @@ internal class ScriptBrowser : IDisposable
                             var selected = ei == eventIdx;
                             if (ImGui.Selectable(eventNames[ei], selected))
                             {
-                                using (_eddy.History.BeginScope("Change Trigger Event"))
+                                using (_eddy.History.BeginScope("Change Trigger Event", EddyContext.Script))
                                 {
                                     t.Event = eventNames[ei];
                                 }
@@ -557,7 +557,7 @@ internal class ScriptBrowser : IDisposable
 
         if (ImGui.Button($"{Lucide.Plus} Add"))
         {
-            using (_eddy.History.BeginScope("Add Condition"))
+            using (_eddy.History.BeginScope("Add Condition", EddyContext.Script))
             {
                 _script!.Conditions.Add(new ScriptCondition());
                 _conditionIndex = _script.Conditions.Count - 1;
@@ -568,7 +568,7 @@ internal class ScriptBrowser : IDisposable
         ImGui.BeginDisabled(_conditionIndex == -1);
         if (ImGui.Button($"{Lucide.Copy} Clone"))
         {
-            using (_eddy.History.BeginScope("Clone Condition"))
+            using (_eddy.History.BeginScope("Clone Condition", EddyContext.Script))
             {
                 var clone = JsonSerializer.Deserialize<ScriptCondition>(
                     JsonSerializer.Serialize(_script!.Conditions[_conditionIndex]))!;
@@ -580,7 +580,7 @@ internal class ScriptBrowser : IDisposable
         ImGui.SameLine();
         if (ImGui.Button($"{Lucide.Trash2} Remove"))
         {
-            using (_eddy.History.BeginScope("Remove Condition"))
+            using (_eddy.History.BeginScope("Remove Condition", EddyContext.Script))
             {
                 _script!.Conditions.RemoveAt(_conditionIndex);
                 _conditionIndex = -1;
@@ -648,7 +648,7 @@ internal class ScriptBrowser : IDisposable
                             var selected = pi == propIdx;
                             if (ImGui.Selectable(propNames[pi], selected))
                             {
-                                using (_eddy.History.BeginScope("Change Condition Property"))
+                                using (_eddy.History.BeginScope("Change Condition Property", EddyContext.Script))
                                 {
                                     c.Property = propNames[pi];
                                 }
@@ -676,7 +676,7 @@ internal class ScriptBrowser : IDisposable
                 var operatorIdx = Math.Max(0, Array.IndexOf(operatorNames, c.Operator.ToString()));
                 if (ImGui.Combo("Operator", ref operatorIdx, operatorDisplays, operatorDisplays.Length))
                 {
-                    using (_eddy.History.BeginScope("Change Condition Operator"))
+                    using (_eddy.History.BeginScope("Change Condition Operator", EddyContext.Script))
                     {
                         c.Operator = Enum.Parse<ComparisonOperator>(operatorNames[operatorIdx]);
                     }
@@ -685,7 +685,7 @@ internal class ScriptBrowser : IDisposable
                 var value = c.Value;
                 if (ImGui.InputText("Value", ref value, 255))
                 {
-                    using (_eddy.History.BeginScope("Change Condition Value"))
+                    using (_eddy.History.BeginScope("Change Condition Value", EddyContext.Script))
                     {
                         c.Value = value;
                     }
@@ -703,7 +703,7 @@ internal class ScriptBrowser : IDisposable
 
         if (ImGui.Button($"{Lucide.Plus} Add"))
         {
-            using (_eddy.History.BeginScope("Add Action"))
+            using (_eddy.History.BeginScope("Add Action", EddyContext.Script))
             {
                 _script!.Actions.Add(new ScriptAction());
                 _actionIndex = _script.Actions.Count - 1;
@@ -714,7 +714,7 @@ internal class ScriptBrowser : IDisposable
         ImGui.BeginDisabled(_actionIndex == -1);
         if (ImGui.Button($"{Lucide.Copy} Clone"))
         {
-            using (_eddy.History.BeginScope("Clone Action"))
+            using (_eddy.History.BeginScope("Clone Action", EddyContext.Script))
             {
                 var clone = JsonSerializer.Deserialize<ScriptAction>(
                     JsonSerializer.Serialize(_script!.Actions[_actionIndex]))!;
@@ -726,7 +726,7 @@ internal class ScriptBrowser : IDisposable
         ImGui.SameLine();
         if (ImGui.Button($"{Lucide.Trash2} Remove"))
         {
-            using (_eddy.History.BeginScope("Remove Action"))
+            using (_eddy.History.BeginScope("Remove Action", EddyContext.Script))
             {
                 _script!.Actions.RemoveAt(_actionIndex);
                 _actionIndex = -1;
@@ -794,7 +794,7 @@ internal class ScriptBrowser : IDisposable
                             var selected = oi == opIdx;
                             if (ImGui.Selectable(opNames[oi], selected))
                             {
-                                using (_eddy.History.BeginScope("Change Action Operation"))
+                                using (_eddy.History.BeginScope("Change Action Operation", EddyContext.Script))
                                 {
                                     a.Operation = opNames[oi];
                                     var newActionDef = actionEntry!.Actions[oi];
@@ -828,7 +828,7 @@ internal class ScriptBrowser : IDisposable
                 var killSwitch = a.Killswitch;
                 if (ImGui.Checkbox("Kill-switch", ref killSwitch))
                 {
-                    using (_eddy.History.BeginScope("Change Action Kill-switch"))
+                    using (_eddy.History.BeginScope("Change Action Kill-switch", EddyContext.Script))
                     {
                         a.Killswitch = killSwitch;
                     }
@@ -839,7 +839,7 @@ internal class ScriptBrowser : IDisposable
                 var blocking = a.Blocking;
                 if (ImGui.Checkbox("Stop-and-Wait Before", ref blocking))
                 {
-                    using (_eddy.History.BeginScope("Change Action Blocking"))
+                    using (_eddy.History.BeginScope("Change Action Blocking", EddyContext.Script))
                     {
                         a.Blocking = blocking;
                     }
@@ -869,7 +869,7 @@ internal class ScriptBrowser : IDisposable
                         var arg = a.Arguments[i];
                         if (ImGui.InputText($"{param.Name}##{i}", ref arg, 255))
                         {
-                            using (_eddy.History.BeginScope($"Change Action Argument [{param.Name}]"))
+                            using (_eddy.History.BeginScope($"Change Action Argument [{param.Name}]", EddyContext.Script))
                             {
                                 a.Arguments[i] = arg;
                             }

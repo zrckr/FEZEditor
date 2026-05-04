@@ -9,7 +9,8 @@ public enum EddyContext
     NonPlayableCharacter,
     Gomez,
     Volume,
-    Path
+    Path,
+    Script
 }
 
 public static class EddyContextExtensions
@@ -26,6 +27,7 @@ public static class EddyContextExtensions
             EddyContext.Gomez => "Gomez",
             EddyContext.Volume => "Volume",
             EddyContext.Path => "Path",
+            EddyContext.Script => "Script",
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null)
         };
     }
@@ -38,6 +40,7 @@ public static class EddyContextExtensions
         "Volume" => EddyContext.Volume,
         "Path" => EddyContext.Path,
         "Plane" => EddyContext.BackgroundPlane,
+        "Script" => EddyContext.Script,
         _ => null
     };
 }

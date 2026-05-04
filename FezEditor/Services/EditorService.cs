@@ -109,7 +109,7 @@ public partial class EditorService
             _editors.Add(editor);
             _activeEditor = editor;
             _pendingActiveEditor = editor;
-            _activeEditor.History.StateChanged += () =>
+            _activeEditor.History.StateChanged += _ =>
             {
                 if (_tracking.TryGetValue(editor, out var tracking))
                 {

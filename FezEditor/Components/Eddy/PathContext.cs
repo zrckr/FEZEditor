@@ -232,7 +232,7 @@ internal class PathContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate Path Waypoint");
+            _translateScope = Eddy.History.BeginScope("Translate Path Waypoint", EddyContext.Path);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -274,7 +274,7 @@ internal class PathContext : BaseContext
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && Eddy.IsViewportHovered)
         {
-            using (Eddy.History.BeginScope("Place Path Waypoint"))
+            using (Eddy.History.BeginScope("Place Path Waypoint", EddyContext.Path))
             {
                 if (_selectedPathId == null)
                 {
@@ -352,7 +352,7 @@ internal class PathContext : BaseContext
         var endBehaviorNames = Enum.GetNames<PathEndBehavior>();
         if (ImGui.Combo("End Behavior", ref endBehavior, endBehaviorNames, endBehaviorNames.Length))
         {
-            using (Eddy.History.BeginScope("Edit Path End Behavior"))
+            using (Eddy.History.BeginScope("Edit Path End Behavior", EddyContext.Path))
             {
                 path.EndBehavior = (PathEndBehavior)endBehavior;
             }
@@ -361,7 +361,7 @@ internal class PathContext : BaseContext
         var isSpline = path.IsSpline;
         if (ImGui.Checkbox("Is Spline", ref isSpline))
         {
-            using (Eddy.History.BeginScope("Edit Path Is Spline"))
+            using (Eddy.History.BeginScope("Edit Path Is Spline", EddyContext.Path))
             {
                 path.IsSpline = isSpline;
             }
@@ -370,7 +370,7 @@ internal class PathContext : BaseContext
         var needsTrigger = path.NeedsTrigger;
         if (ImGui.Checkbox("Needs Trigger", ref needsTrigger))
         {
-            using (Eddy.History.BeginScope("Edit Path Needs Trigger"))
+            using (Eddy.History.BeginScope("Edit Path Needs Trigger", EddyContext.Path))
             {
                 path.NeedsTrigger = needsTrigger;
             }
@@ -379,7 +379,7 @@ internal class PathContext : BaseContext
         var offsetSec = path.OffsetSeconds;
         if (ImGui.DragFloat("Offset Seconds", ref offsetSec))
         {
-            using (Eddy.History.BeginScope("Edit Path Offset Seconds"))
+            using (Eddy.History.BeginScope("Edit Path Offset Seconds", EddyContext.Path))
             {
                 path.OffsetSeconds = offsetSec;
             }

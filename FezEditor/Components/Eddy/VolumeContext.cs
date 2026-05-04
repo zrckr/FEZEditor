@@ -153,7 +153,7 @@ internal class VolumeContext : BaseContext
 
         if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
-            using (Eddy.History.BeginScope("Delete Volumes"))
+            using (Eddy.History.BeginScope("Delete Volumes", EddyContext.Volume))
             {
                 RemoveSelected();
             }
@@ -169,7 +169,7 @@ internal class VolumeContext : BaseContext
             if (_selectedIds.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 BuildClipboard();
-                using (Eddy.History.BeginScope("Cut Volumes"))
+                using (Eddy.History.BeginScope("Cut Volumes", EddyContext.Volume))
                 {
                     RemoveSelected();
                 }
@@ -177,7 +177,7 @@ internal class VolumeContext : BaseContext
 
             if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
-                using (Eddy.History.BeginScope("Paste Volumes"))
+                using (Eddy.History.BeginScope("Paste Volumes", EddyContext.Volume))
                 {
                     PasteClipboard();
                 }
@@ -225,7 +225,7 @@ internal class VolumeContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate Volume");
+            _translateScope = Eddy.History.BeginScope("Translate Volume", EddyContext.Volume);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -291,7 +291,7 @@ internal class VolumeContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _scaleScope?.Dispose();
-            _scaleScope = Eddy.History.BeginScope("Scale Volume");
+            _scaleScope = Eddy.History.BeginScope("Scale Volume", EddyContext.Volume);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -329,7 +329,7 @@ internal class VolumeContext : BaseContext
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && hoveredEmp != null && hoveredFace != null)
         {
-            using (Eddy.History.BeginScope("Place Volume"))
+            using (Eddy.History.BeginScope("Place Volume", EddyContext.Volume))
             {
                 var id = NextAvailableId();
                 var position = new Vector3(hoveredEmp.X, hoveredEmp.Y, hoveredEmp.Z) + hoveredFace.Value.AsVector();
@@ -379,7 +379,7 @@ internal class VolumeContext : BaseContext
         var from = instance.From.ToXna();
         if (ImGuiX.InputFloat3("From", ref from))
         {
-            using (Eddy.History.BeginScope("Edit From"))
+            using (Eddy.History.BeginScope("Edit From", EddyContext.Volume))
             {
                 instance.From = from.ToRepacker();
             }
@@ -388,7 +388,7 @@ internal class VolumeContext : BaseContext
         var to = instance.To.ToXna();
         if (ImGuiX.InputFloat3("To", ref to))
         {
-            using (Eddy.History.BeginScope("Edit To"))
+            using (Eddy.History.BeginScope("Edit To", EddyContext.Volume))
             {
                 instance.To = to.ToRepacker();
             }
@@ -397,7 +397,7 @@ internal class VolumeContext : BaseContext
         var orientations = instance.Orientations;
         if (ImGuiX.EditableArray("Orientations", ref orientations, RenderFace))
         {
-            using (Eddy.History.BeginScope("Edit Orientations"))
+            using (Eddy.History.BeginScope("Edit Orientations", EddyContext.Volume))
             {
                 instance.Orientations = orientations;
             }
@@ -410,7 +410,7 @@ internal class VolumeContext : BaseContext
         var farawayPlaneOffset = settings.FarawayPlaneOffset.ToXna();
         if (ImGuiX.InputFloat2("Faraway Plane Offset", ref farawayPlaneOffset))
         {
-            using (Eddy.History.BeginScope("Edit Faraway Plane Offset"))
+            using (Eddy.History.BeginScope("Edit Faraway Plane Offset", EddyContext.Volume))
             {
                 settings.FarawayPlaneOffset = farawayPlaneOffset.ToRepacker();
             }
@@ -419,7 +419,7 @@ internal class VolumeContext : BaseContext
         var isPointOfInterest = settings.IsPointOfInterest;
         if (ImGui.Checkbox("Is Point Of Interest", ref isPointOfInterest))
         {
-            using (Eddy.History.BeginScope("Edit Is Point Of Interest"))
+            using (Eddy.History.BeginScope("Edit Is Point Of Interest", EddyContext.Volume))
             {
                 settings.IsPointOfInterest = isPointOfInterest;
             }
@@ -428,7 +428,7 @@ internal class VolumeContext : BaseContext
         var dotDialogue = settings.DotDialogue;
         if (ImGuiX.EditableList("Dot Dialogue", ref dotDialogue, RenderDotDialog, () => new DotDialogueLine()))
         {
-            using (Eddy.History.BeginScope("Edit Dot Dialogue"))
+            using (Eddy.History.BeginScope("Edit Dot Dialogue", EddyContext.Volume))
             {
                 settings.DotDialogue = dotDialogue;
             }
@@ -437,7 +437,7 @@ internal class VolumeContext : BaseContext
         var waterLocked = settings.WaterLocked;
         if (ImGui.Checkbox("Water Locked", ref waterLocked))
         {
-            using (Eddy.History.BeginScope("Edit Water Locked"))
+            using (Eddy.History.BeginScope("Edit Water Locked", EddyContext.Volume))
             {
                 settings.WaterLocked = waterLocked;
             }
@@ -446,7 +446,7 @@ internal class VolumeContext : BaseContext
         var codePattern = settings.CodePattern;
         if (ImGuiX.EditableArray("Code Pattern", ref codePattern, RenderCodePattern))
         {
-            using (Eddy.History.BeginScope("Edit Code Pattern"))
+            using (Eddy.History.BeginScope("Edit Code Pattern", EddyContext.Volume))
             {
                 settings.CodePattern = codePattern;
             }
@@ -455,7 +455,7 @@ internal class VolumeContext : BaseContext
         var isBlackHole = settings.IsBlackHole;
         if (ImGui.Checkbox("Is Black Hole", ref isBlackHole))
         {
-            using (Eddy.History.BeginScope("Edit Is Black Hole"))
+            using (Eddy.History.BeginScope("Edit Is Black Hole", EddyContext.Volume))
             {
                 settings.IsBlackHole = isBlackHole;
             }
@@ -464,7 +464,7 @@ internal class VolumeContext : BaseContext
         var needsTrigger = settings.NeedsTrigger;
         if (ImGui.Checkbox("Needs Trigger", ref needsTrigger))
         {
-            using (Eddy.History.BeginScope("Edit Needs Trigger"))
+            using (Eddy.History.BeginScope("Edit Needs Trigger", EddyContext.Volume))
             {
                 settings.NeedsTrigger = needsTrigger;
             }
@@ -473,7 +473,7 @@ internal class VolumeContext : BaseContext
         var isSecretPassage = settings.IsSecretPassage;
         if (ImGui.Checkbox("Is Secret Passage", ref isSecretPassage))
         {
-            using (Eddy.History.BeginScope("Edit Is Secret Passage"))
+            using (Eddy.History.BeginScope("Edit Is Secret Passage", EddyContext.Volume))
             {
                 settings.IsSecretPassage = isSecretPassage;
             }

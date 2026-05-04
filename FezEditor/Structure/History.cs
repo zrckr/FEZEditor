@@ -13,11 +13,6 @@ public class History : IDisposable
         WriteIndented = false
     };
 
-    public void RegisterConverter(JsonConverter converter)
-    {
-        _jsonOptions.Converters.Add(converter);
-    }
-
     private readonly LinkedList<UndoOperation> _undoStack = new();
 
     private readonly LinkedList<UndoOperation> _redoStack = new();
@@ -32,7 +27,12 @@ public class History : IDisposable
 
     public int RedoCount => _redoStack.Count;
 
-    public event Action? StateChanged;
+    public event Action<object?>? StateChanged;
+
+    public void RegisterConverter(JsonConverter converter)
+    {
+        _jsonOptions.Converters.Add(converter);
+    }
 
     public void Dispose()
     {
@@ -70,9 +70,9 @@ public class History : IDisposable
         }
     }
 
-    public IDisposable BeginScope(string name)
+    public IDisposable BeginScope(string name, object? tag = null)
     {
-        return new Scope(this, name);
+        return new Scope(this, name, tag);
     }
 
     public void Undo()
@@ -85,14 +85,14 @@ public class History : IDisposable
         var op = _undoStack.Last!.Value;
         _undoStack.RemoveLast();
 
-        _redoStack.AddLast(CaptureState(op.Name));
+        _redoStack.AddLast(CaptureState(op.Name, op.Tag));
         if (_redoStack.Count > MaxHistorySize)
         {
             _redoStack.RemoveFirst();
         }
 
         Restore(op);
-        StateChanged?.Invoke();
+        StateChanged?.Invoke(op.Tag);
     }
 
     public void Redo()
@@ -105,24 +105,24 @@ public class History : IDisposable
         var op = _redoStack.Last!.Value;
         _redoStack.RemoveLast();
 
-        _undoStack.AddLast(CaptureState(op.Name));
+        _undoStack.AddLast(CaptureState(op.Name, op.Tag));
         if (_undoStack.Count > MaxHistorySize)
         {
             _undoStack.RemoveFirst();
         }
 
         Restore(op);
-        StateChanged?.Invoke();
+        StateChanged?.Invoke(op.Tag);
     }
 
     public void Clear()
     {
         _undoStack.Clear();
         _redoStack.Clear();
-        StateChanged?.Invoke();
+        StateChanged?.Invoke(null);
     }
 
-    private UndoOperation CaptureState(string name)
+    private UndoOperation CaptureState(string name, object? tag)
     {
         var states = new Dictionary<object, (Type type, string Json)>();
         foreach (var target in _tracked)
@@ -131,7 +131,7 @@ public class History : IDisposable
             states[target] = (target.GetType(), json);
         }
 
-        return new UndoOperation(name, states);
+        return new UndoOperation(name, tag, states);
     }
 
     private void Restore(UndoOperation op)
@@ -183,19 +183,20 @@ public class History : IDisposable
         }
 
         _redoStack.Clear();
-        StateChanged?.Invoke();
+        StateChanged?.Invoke(before.Tag);
     }
 
     private sealed class Scope : IDisposable
     {
         private readonly History _service;
         private readonly UndoOperation _before;
+        private readonly object? _tag;
         private bool _disposed;
 
-        internal Scope(History service, string name)
+        internal Scope(History service, string name, object? tag)
         {
             _service = service;
-            _before = service.CaptureState(name);
+            _before = service.CaptureState(name, _tag = tag);
         }
 
         public void Dispose()
@@ -206,10 +207,10 @@ public class History : IDisposable
             }
 
             _disposed = true;
-            var after = _service.CaptureState(_before.Name);
+            var after = _service.CaptureState(_before.Name, _tag);
             _service.Push(_before, after);
         }
     }
 
-    private record UndoOperation(string Name, Dictionary<object, (Type type, string Json)> States);
+    private record UndoOperation(string Name, object? Tag, Dictionary<object, (Type type, string Json)> States);
 }

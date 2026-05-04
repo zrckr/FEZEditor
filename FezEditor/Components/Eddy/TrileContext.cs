@@ -248,7 +248,7 @@ internal sealed class TrileContext : BaseContext
 
         if (_selectedCursor.Emplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.Delete))
         {
-            using (Eddy.History.BeginScope("Delete Triles"))
+            using (Eddy.History.BeginScope("Delete Triles", EddyContext.Trile))
             {
                 RemoveSelected();
             }
@@ -259,7 +259,7 @@ internal sealed class TrileContext : BaseContext
         if (ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift && ImGui.IsKeyPressed(ImGuiKey.G) &&
             _selectedCursor.GroupId != null)
         {
-            using (Eddy.History.BeginScope("Remove Trile Group"))
+            using (Eddy.History.BeginScope("Remove Trile Group", EddyContext.Trile))
             {
                 Level.Groups.Remove(_selectedCursor.GroupId.Value);
             }
@@ -270,7 +270,7 @@ internal sealed class TrileContext : BaseContext
         if (ImGui.GetIO().KeyCtrl && !ImGui.GetIO().KeyShift && ImGui.IsKeyPressed(ImGuiKey.G) &&
             _selectedCursor.Emplacements.Count > 1 && _selectedCursor.GroupId == null)
         {
-            using (Eddy.History.BeginScope("Create Trile Group"))
+            using (Eddy.History.BeginScope("Create Trile Group", EddyContext.Trile))
             {
                 var groupId = Level.Groups.Count > 0 ? Level.Groups.Keys.Max() + 1 : 0;
                 var group = new TrileGroup();
@@ -306,7 +306,7 @@ internal sealed class TrileContext : BaseContext
             if (_selectedCursor.Emplacements.Count > 0 && ImGui.IsKeyPressed(ImGuiKey.X))
             {
                 BuildClipboard();
-                using (Eddy.History.BeginScope("Cut Triles"))
+                using (Eddy.History.BeginScope("Cut Triles", EddyContext.Trile))
                 {
                     RemoveSelected();
                 }
@@ -317,7 +317,7 @@ internal sealed class TrileContext : BaseContext
 
             if (ImGui.IsKeyPressed(ImGuiKey.V, repeat: false))
             {
-                using (Eddy.History.BeginScope("Paste Triles"))
+                using (Eddy.History.BeginScope("Paste Triles", EddyContext.Trile))
                 {
                     PasteClipboard();
                 }
@@ -464,7 +464,7 @@ internal sealed class TrileContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _translateScope?.Dispose();
-            _translateScope = Eddy.History.BeginScope("Translate Trile");
+            _translateScope = Eddy.History.BeginScope("Translate Trile", EddyContext.Trile);
         }
 
         if (Eddy.Gizmo.DragEnded)
@@ -475,7 +475,7 @@ internal sealed class TrileContext : BaseContext
 
         if (ImGui.IsKeyPressed(ImGuiKey.R) && _selectedCursor.Emplacements.Count > 0 && _translateScope == null)
         {
-            using (Eddy.History.BeginScope("Reset Translate Trile"))
+            using (Eddy.History.BeginScope("Reset Translate Trile", EddyContext.Trile))
             {
                 foreach (var emplacement in _selectedCursor.Emplacements)
                 {
@@ -520,7 +520,7 @@ internal sealed class TrileContext : BaseContext
 
         if (Eddy.Gizmo.Rotate(centroid))
         {
-            using (Eddy.History.BeginScope("Rotate Trile(s)"))
+            using (Eddy.History.BeginScope("Rotate Trile(s)", EddyContext.Trile))
             {
                 foreach (var emplacement in _selectedCursor.Emplacements)
                 {
@@ -655,7 +655,7 @@ internal sealed class TrileContext : BaseContext
         if (Eddy.Gizmo.DragStarted)
         {
             _scaleScope?.Dispose();
-            _scaleScope = Eddy.History.BeginScope("Scale Triles");
+            _scaleScope = Eddy.History.BeginScope("Scale Triles", EddyContext.Trile);
             _scale = new ScaleState();
 
             var faceVec1 = _selectedCursor.Face.Value.AsVector();
@@ -851,7 +851,7 @@ internal sealed class TrileContext : BaseContext
 
         if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) && _paintOps.Count != 0)
         {
-            using (Eddy.History.BeginScope("Paint Triles"))
+            using (Eddy.History.BeginScope("Paint Triles", EddyContext.Trile))
             {
                 foreach (var op in _paintOps)
                 {
@@ -1179,7 +1179,7 @@ internal sealed class TrileContext : BaseContext
         var position = instance.Position.ToXna();
         if (ImGuiX.InputFloat3("Position", ref position))
         {
-            using (Eddy.History.BeginScope("Edit Trile Position"))
+            using (Eddy.History.BeginScope("Edit Trile Position", EddyContext.Trile))
             {
                 instance.Position = position.ToRepacker();
             }
@@ -1189,7 +1189,7 @@ internal sealed class TrileContext : BaseContext
         var phiNames = new[] { "Front", "Right", "Back", "Left" };
         if (ImGui.Combo("Rotation", ref phi, phiNames, phiNames.Length))
         {
-            using (Eddy.History.BeginScope("Edit Trile Rotation"))
+            using (Eddy.History.BeginScope("Edit Trile Rotation", EddyContext.Trile))
             {
                 instance.PhiLight = (byte)phi;
             }
@@ -1201,7 +1201,7 @@ internal sealed class TrileContext : BaseContext
         {
             if (ImGui.Button($"{Lucide.Plus} Add"))
             {
-                using (Eddy.History.BeginScope("Add ActorSettings"))
+                using (Eddy.History.BeginScope("Add ActorSettings", EddyContext.Trile))
                 {
                     instance.ActorSettings = new TrileInstanceActorSettings();
                 }
@@ -1212,7 +1212,7 @@ internal sealed class TrileContext : BaseContext
         {
             if (ImGui.Button($"{Lucide.Trash2} Remove"))
             {
-                using (Eddy.History.BeginScope("Remove ActorSettings"))
+                using (Eddy.History.BeginScope("Remove ActorSettings", EddyContext.Trile))
                 {
                     instance.ActorSettings = null;
                 }
@@ -1224,7 +1224,7 @@ internal sealed class TrileContext : BaseContext
             var containedTrile = instance.ActorSettings.ContainedTrile ?? InvalidId;
             if (ImGui.InputInt("Contained Trile", ref containedTrile))
             {
-                using (Eddy.History.BeginScope("Edit Contained Trile"))
+                using (Eddy.History.BeginScope("Edit Contained Trile", EddyContext.Trile))
                 {
                     instance.ActorSettings.ContainedTrile = containedTrile;
                 }
@@ -1233,7 +1233,7 @@ internal sealed class TrileContext : BaseContext
             var signText = instance.ActorSettings.SignText;
             if (ImGui.InputText("Sign Text", ref signText, 1024))
             {
-                using (Eddy.History.BeginScope("Edit Sign Text"))
+                using (Eddy.History.BeginScope("Edit Sign Text", EddyContext.Trile))
                 {
                     instance.ActorSettings.SignText = signText;
                 }
@@ -1242,7 +1242,7 @@ internal sealed class TrileContext : BaseContext
             var sequence = instance.ActorSettings.Sequence;
             if (ImGuiX.EditableArray("Sequence", ref sequence, RenderItem))
             {
-                using (Eddy.History.BeginScope("Edit Sequence"))
+                using (Eddy.History.BeginScope("Edit Sequence", EddyContext.Trile))
                 {
                     instance.ActorSettings.Sequence = sequence;
                 }
@@ -1251,7 +1251,7 @@ internal sealed class TrileContext : BaseContext
             var seqSample = instance.ActorSettings.SequenceSampleName;
             if (ImGui.InputText("Sequence Sample", ref seqSample, 255))
             {
-                using (Eddy.History.BeginScope("Edit Sequence Sample"))
+                using (Eddy.History.BeginScope("Edit Sequence Sample", EddyContext.Trile))
                 {
                     instance.ActorSettings.SequenceSampleName = seqSample;
                 }
@@ -1260,7 +1260,7 @@ internal sealed class TrileContext : BaseContext
             var altSeqSample = instance.ActorSettings.SequenceAlternateSampleName;
             if (ImGui.InputText("Sequence Alternate Sample", ref altSeqSample, 255))
             {
-                using (Eddy.History.BeginScope("Edit Sequence Alternate Sample"))
+                using (Eddy.History.BeginScope("Edit Sequence Alternate Sample", EddyContext.Trile))
                 {
                     instance.ActorSettings.SequenceAlternateSampleName = altSeqSample;
                 }
@@ -1269,7 +1269,7 @@ internal sealed class TrileContext : BaseContext
             var hostVolume = instance.ActorSettings.HostVolume ?? InvalidId;
             if (ImGui.InputInt("Host Volume", ref hostVolume))
             {
-                using (Eddy.History.BeginScope("Edit Host Volume"))
+                using (Eddy.History.BeginScope("Edit Host Volume", EddyContext.Trile))
                 {
                     instance.ActorSettings.HostVolume = hostVolume;
                 }
@@ -1296,7 +1296,7 @@ internal sealed class TrileContext : BaseContext
         {
             var delta = positionDrag - _previousPositionDrag;
             _previousPositionDrag = positionDrag;
-            using (Eddy.History.BeginScope("Edit Triles Position"))
+            using (Eddy.History.BeginScope("Edit Triles Position", EddyContext.Trile))
             {
                 foreach (var inst in instances)
                 {
@@ -1314,7 +1314,7 @@ internal sealed class TrileContext : BaseContext
         var face = allSameFace ? instances[0].PhiLight : -1;
         if (ImGui.Combo("Rotation", ref face, Rotations, Rotations.Length))
         {
-            using (Eddy.History.BeginScope("Edit Trile Rotation"))
+            using (Eddy.History.BeginScope("Edit Trile Rotation", EddyContext.Trile))
             {
                 foreach (var inst in instances)
                 {
@@ -1331,7 +1331,7 @@ internal sealed class TrileContext : BaseContext
         {
             if (ImGui.Button($"{Lucide.Plus} Add to All"))
             {
-                using (Eddy.History.BeginScope("Add ActorSettings"))
+                using (Eddy.History.BeginScope("Add ActorSettings", EddyContext.Trile))
                 {
                     foreach (var inst in instances.Where(i => i.ActorSettings == null))
                     {
@@ -1350,7 +1350,7 @@ internal sealed class TrileContext : BaseContext
 
             if (ImGui.Button($"{Lucide.Trash2} Remove from All"))
             {
-                using (Eddy.History.BeginScope("Remove ActorSettings"))
+                using (Eddy.History.BeginScope("Remove ActorSettings", EddyContext.Trile))
                 {
                     foreach (var inst in instances.Where(i => i.ActorSettings != null))
                     {
@@ -1374,7 +1374,7 @@ internal sealed class TrileContext : BaseContext
         var actors = Enum.GetNames<ActorType>();
         if (ImGui.Combo("Actor Type", ref actor, actors, actors.Length))
         {
-            using (Eddy.History.BeginScope("Edit Group ActorType"))
+            using (Eddy.History.BeginScope("Edit Group ActorType", EddyContext.Trile))
             {
                 group.ActorType = (ActorType)actor;
             }
@@ -1383,7 +1383,7 @@ internal sealed class TrileContext : BaseContext
         var heavy = group.Heavy;
         if (ImGui.Checkbox("Heavy", ref heavy))
         {
-            using (Eddy.History.BeginScope("Edit Group Heavy"))
+            using (Eddy.History.BeginScope("Edit Group Heavy", EddyContext.Trile))
             {
                 group.Heavy = heavy;
             }
@@ -1392,7 +1392,7 @@ internal sealed class TrileContext : BaseContext
         var sound = group.AssociatedSound;
         if (ImGui.InputText("Sound", ref sound, 255))
         {
-            using (Eddy.History.BeginScope("Edit Group Sound"))
+            using (Eddy.History.BeginScope("Edit Group Sound", EddyContext.Trile))
             {
                 group.AssociatedSound = sound;
             }
@@ -1403,7 +1403,7 @@ internal sealed class TrileContext : BaseContext
             var geyserOffset = group.GeyserOffset;
             if (ImGui.DragFloat("Offset", ref geyserOffset, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Geyser Offset"))
+                using (Eddy.History.BeginScope("Edit Geyser Offset", EddyContext.Trile))
                 {
                     group.GeyserOffset = geyserOffset;
                 }
@@ -1412,7 +1412,7 @@ internal sealed class TrileContext : BaseContext
             var geyserPause = group.GeyserPauseFor;
             if (ImGui.DragFloat("Pause For", ref geyserPause, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Geyser Pause"))
+                using (Eddy.History.BeginScope("Edit Geyser Pause", EddyContext.Trile))
                 {
                     group.GeyserPauseFor = geyserPause;
                 }
@@ -1421,7 +1421,7 @@ internal sealed class TrileContext : BaseContext
             var geyserLift = group.GeyserLiftFor;
             if (ImGui.DragFloat("Lift For", ref geyserLift, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Geyser Lift"))
+                using (Eddy.History.BeginScope("Edit Geyser Lift", EddyContext.Trile))
                 {
                     group.GeyserLiftFor = geyserLift;
                 }
@@ -1430,7 +1430,7 @@ internal sealed class TrileContext : BaseContext
             var geyserApex = group.GeyserApexHeight;
             if (ImGui.DragFloat("Apex Height", ref geyserApex, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Geyser Apex"))
+                using (Eddy.History.BeginScope("Edit Geyser Apex", EddyContext.Trile))
                 {
                     group.GeyserApexHeight = geyserApex;
                 }
@@ -1442,7 +1442,7 @@ internal sealed class TrileContext : BaseContext
             var spinCenter = group.SpinCenter.ToXna();
             if (ImGuiX.DragFloat3("Center", ref spinCenter, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Spin Center"))
+                using (Eddy.History.BeginScope("Edit Spin Center", EddyContext.Trile))
                 {
                     group.SpinCenter = spinCenter.ToRepacker();
                 }
@@ -1451,7 +1451,7 @@ internal sealed class TrileContext : BaseContext
             var spinClockwise = group.SpinClockwise;
             if (ImGui.Checkbox("Clockwise", ref spinClockwise))
             {
-                using (Eddy.History.BeginScope("Edit Spin Clockwise"))
+                using (Eddy.History.BeginScope("Edit Spin Clockwise", EddyContext.Trile))
                 {
                     group.SpinClockwise = spinClockwise;
                 }
@@ -1460,7 +1460,7 @@ internal sealed class TrileContext : BaseContext
             var spinFreq = group.SpinFrequency;
             if (ImGui.DragFloat("Frequency", ref spinFreq, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Spin Frequency"))
+                using (Eddy.History.BeginScope("Edit Spin Frequency", EddyContext.Trile))
                 {
                     group.SpinFrequency = spinFreq;
                 }
@@ -1469,7 +1469,7 @@ internal sealed class TrileContext : BaseContext
             var spinNeedsTrigger = group.SpinNeedsTriggering;
             if (ImGui.Checkbox("Needs Triggering", ref spinNeedsTrigger))
             {
-                using (Eddy.History.BeginScope("Edit Spin NeedsTriggering"))
+                using (Eddy.History.BeginScope("Edit Spin NeedsTriggering", EddyContext.Trile))
                 {
                     group.SpinNeedsTriggering = spinNeedsTrigger;
                 }
@@ -1478,7 +1478,7 @@ internal sealed class TrileContext : BaseContext
             var spin180 = group.Spin180Degrees;
             if (ImGui.Checkbox("180 Degrees", ref spin180))
             {
-                using (Eddy.History.BeginScope("Edit Spin 180"))
+                using (Eddy.History.BeginScope("Edit Spin 180", EddyContext.Trile))
                 {
                     group.Spin180Degrees = spin180;
                 }
@@ -1487,7 +1487,7 @@ internal sealed class TrileContext : BaseContext
             var fallOnRotate = group.FallOnRotate;
             if (ImGui.Checkbox("Fall On Rotate", ref fallOnRotate))
             {
-                using (Eddy.History.BeginScope("Edit Spin FallOnRotate"))
+                using (Eddy.History.BeginScope("Edit Spin FallOnRotate", EddyContext.Trile))
                 {
                     group.FallOnRotate = fallOnRotate;
                 }
@@ -1496,7 +1496,7 @@ internal sealed class TrileContext : BaseContext
             var spinOffset = group.SpinOffset;
             if (ImGui.DragFloat("Offset", ref spinOffset, 0.1f))
             {
-                using (Eddy.History.BeginScope("Edit Spin Offset"))
+                using (Eddy.History.BeginScope("Edit Spin Offset", EddyContext.Trile))
                 {
                     group.SpinOffset = spinOffset;
                 }

@@ -37,7 +37,7 @@ public class PoEditor : EditorComponent
     {
         _textStorage = textStorage;
         History.Track(_textStorage);
-        History.StateChanged += UpdateTableView;
+        History.StateChanged += _ => UpdateTableView();
         Game.AddComponent(_edit = new EditWindow(game));
         Game.AddComponent(_confirm = new ConfirmWindow(game));
     }
