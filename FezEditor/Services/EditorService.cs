@@ -178,6 +178,11 @@ public partial class EditorService
         return _tracking.TryGetValue(editor, out var tracking) && tracking.HasChanges;
     }
 
+    public bool IsEditorPathReadonly(EditorComponent editor)
+    {
+        return _tracking.TryGetValue(editor, out var tracking) && _resourceService.IsReadonlyPath(tracking.Path);
+    }
+
     public bool HasAnyEditorUnsavedChanges()
     {
         return _tracking.Any(kv => kv.Value.HasChanges);
@@ -185,7 +190,8 @@ public partial class EditorService
 
     public void SaveActiveEditorChanges()
     {
-        if (_tracking.TryGetValue(_activeEditor!, out var tracking) && tracking.HasChanges)
+        if (_tracking.TryGetValue(_activeEditor!, out var tracking) && tracking.HasChanges &&
+            !_resourceService.IsReadonlyPath(tracking.Path))
         {
             _resourceService.Save(tracking.Path, _activeEditor!.Asset);
             tracking.HasChanges = false;
@@ -225,7 +231,8 @@ public partial class EditorService
 
     public void SaveEditorChanges(EditorComponent editor)
     {
-        if (_tracking.TryGetValue(editor, out var tracking) && tracking.HasChanges)
+        if (_tracking.TryGetValue(editor, out var tracking) && tracking.HasChanges &&
+            !_resourceService.IsReadonlyPath(tracking.Path))
         {
             _resourceService.Save(tracking.Path, editor.Asset);
             tracking.HasChanges = false;
@@ -316,12 +323,8 @@ public partial class EditorService
             Flags &= ~EditorFlags.Redo;
         }
 
-        if (_resourceService.IsReadonly)
-        {
-            return;
-        }
-
-        if (_tracking.TryGetValue(_activeEditor, out var activeTracking) && activeTracking.HasChanges)
+        if (_tracking.TryGetValue(_activeEditor, out var activeTracking) && activeTracking.HasChanges &&
+            !_resourceService.IsReadonlyPath(activeTracking.Path))
         {
             Flags |= EditorFlags.SaveFile;
         }
@@ -330,7 +333,7 @@ public partial class EditorService
             Flags &= ~EditorFlags.SaveFile;
         }
 
-        if (_tracking.Values.Any(et => et.HasChanges))
+        if (_tracking.Any(kv => kv.Value.HasChanges && !_resourceService.IsReadonlyPath(kv.Value.Path)))
         {
             Flags |= EditorFlags.SaveAll;
         }

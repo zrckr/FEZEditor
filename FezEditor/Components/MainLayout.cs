@@ -95,9 +95,13 @@ public class MainLayout : DrawableGameComponent
                             foreach (var editor in _editorService.Editors.ToArray())
                             {
                                 var title = editor.Title;
-                                if (_editorService.HasEditorUnsavedChanges(editor))
+                                if (_editorService.IsEditorPathReadonly(editor))
                                 {
-                                    title = "(*) " + title;
+                                    title = $"{Lucide.LockKeyhole} {title}";
+                                }
+                                else if (_editorService.HasEditorUnsavedChanges(editor))
+                                {
+                                    title = $"{Lucide.Asterisk} {title}";
                                 }
 
                                 var tabFlags = _editorService.ShouldFocusEditor(editor)
@@ -191,7 +195,7 @@ public class MainLayout : DrawableGameComponent
 
     private void SaveAndCloseEditor(EditorComponent editor)
     {
-        if (!_editorService.HasEditorUnsavedChanges(editor))
+        if (!_editorService.HasEditorUnsavedChanges(editor) || _editorService.IsEditorPathReadonly(editor))
         {
             _editorService.CloseEditor(editor);
             return;

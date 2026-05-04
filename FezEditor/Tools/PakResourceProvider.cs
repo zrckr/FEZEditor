@@ -106,6 +106,11 @@ internal class PakResourceProvider : IResourceProvider
         return _pakFile.LastWriteTimeUtc;
     }
 
+    public bool IsReadonlyPath(string path)
+    {
+        return true;
+    }
+
     public void Refresh()
     {
         using var stream = _pakFile.OpenRead();

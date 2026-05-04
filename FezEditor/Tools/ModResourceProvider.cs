@@ -119,6 +119,11 @@ internal class ModResourceProvider : IResourceProvider
             : string.Empty;
     }
 
+    public bool IsReadonlyPath(string path)
+    {
+        return path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
     public Stream OpenStream(string path, string extension)
     {
         return TryGetProviderForPath(path, out var rp, out var resolved)

@@ -107,6 +107,11 @@ public class ResourceService : IDisposable
         return absolutePath.WithoutBaseDirectory(RootPath).Replace('\\', '/');
     }
 
+    public bool IsReadonlyPath(string path)
+    {
+        return _provider?.IsReadonlyPath(path) ?? true;
+    }
+
     public object Load(string path)
     {
         if (path.Contains("SaveSlot", StringComparison.OrdinalIgnoreCase))

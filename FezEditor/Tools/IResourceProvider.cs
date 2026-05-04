@@ -28,5 +28,7 @@ public interface IResourceProvider : IDisposable
 
     DateTime GetLastWriteTimeUtc(string path);
 
+    bool IsReadonlyPath(string path);
+
     void Refresh();
 }

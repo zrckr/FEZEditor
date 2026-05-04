@@ -45,6 +45,11 @@ internal class DirResourceProvider : IResourceProvider
             : Path.Combine(_directory.FullName, path);
     }
 
+    public bool IsReadonlyPath(string path)
+    {
+        return false;
+    }
+
     public Stream OpenStream(string path, string extension)
     {
         var info = _files.GetValueOrDefault(path);
