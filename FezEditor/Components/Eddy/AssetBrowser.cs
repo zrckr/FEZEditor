@@ -83,7 +83,7 @@ public class AssetBrowser : IDisposable
             if (file.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase))
             {
                 var extension = _resources.GetExtension(file);
-                if (!extension.EndsWith(".png"))
+                if (!extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
                 {
                     artObjects.Add(new Entry(file["Art Objects/".Length..], file, AssetType.ArtObject));
                 }
