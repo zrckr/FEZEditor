@@ -503,15 +503,10 @@ internal class NpcContext : BaseContext
         return ImGui.Combo("##npcAction", ref key, actions, actions.Length);
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void PartialRevisualize(EddyContext context)
     {
-        if (partial)
+        if (context == EddyContext.NonPlayableCharacter)
         {
-            if (Eddy.SelectedContext != EddyContext.NonPlayableCharacter)
-            {
-                return;
-            }
-
             var presentIds = Level.NonPlayerCharacters.Keys.Where(k => k != InvalidId).ToHashSet();
             foreach (var id in _npcActors.Keys.ToList())
             {
@@ -546,13 +541,14 @@ internal class NpcContext : BaseContext
             {
                 _hoveredId = null;
             }
-
-            return;
         }
+    }
 
+    public override void FullVisualize()
+    {
         TeardownVisualization();
-
-        #region Non-Playable Characters
+        _selectedIds.Clear();
+        _hoveredId = null;
 
         foreach (var (id, instance) in Level.NonPlayerCharacters.Where(kv => kv.Key != InvalidId))
         {
@@ -565,8 +561,6 @@ internal class NpcContext : BaseContext
             var animations = ResourceService.LoadAnimations($"Character Animations/{instance.Name}");
             mesh.Visualize(animations);
         }
-
-        #endregion
     }
 
     private void RemoveSelected()

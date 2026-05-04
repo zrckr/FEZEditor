@@ -41,7 +41,11 @@ internal abstract class BaseContext : IDisposable
         return Eddy.Scene.CreateActor(_subRoot);
     }
 
-    public virtual void Revisualize(bool partial = false)
+    public virtual void PartialRevisualize(EddyContext context)
+    {
+    }
+
+    public virtual void FullVisualize()
     {
     }
 

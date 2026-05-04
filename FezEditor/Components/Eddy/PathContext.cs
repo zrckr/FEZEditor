@@ -314,16 +314,9 @@ internal class PathContext : BaseContext
         dl.AddText(drawPos, ImGui.GetColorU32(ImGuiCol.Text), text);
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void FullVisualize()
     {
-        if (Eddy.SelectedContext != EddyContext.Path && partial)
-        {
-            return;
-        }
-
         TeardownVisualization();
-
-        #region Paths
 
         foreach (var (id, path) in Level.Paths.Where(kv => kv.Key != InvalidId))
         {
@@ -334,8 +327,6 @@ internal class PathContext : BaseContext
         {
             CreatePathActor(-(groupId + 1), group.Path!, ComputeOffset(groupId, true));
         }
-
-        #endregion
     }
 
     public override void DrawProperties()

@@ -382,70 +382,68 @@ internal class DefaultContext : BaseContext
         return false;
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void PartialRevisualize(EddyContext context)
     {
-        if (partial)
+        if (_boundsActor!.TryGetComponent<BoundsMesh>(out var boundsMesh))
         {
-            if (_boundsActor!.TryGetComponent<BoundsMesh>(out var boundsMesh))
-            {
-                boundsMesh!.Size = Level.Size.ToXna();
-            }
+            boundsMesh!.Size = Level.Size.ToXna();
+        }
 
-            if (Level.SkyName != _skyName)
-            {
-                _skyName = Level.SkyName;
-                _sky = (Sky)ResourceService.Load($"Skies/{_skyName}");
-                Eddy.Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
-                Eddy.Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
+        if (Level.SkyName != _skyName)
+        {
+            _skyName = Level.SkyName;
+            _sky = (Sky)ResourceService.Load($"Skies/{_skyName}");
+            Eddy.Scene.Lighting.Ambient = Color.White * Level.BaseAmbient;
+            Eddy.Scene.Lighting.Diffuse = Color.White * Level.BaseDiffuse;
 
-                if (_skyActor!.TryGetComponent<SkyVisualizer>(out var visualizer))
-                {
-                    visualizer!.LevelSize = Level.Size.ToXna();
-                    visualizer.Visualize(_sky);
-                    visualizer.VisualizeShadows(_sky.Name, _sky.Shadows);
-                }
+            if (_skyActor!.TryGetComponent<SkyVisualizer>(out var visualizer))
+            {
+                visualizer!.LevelSize = Level.Size.ToXna();
+                visualizer.Visualize(_sky);
+                visualizer.VisualizeShadows(_sky.Name, _sky.Shadows);
             }
+        }
 
-            if (Eddy.SelectedContext != EddyContext.Default)
-            {
-                return;
-            }
-
-            if (Level.WaterType == LiquidType.None && _liquidActor != null)
-            {
-                Eddy.Scene.DestroyActor(_liquidActor);
-                _liquidActor = null;
-            }
-            else if (Level.WaterType != LiquidType.None && _liquidActor == null)
-            {
-                _liquidActor = CreateSubActor();
-                _liquidActor.Name = $"Water: {Level.WaterType}";
-                _liquidActor.AddComponent<LiquidMesh>();
-            }
-
-            if (_liquidActor != null)
-            {
-                var mesh = _liquidActor.GetComponent<LiquidMesh>();
-                mesh.Visualize(Level.WaterType, Level.WaterHeight, Level.Size.ToXna());
-            }
-
-            if (Level.Rainy && _rainActor == null)
-            {
-                _rainActor = CreateSubActor();
-                _rainActor.Name = "Rain";
-                var rainMesh = _rainActor.AddComponent<RainMesh>();
-                rainMesh.Camera = Eddy.Camera;
-                rainMesh.LevelSize = Level.Size.ToXna();
-            }
-            else if (!Level.Rainy && _rainActor != null)
-            {
-                Eddy.Scene.DestroyActor(_rainActor);
-                _rainActor = null;
-            }
-
+        if (context != EddyContext.Default)
+        {
             return;
         }
 
+        if (Level.WaterType == LiquidType.None && _liquidActor != null)
+        {
+            Eddy.Scene.DestroyActor(_liquidActor);
+            _liquidActor = null;
+        }
+        else if (Level.WaterType != LiquidType.None && _liquidActor == null)
+        {
+            _liquidActor = CreateSubActor();
+            _liquidActor.Name = $"Water: {Level.WaterType}";
+            _liquidActor.AddComponent<LiquidMesh>();
+        }
+
+        if (_liquidActor != null)
+        {
+            var mesh = _liquidActor.GetComponent<LiquidMesh>();
+            mesh.Visualize(Level.WaterType, Level.WaterHeight, Level.Size.ToXna());
+        }
+
+        if (Level.Rainy && _rainActor == null)
+        {
+            _rainActor = CreateSubActor();
+            _rainActor.Name = "Rain";
+            var rainMesh = _rainActor.AddComponent<RainMesh>();
+            rainMesh.Camera = Eddy.Camera;
+            rainMesh.LevelSize = Level.Size.ToXna();
+        }
+        else if (!Level.Rainy && _rainActor != null)
+        {
+            Eddy.Scene.DestroyActor(_rainActor);
+            _rainActor = null;
+        }
+    }
+
+    public override void FullVisualize()
+    {
         TeardownVisualization();
 
         #region Sky
@@ -517,7 +515,7 @@ internal class DefaultContext : BaseContext
         #endregion
     }
 
-    public void PostRevisualize()
+    public void PostVisualize()
     {
         #region Cloud Shadows
 

@@ -800,15 +800,10 @@ internal class ArtObjectContext : BaseContext
         return edited;
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void PartialRevisualize(EddyContext context)
     {
-        if (partial)
+        if (context == EddyContext.ArtObject)
         {
-            if (Eddy.SelectedContext != EddyContext.ArtObject)
-            {
-                return;
-            }
-
             var presentIds = Level.ArtObjects.Keys.Where(k => k != InvalidId).ToHashSet();
 
             foreach (var id in _artObjectActors.Keys.ToList())
@@ -848,15 +843,14 @@ internal class ArtObjectContext : BaseContext
             {
                 _hoveredId = null;
             }
-
-            return;
         }
+    }
 
+    public override void FullVisualize()
+    {
         TeardownVisualization();
         _selectedIds.Clear();
         _hoveredId = null;
-
-        #region ArtObjects
 
         foreach (var (id, instance) in Level.ArtObjects.Where(kv => kv.Key != InvalidId))
         {
@@ -871,8 +865,6 @@ internal class ArtObjectContext : BaseContext
             var ao = (ArtObject)ResourceService.Load($"Art Objects/{instance.Name}");
             mesh.Visualize(ao);
         }
-
-        #endregion
     }
 
     private void RemoveSelected()

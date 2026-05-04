@@ -232,38 +232,23 @@ internal class GomezContext : BaseContext
         }
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void PartialRevisualize(EddyContext context)
     {
-        if (partial)
+        if (context == EddyContext.Gomez && _gomezActor != null)
         {
-            if (Eddy.SelectedContext != EddyContext.Gomez)
-            {
-                return;
-            }
-
-            if (_gomezActor != null)
-            {
-                _gomezActor.Transform.Position = Level.StartingFace.Id.ToXna().ToVector3() + Vector3.Up;
-                _gomezActor.Transform.Rotation = Level.StartingFace.Face.AsQuaternion();
-            }
-
-            return;
-        }
-
-        TeardownVisualization();
-
-        #region Gomez
-
-        {
-            _gomezActor = CreateSubActor();
-            _gomezActor.Name = "Gomez";
             _gomezActor.Transform.Position = Level.StartingFace.Id.ToXna().ToVector3() + Vector3.Up;
             _gomezActor.Transform.Rotation = Level.StartingFace.Face.AsQuaternion();
-
-            _gomezActor.AddComponent<GomezMesh>();
         }
+    }
 
-        #endregion
+    public override void FullVisualize()
+    {
+        TeardownVisualization();
+        _gomezActor = CreateSubActor();
+        _gomezActor.Name = "Gomez";
+        _gomezActor.Transform.Position = Level.StartingFace.Id.ToXna().ToVector3() + Vector3.Up;
+        _gomezActor.Transform.Rotation = Level.StartingFace.Face.AsQuaternion();
+        _gomezActor.AddComponent<GomezMesh>();
     }
 
     protected override bool IsContextAllowed(EddyContext context)

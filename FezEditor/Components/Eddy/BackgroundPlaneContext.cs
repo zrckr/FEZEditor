@@ -681,15 +681,10 @@ internal class BackgroundPlaneContext : BaseContext
 
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void PartialRevisualize(EddyContext context)
     {
-        if (partial)
+        if (context == EddyContext.BackgroundPlane)
         {
-            if (Eddy.SelectedContext != EddyContext.BackgroundPlane)
-            {
-                return;
-            }
-
             var presentIds = Level.BackgroundPlanes.Keys.Where(k => k != InvalidId).ToHashSet();
 
             foreach (var id in _bgPlaneActors.Keys.ToList())
@@ -728,15 +723,14 @@ internal class BackgroundPlaneContext : BaseContext
             {
                 _hoveredId = null;
             }
-
-            return;
         }
+    }
 
+    public override void FullVisualize()
+    {
         TeardownVisualization();
         _selectedIds.Clear();
         _hoveredId = null;
-
-        #region Background Planes
 
         foreach (var (id, bgPlane) in Level.BackgroundPlanes.Where(kv => kv.Key != InvalidId))
         {
@@ -750,8 +744,6 @@ internal class BackgroundPlaneContext : BaseContext
             var mesh = actor.AddComponent<BackgroundPlaneMesh>();
             SetupVisualization(mesh, bgPlane);
         }
-
-        #endregion
     }
 
     private void RemoveSelected()

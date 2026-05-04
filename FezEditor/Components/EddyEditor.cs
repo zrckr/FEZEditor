@@ -77,7 +77,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     private bool _showRaycastDebug;
 
-    private bool _queueRevisualization;
+    private EddyContext? _revisualizeContext;
 
     private RaycastHit[] _hits = Array.Empty<RaycastHit>();
 
@@ -93,7 +93,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         _scriptBrowser = new ScriptBrowser(game, level, this);
         History.RegisterConverter(new TrileEmplacementConverter());
         History.Track(level);
-        History.StateChanged += () => _queueRevisualization = true;
+        History.StateChanged += () => _revisualizeContext = SelectedContext;
     }
 
     public override void Update(GameTime gameTime)
@@ -149,13 +149,16 @@ public class EddyEditor : EditorComponent, IEddyEditor
             _contexts.Add(new PathContext(Game, _level, this));
             _contexts.Add(_defaultContext);
 
-            _defaultContext.Revisualize();
-            foreach (var ctx in _contexts.Where(c => c != _defaultContext))
+            _defaultContext.FullVisualize();
+            foreach (var context in _contexts)
             {
-                ctx.Revisualize();
+                if (context != _defaultContext)
+                {
+                    context.FullVisualize();
+                }
             }
 
-            _defaultContext.PostRevisualize();
+            _defaultContext.PostVisualize();
         }
         {
             _cursorActor = Scene.CreateActor();
@@ -176,13 +179,14 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     public override void Draw()
     {
-        if (_queueRevisualization)
+        if (_revisualizeContext.HasValue)
         {
-            _queueRevisualization = false;
             foreach (var ctx in _contexts)
             {
-                ctx.Revisualize(partial: true);
+                ctx.PartialRevisualize(_revisualizeContext.Value);
             }
+
+            _revisualizeContext = null;
         }
 
         DrawToolbar();

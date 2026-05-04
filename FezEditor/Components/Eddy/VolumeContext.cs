@@ -527,16 +527,9 @@ internal class VolumeContext : BaseContext
         return edited;
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void FullVisualize()
     {
-        if (Eddy.SelectedContext != EddyContext.Volume && partial)
-        {
-            return;
-        }
-
         TeardownVisualization();
-
-        #region Volumes
 
         foreach (var (id, instance) in Level.Volumes.Where(kv => kv.Key != InvalidId))
         {
@@ -549,8 +542,6 @@ internal class VolumeContext : BaseContext
             mesh.Size = (instance.To - instance.From).ToXna();
             mesh.Color = DefaultColor;
         }
-
-        #endregion
     }
 
     private void RemoveSelected()

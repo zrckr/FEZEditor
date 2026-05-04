@@ -976,7 +976,7 @@ internal sealed class TrileContext : BaseContext
         }
     }
 
-    public override void Revisualize(bool partial = false)
+    public override void PartialRevisualize(EddyContext context)
     {
         if (Level.Triles.Count != 0)
         {
@@ -995,137 +995,141 @@ internal sealed class TrileContext : BaseContext
             _levelBounds = new BoundingBox(Vector3.Zero, Vector3.Zero);
         }
 
-        if (partial)
+        if (context != EddyContext.Trile)
         {
-            if (Eddy.SelectedContext != EddyContext.Trile)
-            {
-                return;
-            }
+            return;
+        }
 
-            _emplacementGroups.Clear();
-            _groupEmplacements.Clear();
-            foreach (var (id, group) in Level.Groups.Where(kv => kv.Key != InvalidId))
+        _emplacementGroups.Clear();
+        _groupEmplacements.Clear();
+        foreach (var (id, group) in Level.Groups.Where(kv => kv.Key != InvalidId))
+        {
+            foreach (var instance in group.Triles)
             {
-                foreach (var instance in group.Triles)
+                var emp = new TrileEmplacement(instance.Position);
+                _emplacementGroups[emp] = id;
+
+                if (!_groupEmplacements.TryGetValue(id, out var set))
                 {
-                    var emp = new TrileEmplacement(instance.Position);
-                    _emplacementGroups[emp] = id;
-
-                    if (!_groupEmplacements.TryGetValue(id, out var set))
-                    {
-                        set = new HashSet<TrileEmplacement>();
-                        _groupEmplacements[id] = set;
-                    }
-
-                    set.Add(emp);
+                    set = new HashSet<TrileEmplacement>();
+                    _groupEmplacements[id] = set;
                 }
-            }
 
-            if (_selectedCursor.GroupId != null && !Level.Groups.ContainsKey(_selectedCursor.GroupId.Value))
-            {
-                _selectedCursor.GroupId = null;
-            }
-
-            var presentIds = Level.Triles.Values
-                .Where(ti => ti.TrileId != InvalidId)
-                .Select(ti => ti.TrileId)
-                .ToHashSet();
-
-            foreach (var id in _trileActors.Keys.ToList())
-            {
-                if (id != InvalidId && !presentIds.Contains(id))
-                {
-                    Eddy.Scene.DestroyActor(_trileActors[id]);
-                    _trileActors.Remove(id);
-                }
-            }
-
-            foreach (var id in presentIds)
-            {
-                EnsureTrileActor(id);
-            }
-
-            foreach (var actor in _trileActors.Values)
-            {
-                actor.GetComponent<TrilesMesh>().ClearInstances();
-            }
-
-            _selectedCursor.Emplacements.RemoveWhere(e => !Level.Triles.ContainsKey(e));
-            if (_hoveredCursor.Emplacement != null && !Level.Triles.ContainsKey(_hoveredCursor.Emplacement))
-            {
-                _hoveredCursor.Reset();
+                set.Add(emp);
             }
         }
-        else
+
+        if (_selectedCursor.GroupId != null && !Level.Groups.ContainsKey(_selectedCursor.GroupId.Value))
         {
-            TeardownVisualization(force: false);
-
-            #region Trile Set
-
-            var path = $"Trile Sets/{Level.TrileSetName}";
-            _set = (TrileSet)ResourceService.Load(path);
-            _hologramTrileId = InvalidId;
-            Eddy.AssetBrowser.SetTrileSet(path, _set);
-
-            #endregion
-
-            #region Triles
-
-            var trileIds = Level.Triles.Values
-                .Where(ti => ti.TrileId != InvalidId)
-                .Select(ti => ti.TrileId)
-                .Distinct();
-
-            foreach (var id in trileIds)
-            {
-                var actor = CreateSubActor();
-                actor.Name = _set.Triles.TryGetValue(id, out var trile) ? $"{id}: {trile.Name}" : $"{id}";
-                _trileActors[id] = actor;
-
-                var mesh = actor.AddComponent<TrilesMesh>();
-                mesh.Visualize(_set, id);
-                if (!mesh.HasGeometry)
-                {
-                    var emptyTriles = Eddy.Visuals.Value.HasFlag(EddyVisuals.EmptyTriles);
-                    actor.Visible = emptyTriles;
-                    mesh.Pickable = emptyTriles;
-                }
-            }
-
-            #endregion
-
-            #region Trile Groups
-
-            _emplacementGroups.Clear();
-            _groupEmplacements.Clear();
-            foreach (var (id, group) in Level.Groups.Where(kv => kv.Key != InvalidId))
-            {
-                foreach (var instance in group.Triles)
-                {
-                    // Grouped emplacements are stored in TrileInstance objects.
-                    // Check FEZRepacker.Core.Definitions.Json.TrileGroupJsonModel
-
-                    var emp = new TrileEmplacement(instance.Position);
-                    _emplacementGroups[emp] = id;
-
-                    if (!_groupEmplacements.TryGetValue(id, out var set))
-                    {
-                        set = new HashSet<TrileEmplacement>();
-                        _groupEmplacements[id] = set;
-                    }
-
-                    set.Add(emp);
-                }
-            }
-
             _selectedCursor.GroupId = null;
+        }
 
-            #endregion
+        var presentIds = Level.Triles.Values
+            .Where(ti => ti.TrileId != InvalidId)
+            .Select(ti => ti.TrileId)
+            .ToHashSet();
 
-            _selectedCursor.Reset();
+        foreach (var id in _trileActors.Keys.ToList())
+        {
+            if (id != InvalidId && !presentIds.Contains(id))
+            {
+                Eddy.Scene.DestroyActor(_trileActors[id]);
+                _trileActors.Remove(id);
+            }
+        }
+
+        foreach (var id in presentIds)
+        {
+            EnsureTrileActor(id);
+        }
+
+        foreach (var actor in _trileActors.Values)
+        {
+            actor.GetComponent<TrilesMesh>().ClearInstances();
+        }
+
+        _selectedCursor.Emplacements.RemoveWhere(e => !Level.Triles.ContainsKey(e));
+        if (_hoveredCursor.Emplacement != null && !Level.Triles.ContainsKey(_hoveredCursor.Emplacement))
+        {
             _hoveredCursor.Reset();
         }
 
+        PostVisualize();
+    }
+
+    public override void FullVisualize()
+    {
+        TeardownVisualization(force: false);
+        _selectedCursor.Reset();
+        _hoveredCursor.Reset();
+
+        #region Trile Set
+
+        var path = $"Trile Sets/{Level.TrileSetName}";
+        _set = (TrileSet)ResourceService.Load(path);
+        _hologramTrileId = InvalidId;
+        Eddy.AssetBrowser.SetTrileSet(path, _set);
+
+        #endregion
+
+        #region Triles
+
+        var trileIds = Level.Triles.Values
+            .Where(ti => ti.TrileId != InvalidId)
+            .Select(ti => ti.TrileId)
+            .Distinct();
+
+        foreach (var id in trileIds)
+        {
+            var actor = CreateSubActor();
+            actor.Name = _set.Triles.TryGetValue(id, out var trile) ? $"{id}: {trile.Name}" : $"{id}";
+            _trileActors[id] = actor;
+
+            var mesh = actor.AddComponent<TrilesMesh>();
+            mesh.Visualize(_set, id);
+            if (!mesh.HasGeometry)
+            {
+                var emptyTriles = Eddy.Visuals.Value.HasFlag(EddyVisuals.EmptyTriles);
+                actor.Visible = emptyTriles;
+                mesh.Pickable = emptyTriles;
+            }
+        }
+
+        #endregion
+
+        #region Trile Groups
+
+        _emplacementGroups.Clear();
+        _groupEmplacements.Clear();
+        foreach (var (id, group) in Level.Groups.Where(kv => kv.Key != InvalidId))
+        {
+            foreach (var instance in group.Triles)
+            {
+                // Grouped emplacements are stored in TrileInstance objects.
+                // Check FEZRepacker.Core.Definitions.Json.TrileGroupJsonModel
+
+                var emp = new TrileEmplacement(instance.Position);
+                _emplacementGroups[emp] = id;
+
+                if (!_groupEmplacements.TryGetValue(id, out var set))
+                {
+                    set = new HashSet<TrileEmplacement>();
+                    _groupEmplacements[id] = set;
+                }
+
+                set.Add(emp);
+            }
+        }
+
+        _selectedCursor.GroupId = null;
+
+        #endregion
+
+        PostVisualize();
+    }
+
+    private void PostVisualize()
+    {
         foreach (var (emplacement, instance) in Level.Triles.Where(kv => kv.Value.TrileId != InvalidId))
         {
             if (_trileActors.TryGetValue(instance.TrileId, out var actor))
