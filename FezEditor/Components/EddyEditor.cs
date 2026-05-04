@@ -195,7 +195,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
         {
             var texture = Scene.Viewport.GetTexture();
             var previewer = Game.Components.OfType<FarawayPreviewer>().FirstOrDefault();
-            if ((previewer == null || !previewer.IsExporting) && (texture == null || texture.Width != w || texture.Height != h))
+            if (previewer is not { IsExporting: true } && (texture == null || texture.Width != w || texture.Height != h))
             {
                 Scene.Viewport.SetSize(w, h);
             }
@@ -203,13 +203,15 @@ public class EddyEditor : EditorComponent, IEddyEditor
             if (texture is { IsDisposed: false })
             {
                 ImGuiX.Image(texture, size);
-                InputService.IsViewportHovered = ImGui.IsItemHovered();
+                const ImGuiHoveredFlags hoverFlags = ImGuiHoveredFlags.AllowWhenBlockedByActiveItem |
+                                                     ImGuiHoveredFlags.AllowWhenBlockedByPopup;
+                InputService.IsViewportHovered = ImGui.IsItemHovered(hoverFlags);
 
                 var viewportMin = ImGuiX.GetItemRectMin();
                 _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;
 
                 _hits = Array.Empty<RaycastHit>();
-                IsViewportHovered = ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Right);
+                IsViewportHovered = ImGui.IsItemHovered(hoverFlags) && !ImGui.IsMouseDragging(ImGuiMouseButton.Right);
                 if (IsViewportHovered)
                 {
                     Ray = Scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
@@ -290,19 +292,12 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
         if (_showScriptBrowser)
         {
-            SelectedContext = EddyContext.Script;
-
             const ImGuiWindowFlags flags = ImGuiWindowFlags.NoCollapse;
             ImGuiX.SetNextWindowSize(new Vector2(500, 400), ImGuiCond.FirstUseEver);
             if (ImGui.Begin("Script Browser", ref _showScriptBrowser, flags))
             {
                 _scriptBrowser.Draw();
                 ImGui.End();
-            }
-
-            if (!_showScriptBrowser)
-            {
-                SelectedContext = EddyContext.Default;
             }
         }
     }

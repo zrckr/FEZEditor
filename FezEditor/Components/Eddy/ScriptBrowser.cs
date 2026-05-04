@@ -30,8 +30,6 @@ internal class ScriptBrowser : IDisposable
 
     private readonly IEddyEditor _eddy;
 
-    private readonly InputService _input;
-
     private readonly ConfirmWindow _confirm;
 
     private Script? _script;
@@ -51,7 +49,6 @@ internal class ScriptBrowser : IDisposable
         _game = game;
         _level = level;
         _eddy = eddy;
-        _input = game.GetService<InputService>();
         game.AddComponent(_confirm = new ConfirmWindow(game));
     }
 
@@ -397,7 +394,7 @@ internal class ScriptBrowser : IDisposable
                 }
             }
 
-            var context = GetEntityContext(entity.Type);
+            var context = EddyContextExtensions.GetEntity(entity.Type);
             if (context.HasValue)
             {
                 var isPicking = _pickTarget == entity;
@@ -420,18 +417,6 @@ internal class ScriptBrowser : IDisposable
             }
         }
     }
-
-    private static EddyContext? GetEntityContext(string typeName) => typeName switch
-    {
-        "ArtObject" => EddyContext.ArtObject,
-        "Group" or "RotatingGroup" or "SuckBlock" or "Switch" or "SpinBlock" => EddyContext.Trile,
-        "Npc" => EddyContext.NonPlayableCharacter,
-        "Volume" => EddyContext.Volume,
-        "Path" => EddyContext.Path,
-        "Script" => EddyContext.Script,
-        "Plane" => EddyContext.BackgroundPlane,
-        _ => null
-    };
 
     private void DrawTriggers()
     {
