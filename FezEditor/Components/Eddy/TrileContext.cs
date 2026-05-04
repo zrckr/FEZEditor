@@ -742,15 +742,11 @@ internal sealed class TrileContext : BaseContext
         {
             var emp = _hoveredCursor.Emplacement;
             var candidatePos = new Vector3(emp.X, emp.Y, emp.Z) + TrilesMesh.EmplacementCenter;
-            var hologramPhi = GetPhi(emp);
+            var hologramPhi = ResolvePaintPhi(emp, false);
 
             if (ImGui.GetIO().KeyShift)
             {
                 candidatePos += _hoveredCursor.Face.Value.AsVector();
-                if (_rotationMode != RotationMode.Copy)
-                {
-                    hologramPhi = _paintingPhi;
-                }
             }
 
             Eddy.Cursor.SetHologramPose(candidatePos, TrilesMesh.PhiAngles[hologramPhi]);
@@ -789,10 +785,9 @@ internal sealed class TrileContext : BaseContext
             var emplacements = _selectedCursor.Emplacements.ToList();
             if (ImGui.GetIO().KeyShift)
             {
-                var appendPhi = GetPhi(_hoveredCursor.Emplacement);
                 foreach (var emplacement in emplacements)
                 {
-                    AppendNewTrile(emplacement, appendPhi);
+                    AppendNewTrile(emplacement);
                 }
 
                 UpdateCollisionMesh();
@@ -830,8 +825,7 @@ internal sealed class TrileContext : BaseContext
             Eddy.SelectedContext = EddyContext.Trile;
             if (ImGui.GetIO().KeyShift)
             {
-                var appendPhi = GetPhi(_hoveredCursor.Emplacement);
-                AppendNewTrile(_hoveredCursor.Emplacement!, appendPhi);
+                AppendNewTrile(_hoveredCursor.Emplacement!);
                 UpdateCollisionMesh();
             }
             else if (ImGui.GetIO().KeyCtrl)
@@ -868,11 +862,12 @@ internal sealed class TrileContext : BaseContext
                                 break;
                             }
 
-                        case PaintOp.Changed(var emplacement, var newId):
+                        case PaintOp.Changed(var emplacement, var newId, var newPhi):
                             {
                                 if (Level.Triles.TryGetValue(emplacement, out var instance))
                                 {
                                     instance.TrileId = newId;
+                                    instance.PhiLight = newPhi;
                                 }
 
                                 break;
@@ -897,7 +892,7 @@ internal sealed class TrileContext : BaseContext
             return Level.Triles.GetValueOrDefault(emplacement ?? new TrileEmplacement())?.PhiLight ?? _paintingPhi;
         }
 
-        void AppendNewTrile(TrileEmplacement emplacement, byte phi)
+        void AppendNewTrile(TrileEmplacement emplacement)
         {
             var faceNormal = _hoveredCursor.Face!.Value.AsVector();
             var newEmp = new TrileEmplacement(
@@ -907,6 +902,7 @@ internal sealed class TrileContext : BaseContext
             );
 
             var position = new Vector3(newEmp.X, newEmp.Y, newEmp.Z);
+            var phi = ResolvePaintPhi(emplacement, true);
             var mesh = EnsureTrileActor(trileId).GetComponent<TrilesMesh>();
             mesh.SetInstanceData(newEmp, position, phi);
 
@@ -914,11 +910,6 @@ internal sealed class TrileContext : BaseContext
             if (_selectedCursor.Emplacements.Remove(emplacement))
             {
                 _selectedCursor.Emplacements.Add(newEmp);
-            }
-
-            if (_rotationMode == RotationMode.Random)
-            {
-                _paintingPhi = (byte)Random.Shared.Next(4);
             }
         }
 
@@ -940,7 +931,8 @@ internal sealed class TrileContext : BaseContext
         {
             var instance = Level.Triles[emplacement];
             var oldTrileId = instance.TrileId;
-            if (oldTrileId == trileId || trileId == InvalidId)
+            var phi = ResolvePaintPhi(emplacement, true);
+            if ((oldTrileId == trileId && phi == GetPhi(emplacement)) || trileId == InvalidId)
             {
                 return;
             }
@@ -953,9 +945,26 @@ internal sealed class TrileContext : BaseContext
             }
 
             var mesh = EnsureTrileActor(trileId).GetComponent<TrilesMesh>();
-            mesh.SetInstanceData(emplacement, instance.Position.ToXna(), instance.PhiLight);
+            mesh.SetInstanceData(emplacement, instance.Position.ToXna(), phi);
 
-            _paintOps.Add(new PaintOp.Changed(emplacement, trileId));
+            _paintOps.Add(new PaintOp.Changed(emplacement, trileId, phi));
+        }
+
+        byte ResolvePaintPhi(TrileEmplacement emplacement, bool placingTrile)
+        {
+            if (placingTrile && _rotationMode == RotationMode.Random)
+            {
+                var phiToUse = _paintingPhi;
+                _paintingPhi = (byte)Random.Shared.Next(4);
+                return phiToUse;
+            }
+
+            if (_rotationMode == RotationMode.Copy)
+            {
+                _paintingPhi = GetPhi(emplacement);
+            }
+
+            return _paintingPhi;
         }
     }
 
@@ -1866,7 +1875,7 @@ internal sealed class TrileContext : BaseContext
 
         public record Erased(TrileEmplacement Emp) : PaintOp(Emp);
 
-        public record Changed(TrileEmplacement Emp, int NewId) : PaintOp(Emp);
+        public record Changed(TrileEmplacement Emp, int NewId, byte NewPhi) : PaintOp(Emp);
     }
 
     private record struct TrileEntry(TrileEmplacement Emp, int TrileId, byte PhiLight);
