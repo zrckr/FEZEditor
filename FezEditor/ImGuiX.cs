@@ -626,7 +626,7 @@ public static class ImGuiX
                         }
 
                         ImGui.SameLine();
-                        if (ImGui.Button(Icons.Close))
+                        if (ImGui.Button(Lucide.X))
                         {
                             items.RemoveAt(i);
                             i--;
@@ -639,7 +639,7 @@ public static class ImGuiX
                     ImGui.EndListBox();
                 }
 
-                if (ImGui.Button($"{Icons.Add} Add"))
+                if (ImGui.Button($"{Lucide.Plus} Add"))
                 {
                     items.Add(createNew());
                     changed = true;
@@ -736,7 +736,7 @@ public static class ImGuiX
                         }
 
                         ImGui.SameLine();
-                        if (ImGui.Button(Icons.Close))
+                        if (ImGui.Button(Lucide.X))
                         {
                             items.Remove(key);
                             changed = true;
@@ -750,7 +750,7 @@ public static class ImGuiX
 
                 // New entry input
                 K newKey = default!;
-                ImGui.Button($"{Icons.Add} Add New Key");
+                ImGui.Button($"{Lucide.Plus} Add New Key");
                 ImGui.SameLine();
 
                 if (renderNewKey(ref newKey))
@@ -842,7 +842,7 @@ public static class ImGuiX
         var lineHeight = ImGui.GetTextLineHeight();
         var padding = new NVector2(4, 4);
 
-        var timeText = $@"{Icons.Clockface} {clock.CurrentTime:HH\:mm}";
+        var timeText = $@"{Lucide.Clock} {clock.CurrentTime:HH\:mm}";
 
         const float sliderWidth = 120f;
         var totalWidth = sliderWidth + padding.X * 2;

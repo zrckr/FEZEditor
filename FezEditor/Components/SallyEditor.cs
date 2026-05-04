@@ -95,7 +95,7 @@ public class SallyEditor : EditorComponent
 
     private void DrawToolbar()
     {
-        if (ImGui.Button($"{Icons.Refresh} New Save"))
+        if (ImGui.Button($"{Lucide.RotateCcw} New Save"))
         {
             _nextState = State.OverrideSaveSlot;
             _saveSlotOverrider = () => new SaveData();
@@ -103,7 +103,7 @@ public class SallyEditor : EditorComponent
 
         ImGui.SameLine();
 
-        if (ImGui.Button($"{Icons.StarEmpty} 209.4% Save"))
+        if (ImGui.Button($"{Lucide.Star} 209.4% Save"))
         {
             _nextState = State.OverrideSaveSlot;
             _saveSlotOverrider = () => _resources.LoadSaveDataFromContent("SaveSlots/209,4%");
@@ -111,7 +111,7 @@ public class SallyEditor : EditorComponent
 
         ImGui.SameLine();
 
-        if (ImGui.Button($"{Icons.StarFull} Full Completion Save"))
+        if (ImGui.Button($"{Lucide.CircleStar} Full Completion Save"))
         {
             _nextState = State.OverrideSaveSlot;
             _saveSlotOverrider = () => _resources.LoadSaveDataFromContent("SaveSlots/100%");
@@ -449,7 +449,7 @@ public class SallyEditor : EditorComponent
         ImGui.Text("Levels");
         ImGui.Separator();
 
-        if (ImGui.Button($"{Icons.Add} Add"))
+        if (ImGui.Button($"{Lucide.Plus} Add"))
         {
             using (History.BeginScope("Add New Level"))
             {
@@ -461,7 +461,7 @@ public class SallyEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_levelIndex == -1);
-        if (ImGui.Button($"{Icons.Rename} Rename"))
+        if (ImGui.Button($"{Lucide.TextCursorInput} Rename"))
         {
             _nextState = State.RenameLevel;
         }
@@ -470,7 +470,7 @@ public class SallyEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_levelIndex == -1);
-        if (ImGui.Button($"{Icons.Remove} Remove"))
+        if (ImGui.Button($"{Lucide.Minus} Remove"))
         {
             _nextState = State.RemoveLevel;
         }

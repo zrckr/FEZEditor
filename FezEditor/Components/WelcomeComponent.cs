@@ -82,9 +82,9 @@ public class WelcomeComponent : EditorComponent
 
                         var icon = entry.Kind switch
                         {
-                            "File" => Icons.Package,
-                            "Directory" => Icons.Folder,
-                            "Mod" => Icons.FileSubmodule,
+                            "File" => Lucide.Package,
+                            "Directory" => Lucide.Folder,
+                            "Mod" => Lucide.FolderCog,
                             _ => throw new InvalidOperationException()
                         };
                         if (ImGuiX.Button($"{icon} {name}##recent_{entry.Path}", new Vector2(-1, 0)))
@@ -98,7 +98,7 @@ public class WelcomeComponent : EditorComponent
                         }
                     }
 
-                    if (ImGuiX.Button($"{Icons.Trash} Clear recent files", new Vector2(-1, 0)))
+                    if (ImGuiX.Button($"{Lucide.Trash2} Clear recent files", new Vector2(-1, 0)))
                     {
                         _appStorageService.ClearRecentPaths();
                     }
@@ -108,7 +108,7 @@ public class WelcomeComponent : EditorComponent
             ImGui.EndChild();
         }
 
-        if (ImGui.Button($"{Icons.Package} Open PAK file"))
+        if (ImGui.Button($"{Lucide.Package} Open PAK file"))
         {
             FileDialog.Show(FileDialog.Type.OpenFile, OpenPakFile, new FileDialog.Options
             {
@@ -120,7 +120,7 @@ public class WelcomeComponent : EditorComponent
             });
         }
 
-        if (ImGui.Button($"{Icons.Folder} Open assets directory"))
+        if (ImGui.Button($"{Lucide.Folder} Open assets directory"))
         {
             FileDialog.Show(FileDialog.Type.OpenFolder, OpenDirectory, new FileDialog.Options
             {
@@ -128,7 +128,7 @@ public class WelcomeComponent : EditorComponent
             });
         }
 
-        if (ImGui.Button($"{Icons.FileSubmodule} Open mod assets directory"))
+        if (ImGui.Button($"{Lucide.FolderCog} Open mod assets directory"))
         {
             FileDialog.Show(FileDialog.Type.OpenFolder, OpenMod, new FileDialog.Options
             {
@@ -136,7 +136,7 @@ public class WelcomeComponent : EditorComponent
             });
         }
 
-        if (ImGui.Button($"{Icons.Export} Extract assets and open them..."))
+        if (ImGui.Button($"{Lucide.ArrowsUpFromLine} Extract assets and open them..."))
         {
             var selectOptions = new FileDialog.Options
             {
@@ -159,7 +159,7 @@ public class WelcomeComponent : EditorComponent
                 selectOptions);
         }
 
-        if (ImGui.Button($"{Icons.SaveAs} Open SaveSlot file to edit"))
+        if (ImGui.Button($"{Lucide.Save} Open SaveSlot file to edit"))
         {
             var path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             FileDialog.Show(FileDialog.Type.OpenFolder, OpenDirectory, new FileDialog.Options
@@ -169,7 +169,7 @@ public class WelcomeComponent : EditorComponent
             });
         }
 
-        if (ImGui.Button($"{Icons.CloseAll} Quit"))
+        if (ImGui.Button($"{Lucide.CopyX} Quit"))
         {
             Game.Exit();
         }

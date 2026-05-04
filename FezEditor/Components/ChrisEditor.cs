@@ -155,7 +155,7 @@ public class ChrisEditor : EditorComponent
     private void DrawToolbar()
     {
         ImGui.BeginDisabled(_editMode == EditMode.Select);
-        if (ImGui.Button($"{Icons.Cursor} Select"))
+        if (ImGui.Button($"{Lucide.MousePointer2} Select"))
         {
             _editMode = EditMode.Select;
         }
@@ -164,7 +164,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_editMode == EditMode.Remove);
-        if (ImGui.Button($"{Icons.Eraser} Remove"))
+        if (ImGui.Button($"{Lucide.Eraser} Remove"))
         {
             _editMode = EditMode.Remove;
         }
@@ -173,7 +173,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_editMode == EditMode.Add);
-        if (ImGui.Button($"{Icons.Pencil} Add"))
+        if (ImGui.Button($"{Lucide.Pencil} Add"))
         {
             _editMode = EditMode.Add;
         }
@@ -185,7 +185,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_showProperties);
-        if (ImGui.Button($"{Icons.SymbolProperty} Properties"))
+        if (ImGui.Button($"{Lucide.Wrench} Properties"))
         {
             _showProperties = true;
         }
@@ -194,7 +194,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_showTexture);
-        if (ImGui.Button($"{Icons.FileMedia} Texture"))
+        if (ImGui.Button($"{Lucide.Image} Texture"))
         {
             _showTexture = true;
         }
@@ -212,7 +212,7 @@ public class ChrisEditor : EditorComponent
         if (_context is TrileSetContext)
         {
             var collision = _meshActor.GetComponent<TrileCollisionMesh>();
-            var icon = collision.Visible ? Icons.EyeClosed : Icons.Eye;
+            var icon = collision.Visible ? Lucide.EyeOff : Lucide.Eye;
             ImGui.SameLine();
             if (ImGui.Button($"{icon} Collision"))
             {
@@ -236,7 +236,7 @@ public class ChrisEditor : EditorComponent
         }
 
         ImGui.Separator();
-        if (ImGui.Button($"{Icons.Add} Add"))
+        if (ImGui.Button($"{Lucide.Plus} Add"))
         {
             using (History.BeginScope("Add Trile"))
             {
@@ -251,7 +251,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Icons.Remove} Remove"))
+        if (ImGui.Button($"{Lucide.Minus} Remove"))
         {
             using (History.BeginScope("Remove Trile"))
             {
@@ -268,7 +268,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Icons.Copy} Copy"))
+        if (ImGui.Button($"{Lucide.Copy} Copy"))
         {
             using (History.BeginScope("Copy Triles"))
             {
@@ -285,7 +285,7 @@ public class ChrisEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Icons.ClearAll} Clear"))
+        if (ImGui.Button($"{Lucide.ListX} Clear"))
         {
             _selectedTriles.Clear();
         }
@@ -293,7 +293,7 @@ public class ChrisEditor : EditorComponent
         ImGui.EndDisabled();
 
         ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Icons.Export} Export Selected"))
+        if (ImGui.Button($"{Lucide.ArrowRightFromLine} Export Selected"))
         {
             var options = new FileDialog.Options
             {
@@ -321,7 +321,7 @@ public class ChrisEditor : EditorComponent
         if (!string.IsNullOrEmpty(_filterTriles))
         {
             ImGui.SameLine();
-            if (ImGui.Button(Icons.ClearAll))
+            if (ImGui.Button(Lucide.ListX))
             {
                 _filterTriles = "";
             }

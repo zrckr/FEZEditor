@@ -484,7 +484,7 @@ public class EddyEditor : EditorComponent, IEddyEditor
 
     private void DrawViewOptions()
     {
-        var text = $"{Icons.KebabVertical} {_viewMode}";
+        var text = $"{Lucide.EllipsisVertical} {_viewMode}";
         var viewButtonWidth = ImGui.CalcTextSize(text).X + ImGui.GetStyle().FramePadding.X * 2;
         ImGui.SameLine(ImGui.GetContentRegionMax().X - viewButtonWidth);
 

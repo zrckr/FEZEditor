@@ -59,7 +59,7 @@ public class ReferencesWindow : DrawableGameComponent
             {
                 ImGui.Text(paths[i]);
                 ImGui.SameLine();
-                if (ImGui.Button($"{Icons.FolderOpened}##open_{i}"))
+                if (ImGui.Button($"{Lucide.FolderOpen}##open_{i}"))
                 {
                     _resourceService.OpenInFileManager(paths[i]);
                 }
@@ -70,7 +70,7 @@ public class ReferencesWindow : DrawableGameComponent
                 }
 
                 ImGui.SameLine();
-                if (ImGui.Button($"{Icons.Trash}##remove_{i}"))
+                if (ImGui.Button($"{Lucide.Trash2}##remove_{i}"))
                 {
                     removeAt = i;
                 }
@@ -93,7 +93,7 @@ public class ReferencesWindow : DrawableGameComponent
 
         ImGui.Separator();
 
-        if (ImGui.Button($"{Icons.Package} Add PAK files"))
+        if (ImGui.Button($"{Lucide.Package} Add PAK files"))
         {
             ImGui.CloseCurrentPopup();
             _open = false;
@@ -112,7 +112,7 @@ public class ReferencesWindow : DrawableGameComponent
 
         ImGui.SameLine();
 
-        if (ImGui.Button($"{Icons.Folder} Add folder"))
+        if (ImGui.Button($"{Lucide.Folder} Add folder"))
         {
             ImGui.CloseCurrentPopup();
             _open = false;

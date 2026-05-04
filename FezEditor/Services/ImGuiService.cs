@@ -86,13 +86,12 @@ public partial class ImGuiService : IDisposable
         // Load fonts
         {
             var io = ImGui.GetIO();
-            LoadFont("Fonts/ProggyForever", io.Fonts.GetGlyphRangesDefault(), 13f); // default font
-            LoadIconsFont("Fonts/Codicon", Icons.IconMin, Icons.IconMax);
-            LoadIconsFont("Fonts/Lucide", Lucide.IconMin, Lucide.IconMax);
-            ImGuiX.Fonts.NotoSans = LoadFont("Fonts/NotoSans", io.Fonts.GetGlyphRangesDefault());
-            ImGuiX.Fonts.NotoSansJp = LoadFont("Fonts/NotoSansJP", io.Fonts.GetGlyphRangesJapanese());
-            ImGuiX.Fonts.NotoSansKr = LoadFont("Fonts/NotoSansKR", io.Fonts.GetGlyphRangesKorean());
-            ImGuiX.Fonts.NotoSansTc = LoadFont("Fonts/NotoSansTC", io.Fonts.GetGlyphRangesChineseFull());
+            LoadFont("Fonts/ProggyForever", io.Fonts.GetGlyphRangesDefault(), size: 13f); // default font
+            LoadIconsFont("Fonts/Lucide", Lucide.IconMin, Lucide.IconMax, size: 16f, yOffset: 4f);
+            ImGuiX.Fonts.NotoSans = LoadFont("Fonts/NotoSans", io.Fonts.GetGlyphRangesDefault(), size: 24f);
+            ImGuiX.Fonts.NotoSansJp = LoadFont("Fonts/NotoSansJP", io.Fonts.GetGlyphRangesJapanese(), size: 24f);
+            ImGuiX.Fonts.NotoSansKr = LoadFont("Fonts/NotoSansKR", io.Fonts.GetGlyphRangesKorean(), size: 24f);
+            ImGuiX.Fonts.NotoSansTc = LoadFont("Fonts/NotoSansTC", io.Fonts.GetGlyphRangesChineseFull(), size: 24f);
         }
 
         // Rebuild Font atlas
@@ -364,7 +363,7 @@ public partial class ImGuiService : IDisposable
     /// <summary>
     /// Loads font into ImGui from game content.
     /// </summary>
-    private unsafe ImFontPtr LoadFont(string path, nint glyphRanges, float size = 24f)
+    private unsafe ImFontPtr LoadFont(string path, nint glyphRanges, float size)
     {
         Logger.Debug("Loading font - {0}", path);
         var io = ImGui.GetIO();
@@ -382,7 +381,7 @@ public partial class ImGuiService : IDisposable
     /// <remarks>
     /// This method merges icons into previously loaded font.
     /// </remarks>
-    private unsafe void LoadIconsFont(string path, ushort min, ushort max, float size = 16f)
+    private unsafe void LoadIconsFont(string path, ushort min, ushort max, float size, float yOffset)
     {
         Logger.Debug("Loading icons font - {0}", path);
         var io = ImGui.GetIO();
@@ -392,7 +391,7 @@ public partial class ImGuiService : IDisposable
         var config = ImGuiNative.ImFontConfig_ImFontConfig();
         config->MergeMode = 1;
         config->GlyphMinAdvanceX = size * _displayScale;
-        config->GlyphOffset = new NVector2(0, size > 16 ? 7 : 5);
+        config->GlyphOffset = new NVector2(0, yOffset);
 
         var ranges = new ushort[] { min, max, 0 };
         fixed (ushort* rangesPtr = ranges)

@@ -92,7 +92,7 @@ public class DiezEditor : EditorComponent
         ImGui.Separator();
 
         ImGui.BeginDisabled(_loopIndex == -1 || _loopIndex == _trackedSong.Loops.Count - 1);
-        if (ImGui.Button($"{Icons.ChevronDown} Down"))
+        if (ImGui.Button($"{Lucide.ChevronDown} Down"))
         {
             MoveLoop(_loopIndex, ++_loopIndex);
         }
@@ -101,7 +101,7 @@ public class DiezEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_loopIndex is -1 or 0);
-        if (ImGui.Button($"{Icons.ChevronUp} Up"))
+        if (ImGui.Button($"{Lucide.ChevronUp} Up"))
         {
             MoveLoop(_loopIndex, --_loopIndex);
         }
@@ -109,7 +109,7 @@ public class DiezEditor : EditorComponent
         ImGui.EndDisabled();
 
         ImGui.SameLine();
-        if (ImGui.Button($"{Icons.Add} Add"))
+        if (ImGui.Button($"{Lucide.Plus} Add"))
         {
             using (History.BeginScope("Add New Loop"))
             {
@@ -122,7 +122,7 @@ public class DiezEditor : EditorComponent
 
         ImGui.SameLine();
         ImGui.BeginDisabled(_loopIndex == -1);
-        if (ImGui.Button($"{Icons.Remove} Remove"))
+        if (ImGui.Button($"{Lucide.Minus} Remove"))
         {
             using (History.BeginScope("Remove The Loop"))
             {
@@ -228,7 +228,7 @@ public class DiezEditor : EditorComponent
                 ImGui.BeginDisabled();
             }
 
-            if (ImGui.Button($"{Icons.Play} Preview the Assemble Chord"))
+            if (ImGui.Button($"{Lucide.Play} Preview the Assemble Chord"))
             {
                 var path = $"Sounds/Collects/SplitUpCube/Assemble_{_trackedSong.AssembleChord}";
                 using var stream = ResourceService.OpenStream(path, ".wav");

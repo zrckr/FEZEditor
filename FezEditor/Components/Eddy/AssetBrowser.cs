@@ -336,7 +336,7 @@ public class AssetBrowser : IDisposable
         if (!string.IsNullOrEmpty(_filterEntries))
         {
             ImGui.SameLine();
-            if (ImGui.Button($"{Icons.Close}"))
+            if (ImGui.Button($"{Lucide.X}"))
             {
                 _filterEntries = string.Empty;
             }

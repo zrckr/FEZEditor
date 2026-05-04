@@ -15,7 +15,7 @@ public class NotSupportedComponent : EditorComponent
 
     public override void Draw()
     {
-        var text = $"{Icons.Warning} There's no editor for {_type.Name} asset!";
+        var text = $"{Lucide.TriangleAlert} There's no editor for {_type.Name} asset!";
         ImGuiX.SetTextCentered(text);
         ImGui.Text(text);
     }

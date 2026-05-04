@@ -66,8 +66,8 @@ public class RickViewer : EditorComponent
     private void DrawPlaybackButton()
     {
         var buttonIcon = _soundEffectInstance?.State == SoundState.Playing
-            ? Icons.DebugPause
-            : Icons.Play;
+            ? Lucide.Pause
+            : Lucide.Play;
 
         if (ImGuiX.Button(buttonIcon, Vector2.One * PlayerButtonSize))
         {

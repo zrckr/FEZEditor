@@ -189,19 +189,19 @@ public class TexViewer : EditorComponent
 
     private void DrawToolbar(Rectangle frame)
     {
-        if (ImGui.Button($"{Icons.ZoomIn} Zoom In"))
+        if (ImGui.Button($"{Lucide.ZoomIn} Zoom In"))
         {
             _zoom = MathHelper.Min(_zoom * 2f, MaxZoom);
         }
 
         ImGui.SameLine();
-        if (ImGui.Button($"{Icons.ZoomOut} Zoom Out"))
+        if (ImGui.Button($"{Lucide.ZoomOut} Zoom Out"))
         {
             _zoom = MathHelper.Max(_zoom / 2f, MinZoom);
         }
 
         ImGui.SameLine();
-        if (ImGui.Button($"{Icons.ScreenNormal} Reset View"))
+        if (ImGui.Button($"{Lucide.Minimize} Reset View"))
         {
             _zoom = _initialZoom!.Value;
             _pan = Vector2.Zero;
@@ -220,7 +220,7 @@ public class TexViewer : EditorComponent
             ImGui.SameLine();
             ImGui.Text("|");
 
-            var icon = _showTimeline ? Icons.EyeClosed : Icons.Eye;
+            var icon = _showTimeline ? Lucide.EyeOff : Lucide.Eye;
             ImGui.SameLine();
             if (ImGui.Button($"{icon} Timeline"))
             {
@@ -253,7 +253,7 @@ public class TexViewer : EditorComponent
 
             #region Playback controls
 
-            if (ImGui.Button(Icons.DebugStepBack))
+            if (ImGui.Button(Lucide.UndoDot))
             {
                 _playing = false;
                 CurrentFrame = (CurrentFrame - 1 + frameCount) % frameCount;
@@ -261,13 +261,13 @@ public class TexViewer : EditorComponent
             }
 
             ImGui.SameLine();
-            if (ImGui.Button(_playing ? Icons.DebugPause : Icons.Play))
+            if (ImGui.Button(_playing ? Lucide.Pause : Lucide.Play))
             {
                 _playing = !_playing;
             }
 
             ImGui.SameLine();
-            if (ImGui.Button(Icons.Stop))
+            if (ImGui.Button(Lucide.Square))
             {
                 _playing = false;
                 CurrentFrame = 0;
@@ -275,7 +275,7 @@ public class TexViewer : EditorComponent
             }
 
             ImGui.SameLine();
-            if (ImGui.Button(Icons.DebugStepOver))
+            if (ImGui.Button(Lucide.RedoDot))
             {
                 _playing = false;
                 CurrentFrame = (CurrentFrame + 1) % frameCount;
@@ -296,11 +296,11 @@ public class TexViewer : EditorComponent
             ImGui.Separator();
 
             ImGui.TextWrapped(
-                $"{Icons.Info} To edit this animation, use Aseprite or another sprite editor. " +
+                $"{Lucide.Info} To edit this animation, use Aseprite or another sprite editor. " +
                 $"Export the texture, edit it externally, and changes will be detected automatically " +
                 $"when you return to this window.");
 
-            if (ImGui.Button($"{Icons.FolderOpened} Open in File Manager"))
+            if (ImGui.Button($"{Lucide.FolderOpen} Open in File Manager"))
             {
                 ResourceService.OpenInFileManager(Title);
             }

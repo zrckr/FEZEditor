@@ -196,7 +196,7 @@ public class ZuEditor : EditorComponent
 
         _lastSelectedIndex = _selectedIndex;
 
-        if (ImGuiX.Button($"{Icons.Add} Add", Vector2.Zero))
+        if (ImGuiX.Button($"{Lucide.Plus} Add", Vector2.Zero))
         {
             AddCharacter('?');
         }
@@ -204,14 +204,14 @@ public class ZuEditor : EditorComponent
         ImGui.SameLine();
         ImGui.BeginDisabled(_selectedIndex < 0);
 
-        if (ImGuiX.Button($"{Icons.Copy} Duplicate", Vector2.Zero))
+        if (ImGuiX.Button($"{Lucide.Copy} Duplicate", Vector2.Zero))
         {
             DuplicateSelected();
         }
 
         ImGui.SameLine();
 
-        if (ImGuiX.Button($"{Icons.Remove} Remove", Vector2.Zero))
+        if (ImGuiX.Button($"{Lucide.Minus} Remove", Vector2.Zero))
         {
             DeleteSelected();
         }

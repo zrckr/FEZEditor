@@ -90,7 +90,7 @@ public class PoEditor : EditorComponent
         }
 
         ImGui.SameLine();
-        if (ImGui.Button($"{Icons.Add} Add New Entry"))
+        if (ImGui.Button($"{Lucide.Plus} Add New Entry"))
         {
             _newEntryId = "";
             _nextState = State.AddEntry;

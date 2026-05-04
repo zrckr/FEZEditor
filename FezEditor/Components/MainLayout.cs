@@ -127,7 +127,7 @@ public class MainLayout : DrawableGameComponent
                     }
                     else
                     {
-                        const string text = $"{Icons.ArrowLeft} Open a file from File Browser";
+                        const string text = $"{Lucide.ArrowLeft} Open a file from File Browser";
                         ImGuiX.SetTextCentered(text);
                         ImGui.Text(text);
                     }

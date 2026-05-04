@@ -106,7 +106,7 @@ public class FileBrowser : DrawableGameComponent
     {
         if (_resourceService.HasNoProvider)
         {
-            const string text = $"{Icons.Info} No resources";
+            const string text = $"{Lucide.Info} No resources";
             ImGuiX.SetTextCentered(text);
             ImGui.TextDisabled(text);
         }
@@ -182,14 +182,14 @@ public class FileBrowser : DrawableGameComponent
             if (!string.IsNullOrEmpty(_filter))
             {
                 ImGui.SameLine();
-                if (ImGui.Button(Icons.ClearAll))
+                if (ImGui.Button(Lucide.ListX))
                 {
                     _filter = "";
                 }
             }
 
             ImGui.SameLine();
-            if (ImGui.Button(Icons.ListFilter))
+            if (ImGui.Button(Lucide.Funnel))
             {
                 ImGui.OpenPopup("SortOptions");
             }
@@ -302,13 +302,22 @@ public class FileBrowser : DrawableGameComponent
                 }
 
                 // Choose icon based on node type
-                var icon = node.IsDirectory
-                    ? node is { IsReference: true, Path: "References" }
-                        ? Icons.References
-                        : node.IsOpen
-                            ? Icons.FolderOpened
-                            : Icons.Folder
-                    : GetFileIcon(node.Extension);
+                string? icon;
+                if (node.IsDirectory)
+                {
+                    if (node is { IsReference: true, Path: "References" })
+                    {
+                        icon = Lucide.FolderSymlink;
+                    }
+                    else
+                    {
+                        icon = node.IsOpen ? Lucide.FolderOpen : Lucide.Folder;
+                    }
+                }
+                else
+                {
+                    icon = GetFileIcon(node.Extension);
+                }
 
                 var label = $"{icon} {node.Name}";
                 var nodeOpen = ImGui.TreeNodeEx($"{node.Path}##{node.Path}", nodeFlags, label);
@@ -409,14 +418,14 @@ public class FileBrowser : DrawableGameComponent
         }
         else
         {
-            if (ImGui.BeginMenu($"{Icons.FileAdd} Create New Asset..."))
+            if (ImGui.BeginMenu($"{Lucide.FilePlusCorner} Create New Asset..."))
             {
                 DrawNewAssetMenuItems(string.Empty, node.Path);
                 ImGui.EndMenu();
             }
 
             var shortcut = _inputService.GetActionBinding(InputActions.FileBrowserCopyRelativePath);
-            if (ImGui.MenuItem($"{Icons.Copy} Copy Relative Path", shortcut))
+            if (ImGui.MenuItem($"{Lucide.Copy} Copy Relative Path", shortcut))
             {
                 ImGui.SetClipboardText(node.Path);
             }
@@ -429,24 +438,24 @@ public class FileBrowser : DrawableGameComponent
 
             ImGui.Separator();
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserRename);
-            if (ImGui.MenuItem($"{Icons.Rename} Rename", shortcut))
+            if (ImGui.MenuItem($"{Lucide.TextCursorInput} Rename", shortcut))
             {
                 ShowRenameDialog(node.Path);
             }
 
-            if (ImGui.MenuItem($"{Icons.Copy} Duplicate"))
+            if (ImGui.MenuItem($"{Lucide.Copy} Duplicate"))
             {
                 _resourceService.Duplicate(node.Path);
             }
 
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserMove);
-            if (ImGui.MenuItem($"{Icons.Move} Move", shortcut))
+            if (ImGui.MenuItem($"{Lucide.Move} Move", shortcut))
             {
                 ShowMoveDialog(node.Path);
             }
 
             shortcut = _inputService.GetActionBinding(InputActions.FileBrowserDelete);
-            if (ImGui.MenuItem($"{Icons.Remove} Delete", shortcut))
+            if (ImGui.MenuItem($"{Lucide.Minus} Delete", shortcut))
             {
                 ShowDeleteDialog(node.Path);
             }
@@ -455,7 +464,7 @@ public class FileBrowser : DrawableGameComponent
         ImGui.Separator();
 
         var openShortcut = _inputService.GetActionBinding(InputActions.FileBrowserOpenInFileManager);
-        if (ImGui.MenuItem($"{Icons.FolderOpened} Open in File Manager", openShortcut))
+        if (ImGui.MenuItem($"{Lucide.FolderOpen} Open in File Manager", openShortcut))
         {
             _resourceService.OpenInFileManager(node.Path);
         }
@@ -463,7 +472,7 @@ public class FileBrowser : DrawableGameComponent
 
     private void DrawReferenceContextMenu(FileNode node)
     {
-        if (ImGui.MenuItem($"{Icons.Copy} Copy to mod"))
+        if (ImGui.MenuItem($"{Lucide.Copy} Copy to mod"))
         {
             _resourceService.CopyFromReference(node.Path);
         }
@@ -793,16 +802,16 @@ public class FileBrowser : DrawableGameComponent
     {
         if (string.IsNullOrEmpty(extension))
         {
-            return Icons.File;
+            return Lucide.FileQuestionMark;
         }
 
         var parts = extension.TrimStart('.').Split('.');
         var lastExt = parts.Length > 0 ? parts[^1].ToLowerInvariant() : "";
         return lastExt switch
         {
-            "json" => Icons.Json,
-            "png" or "jpg" or "jpeg" or "gif" or "bmp" or "glb" => Icons.FileMedia,
-            _ => Icons.File
+            "json" => Lucide.Braces,
+            "png" or "jpg" or "jpeg" or "gif" or "bmp" or "glb" => Lucide.Image,
+            _ => Lucide.FileBox
         };
     }
 

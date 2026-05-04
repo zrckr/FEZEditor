@@ -1195,7 +1195,7 @@ internal sealed class TrileContext : BaseContext
 
         if (instance.ActorSettings == null)
         {
-            if (ImGui.Button($"{Icons.Add} Add"))
+            if (ImGui.Button($"{Lucide.Plus} Add"))
             {
                 using (Eddy.History.BeginScope("Add ActorSettings"))
                 {
@@ -1206,7 +1206,7 @@ internal sealed class TrileContext : BaseContext
 
         if (instance.ActorSettings != null)
         {
-            if (ImGui.Button($"{Icons.Trash} Remove"))
+            if (ImGui.Button($"{Lucide.Trash2} Remove"))
             {
                 using (Eddy.History.BeginScope("Remove ActorSettings"))
                 {
@@ -1325,7 +1325,7 @@ internal sealed class TrileContext : BaseContext
 
         if (anyWithout)
         {
-            if (ImGui.Button($"{Icons.Add} Add to All"))
+            if (ImGui.Button($"{Lucide.Plus} Add to All"))
             {
                 using (Eddy.History.BeginScope("Add ActorSettings"))
                 {
@@ -1344,7 +1344,7 @@ internal sealed class TrileContext : BaseContext
                 ImGui.SameLine();
             }
 
-            if (ImGui.Button($"{Icons.Trash} Remove from All"))
+            if (ImGui.Button($"{Lucide.Trash2} Remove from All"))
             {
                 using (Eddy.History.BeginScope("Remove ActorSettings"))
                 {

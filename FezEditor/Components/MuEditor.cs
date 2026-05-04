@@ -67,7 +67,7 @@ public class MuEditor : EditorComponent
 
             ImGui.SameLine();
             ImGui.BeginDisabled(string.IsNullOrEmpty(_npcMetadata.SoundPath));
-            if (ImGui.Button($"{Icons.Folder}"))
+            if (ImGui.Button($"{Lucide.Folder}"))
             {
                 _editorService.OpenEditorFor($"Sounds/{_npcMetadata.SoundPath}");
             }

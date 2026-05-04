@@ -167,14 +167,14 @@ public class LukeEditor : EditorComponent
     private void DrawToolbar()
     {
         ImGui.BeginDisabled(_showProperties);
-        if (ImGui.Button($"{Icons.SymbolProperty} Properties"))
+        if (ImGui.Button($"{Lucide.Wrench} Properties"))
         {
             _showProperties = true;
         }
         ImGui.EndDisabled();
 
         var visualizer = _skyActor.GetComponent<SkyVisualizer>();
-        var icon = visualizer.Shadows ? Icons.EyeClosed : Icons.Eye;
+        var icon = visualizer.Shadows ? Lucide.EyeOff : Lucide.Eye;
 
         ImGui.SameLine();
         if (ImGui.Button($"{icon} Shadows"))
@@ -498,7 +498,7 @@ public class LukeEditor : EditorComponent
 
         if (ImGui.CollapsingHeader("Clouds", ImGuiTreeNodeFlags.DefaultOpen))
         {
-            if (ImGui.Button($"{Icons.Add} Add##AddCloud"))
+            if (ImGui.Button($"{Lucide.Plus} Add##AddCloud"))
             {
                 using (History.BeginScope("Add Cloud"))
                 {
@@ -522,7 +522,7 @@ public class LukeEditor : EditorComponent
                 }
 
                 ImGui.SameLine();
-                if (ImGui.Button(Icons.Trash))
+                if (ImGui.Button(Lucide.Trash2))
                 {
                     using (History.BeginScope("Remove Cloud"))
                     {
@@ -548,7 +548,7 @@ public class LukeEditor : EditorComponent
 
         if (ImGui.CollapsingHeader("Layers", ImGuiTreeNodeFlags.DefaultOpen))
         {
-            if (ImGui.Button($"{Icons.Add} Add##AddLayer"))
+            if (ImGui.Button($"{Lucide.Plus} Add##AddLayer"))
             {
                 using (History.BeginScope("Add Layer"))
                 {
@@ -608,7 +608,7 @@ public class LukeEditor : EditorComponent
                         }
                     }
 
-                    if (ImGui.Button($"{Icons.Trash} Remove"))
+                    if (ImGui.Button($"{Lucide.Trash2} Remove"))
                     {
                         using (History.BeginScope("Remove Layer"))
                         {
@@ -652,7 +652,7 @@ public class LukeEditor : EditorComponent
                 Color.White, Color.LightGray);
 
             ImGui.SameLine();
-            if (ImGui.Button($"{Icons.Folder}##{textureName}"))
+            if (ImGui.Button($"{Lucide.Folder}##{textureName}"))
             {
                 ResourceService.OpenInFileManager($"Skies/{_sky.Name}/{textureName}");
             }
