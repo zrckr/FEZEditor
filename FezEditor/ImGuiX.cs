@@ -664,6 +664,16 @@ public static class ImGuiX
         {
             if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
             {
+                var arraySize = items.Length;
+                if (ImGui.InputInt($"Size", ref arraySize) && arraySize >= 0)
+                {
+                    var newItems = new T[arraySize];
+                    var elementsToCopy = Math.Min(items.Length, newItems.Length);
+                    Array.Copy(items, 0, newItems, 0, elementsToCopy);
+                    items = newItems;
+                    changed = true;
+                }
+
                 if (BeginListBox($"##ListBox_{hash}", new Vector2(-1, 0)))
                 {
                     for (var i = 0; i < items.Length; i++)
