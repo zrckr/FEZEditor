@@ -677,8 +677,6 @@ public static class ImGuiX
                             items[i] = item;
                             changed = true;
                         }
-
-                        ImGui.SameLine();
                         ImGui.PopID();
                     }
 
