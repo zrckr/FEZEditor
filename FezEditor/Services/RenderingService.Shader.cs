@@ -133,7 +133,10 @@ public partial class RenderingService
     {
         var parameters = material.Effect!.Parameters;
         var worldViewProjection = matrices.World * matrices.ViewProjection;
-        var worldInverseTranspose = Matrix.Transpose(Matrix.Invert(matrices.World));
+        var worldInverse = Matrix.Invert(matrices.World);
+        var worldInverseTranspose = float.IsFinite(worldInverse.M11)
+            ? Matrix.Transpose(worldInverse)
+            : Matrix.Identity;
 
         // Matrices
         parameters["Matrices_WorldViewProjection"].SetValue(worldViewProjection);
