@@ -519,11 +519,16 @@ internal class VolumeContext : BaseContext
         ImGui.TextDisabled(index + ":");
         ImGui.SameLine();
 
-        var input = (int)item;
-        var inputs = Enum.GetNames<CodeInput>();
+        var inputValues = Enum.GetValues<CodeInput>();
+        var inputNames = Enum.GetNames<CodeInput>();
 
-        var edited = ImGui.Combo("##cp" + index, ref input, inputs, inputs.Length);
-        item = (CodeInput)input;
+        var input = Array.IndexOf(inputValues, item);
+
+        var edited = ImGui.Combo("##cp" + index, ref input, inputNames, inputNames.Length);
+        if (input >= 0 && input < inputNames.Length)
+        {
+            item = inputValues[input];
+        }
         return edited;
     }
 
