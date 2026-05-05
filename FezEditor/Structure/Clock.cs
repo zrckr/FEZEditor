@@ -35,6 +35,8 @@ public class Clock
 
     public float TimeFactor { get; set; } = 1f;
 
+    public bool Running { get; set; } = true;
+
     public float DayFraction => (float)_currentTime.Ticks / TimeSpan.TicksPerDay;
 
     /// <summary>
@@ -56,6 +58,11 @@ public class Clock
 
     public void Tick(GameTime gameTime)
     {
+        if (!Running)
+        {
+            return;
+        }
+
         var ticks = CurrentTime.Ticks;
         ticks += (long)(gameTime.ElapsedGameTime.Ticks * TimeFactor * DefaultTimeMultiplier);
         CurrentTime = new TimeOnly(ticks % TimeSpan.TicksPerDay);

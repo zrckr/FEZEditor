@@ -838,11 +838,12 @@ public static class ImGuiX
         var dl = ImGui.GetWindowDrawList();
         var lineHeight = ImGui.GetTextLineHeight();
         var padding = new NVector2(4, 4);
+        var pauseButtonWidth = 24f;
 
         var timeText = $@"{Lucide.Clock} {clock.CurrentTime:HH\:mm}";
 
         const float sliderWidth = 120f;
-        var totalWidth = sliderWidth + padding.X * 2;
+        var totalWidth = sliderWidth + pauseButtonWidth + padding.X * 2;
 
         // Center horizontally around the given position
         var bgMin = new NVector2(position.X - totalWidth / 2f, position.Y) - padding;
@@ -865,6 +866,13 @@ public static class ImGuiX
             ImGui.GetStyle().FramePadding.Y + (lineHeight - timeTextSize.Y) / 2f
         );
         dl.AddText(timeTextPos, 0xFFFFFFFF, timeText);
+
+        var buttonPos = sliderPos + new NVector2(sliderWidth + padding.X, 0);
+        ImGui.SetCursorScreenPos(buttonPos);
+        ImGui.SetNextItemWidth(pauseButtonWidth);
+        if (ImGui.Button(clock.Running ? Lucide.Pause: Lucide.Play)) {
+            clock.Running = !clock.Running;
+        }
     }
 
     #endregion
