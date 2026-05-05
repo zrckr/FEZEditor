@@ -603,7 +603,7 @@ public static class ImGuiX
         ImGui.SameLine();
 
         var count = "item" + (items.Count is > 1 or 0 ? "s" : "");
-        var header = $"List ({items.Count} {count})##Header_{hash}";
+        var header = $"List ({items.Count} {count})###ListHeader_{hash}";
         if (ImGui.CollapsingHeader(header))
         {
             if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
@@ -659,7 +659,7 @@ public static class ImGuiX
         ImGui.SameLine();
 
         var count = "item" + (items.Length is > 1 or 0 ? "s" : "");
-        var header = $"Array ({items.Length} {count})##Header_{hash}";
+        var header = $"Array ({items.Length} {count})###ArrayHeader_{hash}";
         if (ImGui.CollapsingHeader(header))
         {
             if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
@@ -717,7 +717,7 @@ public static class ImGuiX
         ImGui.SameLine();
 
         var count = "key" + (items.Count is > 1 or 0 ? "s" : "");
-        var header = $"Dictionary ({items.Count} {count})##Header_{hash}";
+        var header = $"Dictionary ({items.Count} {count})###DictionaryHeader_{hash}";
         if (ImGui.CollapsingHeader(header))
         {
             if (BeginChild($"##Child_{hash}", Vector2.Zero, flags))
