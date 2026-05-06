@@ -221,7 +221,7 @@ public static class TrixelMaterializer
         return (vertices.ToArray(), indices.ToArray());
     }
 
-    private static List<MeshRect> GreedyMesh(IEnumerable<TrixelFace> faces)
+    public static List<MeshRect> GreedyMesh(IEnumerable<TrixelFace> faces)
     {
         var groups = new Dictionary<(FaceOrientation, int), List<(int t, int b)>>();
         foreach (var face in faces)
@@ -365,7 +365,7 @@ public static class TrixelMaterializer
         return new Vector2(faceOffset.X + (u / 8f), faceOffset.Y + v);
     }
 
-    private record struct MeshRect(
+    public record struct MeshRect(
         FaceOrientation Orientation,
         int StartTangent,
         int StartBitangent,

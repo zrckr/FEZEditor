@@ -9,12 +9,17 @@ using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using PrimitiveType = Microsoft.Xna.Framework.Graphics.PrimitiveType;
 
 namespace FezEditor.Components;
 
 public class ChrisEditor : EditorComponent
 {
     private static readonly TimeSpan EditStep = TimeSpan.FromMilliseconds(100);
+
+    private static readonly Color HoverColor = Color.Blue with { A = 85 };
+
+    private static readonly Color SelectionColor = Color.Red with { A = 85 };
 
     public override object Asset => _context.GetAsset(_obj);
 
@@ -33,6 +38,10 @@ public class ChrisEditor : EditorComponent
     private Actor _cameraActor = null!;
 
     private Actor _meshActor = null!;
+
+    private Actor _cursorActor = null!;
+
+    private Actor _boundsActor = null!;
 
     private TrixelObject _obj = null!;
 
@@ -95,7 +104,14 @@ public class ChrisEditor : EditorComponent
             _meshActor = _scene.CreateActor();
             _meshActor.AddComponent<TrixelsMesh>();
             _meshActor.AddComponent<TrileCollisionMesh>();
-            _meshActor.AddComponent<BoundsMesh>();
+        }
+        {
+            _boundsActor = _scene.CreateActor();
+            _boundsActor.AddComponent<BoundsMesh>();
+        }
+        {
+            _cursorActor = _scene.CreateActor();
+            _cursorActor.AddComponent<CursorMesh>();
         }
 
         RevisualizeSubject();
@@ -402,7 +418,7 @@ public class ChrisEditor : EditorComponent
             if (_hoveredFace.HasValue)
             {
                 _hoveredFace = null;
-                mesh.SetHoveredFace(null);
+                UpdateHoverCursor();
             }
 
             return;
@@ -413,7 +429,7 @@ public class ChrisEditor : EditorComponent
         if (hit != _hoveredFace)
         {
             _hoveredFace = hit;
-            mesh.SetHoveredFace(_hoveredFace);
+            UpdateHoverCursor();
         }
 
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
@@ -424,7 +440,7 @@ public class ChrisEditor : EditorComponent
                 _selectedFaces.Clear();
                 _selectionOrientation = null;
                 _editMode = EditMode.Select;
-                mesh.SetSelectedFaces(_selectedFaces);
+                UpdateSelectionCursor();
                 return;
             }
         }
@@ -461,7 +477,7 @@ public class ChrisEditor : EditorComponent
                             _selectedFaces.Add(f);
                         }
 
-                        mesh.SetSelectedFaces(_selectedFaces);
+                        UpdateSelectionCursor();
                     }
 
                     break;
@@ -486,7 +502,7 @@ public class ChrisEditor : EditorComponent
 
                     mesh.Visualize(_obj);
                     RemapSelectionAfterCarve(hit.Value.Face, edit);
-                    mesh.SetSelectedFaces(_selectedFaces);
+                    UpdateSelectionCursor();
 
                     break;
                 }
@@ -591,6 +607,38 @@ public class ChrisEditor : EditorComponent
         base.Dispose();
     }
 
+    private void UpdateHoverCursor()
+    {
+        var cursor = _cursorActor.GetComponent<CursorMesh>();
+        cursor.ClearHover();
+        if (_hoveredFace.HasValue)
+        {
+            var tf = _hoveredFace.Value;
+            var surface = BuildTrixelFaceQuad(tf);
+            cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
+        }
+    }
+
+    private void UpdateSelectionCursor()
+    {
+        var cursor = _cursorActor.GetComponent<CursorMesh>();
+        cursor.ClearSelection();
+        if (_selectedFaces.Count != 0)
+        {
+            var surfaces = _selectedFaces.Select(tf => (BuildTrixelFaceQuad(tf), PrimitiveType.TriangleList));
+            cursor.SetSelectionSurfaces(surfaces, SelectionColor);
+        }
+    }
+
+    private MeshSurface BuildTrixelFaceQuad(TrixelFace tf)
+    {
+        var meshOffset = Vector3.Zero - (_obj.Size / 2f);
+        var faceCenter = (tf.Emplacement.ToVector3() + ((Vector3.One + tf.Face.AsVector()) * 0.5f))
+                         * Mathz.TrixelSize + meshOffset;
+        var origin = faceCenter + tf.Face.AsVector() * CursorMesh.OverlayOffset;
+        return MeshSurface.CreateFaceQuad(Vector3.One * Mathz.TrixelSize, origin, tf.Face);
+    }
+
     private void RevisualizeSubject(bool materialize = true)
     {
         if (materialize)
@@ -604,6 +652,10 @@ public class ChrisEditor : EditorComponent
         mesh.Texture = _context.LoadTexture();
         mesh.Visualize(_obj);
 
+        var cursor = _cursorActor.GetComponent<CursorMesh>();
+        cursor.ClearHover();
+        cursor.ClearSelection();
+
         if (_context is TrileSetContext subject)
         {
             var collision = _meshActor.GetComponent<TrileCollisionMesh>();
@@ -611,8 +663,9 @@ public class ChrisEditor : EditorComponent
             collision.AddInstanceData(Vector3.Zero, subject.GetTrileCollision(), _obj.Size);
         }
 
-        var bounds = _meshActor.GetComponent<BoundsMesh>();
+        var bounds = _boundsActor.GetComponent<BoundsMesh>();
         bounds.Size = _obj.Size;
+        _boundsActor.Transform.Position = -_obj.Size / 2f;
     }
 
     private void OnTextureReload(Texture2D newTexture)
@@ -642,7 +695,7 @@ public class ChrisEditor : EditorComponent
         {
             var normal = tf.Face.AsVector();
             var denom = Vector3.Dot(normal, ray.Direction);
-            if (MathF.Abs(denom) < 1e-6f)
+            if (MathF.Abs(denom) < float.Epsilon)
             {
                 continue;
             }
