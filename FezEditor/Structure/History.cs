@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace FezEditor.Structure;
@@ -143,7 +144,8 @@ public class History : IDisposable
             var targetType = target.GetType();
             foreach (var prop in targetType.GetProperties())
             {
-                if (prop is { CanRead: true, CanWrite: true })
+                if (prop is { CanRead: true, CanWrite: true }
+                    && prop.GetCustomAttribute<JsonIgnoreAttribute>() == null)
                 {
                     prop.SetValue(target, prop.GetValue(restored));
                 }
@@ -151,7 +153,8 @@ public class History : IDisposable
 
             foreach (var field in targetType.GetFields())
             {
-                if (!field.IsInitOnly)
+                if (!field.IsInitOnly
+                    && field.GetCustomAttribute<JsonIgnoreAttribute>() == null)
                 {
                     field.SetValue(target, field.GetValue(restored));
                 }

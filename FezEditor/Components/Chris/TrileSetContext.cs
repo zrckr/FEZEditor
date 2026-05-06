@@ -148,6 +148,13 @@ internal class TrileSetContext : IContext
         return _set;
     }
 
+    public void InvalidateAtlasCache()
+    {
+        _atlasTexture?.Dispose();
+        _atlasTexture = null;
+        _pendingTextures.Clear();
+    }
+
     public Texture2D LoadTexture()
     {
         if (_atlasTexture == null)

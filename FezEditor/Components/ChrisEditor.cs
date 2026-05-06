@@ -647,6 +647,10 @@ public class ChrisEditor : EditorComponent
             _obj = _context.Materialize();
             History.Track(_obj);
         }
+        else if (_context is TrileSetContext trileCtx)
+        {
+            trileCtx.InvalidateAtlasCache();
+        }
 
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
         mesh.Texture = _context.LoadTexture();
