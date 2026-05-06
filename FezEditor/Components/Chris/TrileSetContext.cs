@@ -44,9 +44,9 @@ internal class TrileSetContext : IContext
         {
             if (_id != value)
             {
-                if (!_set.Triles.ContainsKey(_id))
+                if (!_set.Triles.ContainsKey(value))
                 {
-                    throw new KeyNotFoundException($"Trile with ID {_id} not found");
+                    throw new KeyNotFoundException($"Trile with ID {value} not found");
                 }
 
                 _id = value;
@@ -516,7 +516,14 @@ internal class TrileSetContext : IContext
         var newTrile = new Trile
         {
             Name = "UNTITLED",
-            Size = Vector3.One.ToRepacker()
+            Size = Vector3.One.ToRepacker(),
+            Faces = new Dictionary<FaceOrientation, CollisionType>
+            {
+                [FaceOrientation.Front] = CollisionType.None,
+                [FaceOrientation.Right] = CollisionType.None,
+                [FaceOrientation.Back] = CollisionType.None,
+                [FaceOrientation.Left] = CollisionType.None
+            }
         };
 
         _set.Triles[newId] = newTrile;
