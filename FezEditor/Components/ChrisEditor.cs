@@ -51,6 +51,8 @@ public class ChrisEditor : EditorComponent
 
     private bool _showTexture;
 
+    private bool _showTrileList = true;
+
     private EditMode _editMode = EditMode.Select;
 
     private TrixelFace? _hoveredFace;
@@ -138,28 +140,12 @@ public class ChrisEditor : EditorComponent
 
         DrawToolbar();
 
+        DrawSceneViewport();
+        EditTrixelObject();
+
         if (_context is TrileSetContext subject)
         {
-            var width = ImGui.GetContentRegionAvail().X;
-            if (ImGuiX.BeginChild("##SceneViewport", new Vector2(width - 300, 0)))
-            {
-                DrawSceneViewport();
-                EditTrixelObject();
-                ImGui.EndChild();
-            }
-
-            ImGui.SameLine();
-
-            if (ImGuiX.BeginChild("##TrileSet", Vector2.Zero, ImGuiChildFlags.Border))
-            {
-                DrawTrileList(subject);
-                ImGui.EndChild();
-            }
-        }
-        else if (_context is ArtObjectContext)
-        {
-            DrawSceneViewport();
-            EditTrixelObject();
+            DrawTrileListWindow(subject);
         }
 
         DrawPropertiesWindow();
@@ -234,16 +220,41 @@ public class ChrisEditor : EditorComponent
             {
                 collision.Visible = !collision.Visible;
             }
+
+            ImGui.SameLine();
+            ImGui.BeginDisabled(_showTrileList);
+            if (ImGui.Button($"{Lucide.List} Trile Set"))
+            {
+                _showTrileList = true;
+            }
+
+            ImGui.EndDisabled();
         }
 
         ImGui.Separator();
     }
 
-    private void DrawTrileList(TrileSetContext setContext)
+    private void DrawTrileListWindow(TrileSetContext setContext)
     {
+        if (!_showTrileList)
+        {
+            return;
+        }
+
+        const ImGuiWindowFlags flags = ImGuiWindowFlags.NoCollapse;
+        ImGuiX.SetNextWindowSize(new Vector2(320, 480), ImGuiCond.Appearing);
+        if (!ImGui.Begin($"Trile Set##{Title}", ref _showTrileList, flags))
+        {
+            ImGui.End();
+            return;
+        }
+
+        ImGui.Text("Name:");
+        ImGui.SameLine();
+
         var name = setContext.Name;
-        ImGui.SetNextItemWidth(150f);
-        if (ImGui.InputText("Trile Set Name", ref name, 255))
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputText("##trileset_name", ref name, 255))
         {
             using (History.BeginScope("Rename Trile Set"))
             {
@@ -251,100 +262,143 @@ public class ChrisEditor : EditorComponent
             }
         }
 
-        ImGui.Separator();
-        if (ImGui.Button($"{Lucide.Plus} Add"))
+        // Toolbar
         {
-            using (History.BeginScope("Add Trile"))
+            if (ImGui.Button($"{Lucide.Plus}"))
             {
-                var newId = setContext.AddTrile();
-                _selectedTriles.Clear();
-                _selectedTriles.Add(newId);
-                _currentTrile = newId;
-                setContext.Id = newId;
-                RevisualizeSubject();
-            }
-        }
-
-        ImGui.SameLine();
-        ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Lucide.Minus} Remove"))
-        {
-            using (History.BeginScope("Remove Trile"))
-            {
-                var nextId = setContext.RemoveTriles(_selectedTriles);
-                _selectedTriles.Clear();
-                _selectedTriles.Add(nextId);
-                _currentTrile = nextId;
-                setContext.Id = nextId;
-                RevisualizeSubject();
-            }
-        }
-
-        ImGui.EndDisabled();
-
-        ImGui.SameLine();
-        ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Lucide.Copy} Copy"))
-        {
-            using (History.BeginScope("Copy Triles"))
-            {
-                var newId = setContext.CopyTriles(_selectedTriles);
-                _selectedTriles.Clear();
-                _selectedTriles.Add(newId);
-                _currentTrile = newId;
-                setContext.Id = newId;
-                RevisualizeSubject();
-            }
-        }
-
-        ImGui.EndDisabled();
-
-        ImGui.SameLine();
-        ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Lucide.ListX} Clear"))
-        {
-            _selectedTriles.Clear();
-        }
-
-        ImGui.EndDisabled();
-
-        ImGui.BeginDisabled(_selectedTriles.Count == 0);
-        if (ImGui.Button($"{Lucide.ArrowRightFromLine} Export Selected"))
-        {
-            var options = new FileDialog.Options
-            {
-                Title = "Choose trile set file...",
-                Filters = new FileDialog.Filter[]
+                using (History.BeginScope("Add Trile"))
                 {
-                    new("FEZTS files", "fezts.glb")
+                    var newId = setContext.AddTrile();
+                    _selectedTriles.Clear();
+                    _selectedTriles.Add(newId);
+                    _currentTrile = newId;
+                    setContext.Id = newId;
+                    RevisualizeSubject();
                 }
-            };
+            }
 
-            FileDialog.Show(FileDialog.Type.OpenFile, files =>
+            if (ImGui.IsItemHovered())
             {
-                var path = files[0];
-                var targetSet = (TrileSet)ResourceService.Load(path);
-                setContext.AppendTriles(_selectedTriles, targetSet);
-                ResourceService.Save(path, targetSet);
-            }, options);
+                ImGui.SetTooltip("Add Trile");
+            }
         }
 
-        ImGui.EndDisabled();
-
-        ImGui.SetNextItemWidth(-40);
-        ImGui.InputTextWithHint("", "Filter", ref _filterTriles, 255);
-
-        if (!string.IsNullOrEmpty(_filterTriles))
+        ImGui.SameLine();
         {
-            ImGui.SameLine();
-            if (ImGui.Button(Lucide.ListX))
+            ImGui.BeginDisabled(_selectedTriles.Count == 0);
+            if (ImGui.Button($"{Lucide.Minus}"))
             {
-                _filterTriles = "";
+                using (History.BeginScope("Remove Trile"))
+                {
+                    var nextId = setContext.RemoveTriles(_selectedTriles);
+                    _selectedTriles.Clear();
+                    _selectedTriles.Add(nextId);
+                    _currentTrile = nextId;
+                    setContext.Id = nextId;
+                    RevisualizeSubject();
+                }
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Remove Selected");
+            }
+
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        {
+            ImGui.BeginDisabled(_selectedTriles.Count == 0);
+            if (ImGui.Button($"{Lucide.Copy}"))
+            {
+                using (History.BeginScope("Copy Triles"))
+                {
+                    var newId = setContext.CopyTriles(_selectedTriles);
+                    _selectedTriles.Clear();
+                    _selectedTriles.Add(newId);
+                    _currentTrile = newId;
+                    setContext.Id = newId;
+                    RevisualizeSubject();
+                }
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Copy Selected");
+            }
+
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        {
+            ImGui.BeginDisabled(_selectedTriles.Count == 0);
+            if (ImGui.Button($"{Lucide.ListX}"))
+            {
+                _selectedTriles.Clear();
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Clear Selection");
+            }
+
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        {
+            ImGui.BeginDisabled(_selectedTriles.Count == 0);
+            if (ImGui.Button($"{Lucide.ArrowRightFromLine}"))
+            {
+                var options = new FileDialog.Options
+                {
+                    Title = "Choose trile set file...",
+                    Filters = new FileDialog.Filter[]
+                    {
+                        new("FEZTS files", "fezts.glb")
+                    }
+                };
+
+                FileDialog.Show(FileDialog.Type.OpenFile, files =>
+                {
+                    var path = files[0];
+                    var targetSet = (TrileSet)ResourceService.Load(path);
+                    setContext.AppendTriles(_selectedTriles, targetSet);
+                    ResourceService.Save(path, targetSet);
+                }, options);
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Export Selected to File");
+            }
+
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        {
+            var filterWidth = ImGui.GetContentRegionAvail().X;
+            if (!string.IsNullOrEmpty(_filterTriles))
+            {
+                filterWidth -= ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X;
+            }
+
+            ImGui.SetNextItemWidth(filterWidth);
+            ImGui.InputTextWithHint("##filter", "Filter", ref _filterTriles, 255);
+            if (!string.IsNullOrEmpty(_filterTriles))
+            {
+                ImGui.SameLine();
+                if (ImGui.Button(Lucide.X))
+                {
+                    _filterTriles = "";
+                }
             }
         }
 
         ImGui.Separator();
-
         if (ImGuiX.BeginChild("##TrileSetList", Vector2.Zero))
         {
             foreach (var entry in setContext.EnumerateTriles(_filterTriles))
@@ -378,6 +432,8 @@ public class ChrisEditor : EditorComponent
 
             ImGui.EndChild();
         }
+
+        ImGui.End();
     }
 
     private void DrawSceneViewport()
@@ -634,7 +690,7 @@ public class ChrisEditor : EditorComponent
     {
         var meshOffset = Vector3.Zero - (_obj.Size / 2f);
         var faceCenter = (tf.Emplacement.ToVector3() + ((Vector3.One + tf.Face.AsVector()) * 0.5f))
-                         * Mathz.TrixelSize + meshOffset;
+            * Mathz.TrixelSize + meshOffset;
         var origin = faceCenter + tf.Face.AsVector() * CursorMesh.OverlayOffset;
         return MeshSurface.CreateFaceQuad(Vector3.One * Mathz.TrixelSize, origin, tf.Face);
     }
