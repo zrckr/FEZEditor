@@ -328,10 +328,10 @@ internal class TrileSetContext : IContext
         }
 
         var actorFace = (int)Trile.Face;
-        var actorFaces = Enum.GetNames<ActorType>();
-        if (ImGui.Combo("Actor Face", ref actorFace, actorFaces, actorFaces.Length))
+        var actorFaces = Enum.GetNames<FaceOrientation>();
+        if (ImGui.Combo("Initial Face", ref actorFace, actorFaces, actorFaces.Length))
         {
-            using (history.BeginScope("Edit Actor Face"))
+            using (history.BeginScope("Edit Initial Face"))
             {
                 Trile.Face = (FaceOrientation)actorFace;
             }
