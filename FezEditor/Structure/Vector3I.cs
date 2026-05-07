@@ -133,6 +133,11 @@ public struct Vector3I : IEquatable<Vector3I>, IComparable<Vector3I>
         return new Vector3I(lhs.X - rhs.X, lhs.Y - rhs.Y, lhs.Z - rhs.Z);
     }
 
+    public static Vector3I operator *(Vector3I lhs, int rhs)
+    {
+        return new Vector3I(lhs.X * rhs, lhs.Y * rhs, lhs.Z * rhs);
+    }
+
     public static Vector3I operator /(Vector3I lhs, float rhs)
     {
         return new Vector3I(lhs.X / rhs, lhs.Y / rhs, lhs.Z / rhs);

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FezEditor.Services;
+using Microsoft.Xna.Framework;
 
 namespace FezEditor.Structure;
 
@@ -15,6 +16,8 @@ public record Settings
     public Dictionary<string, List<string>> ReferenceProviders { get; init; } = new();
 
     public WindowSize Window { get; init; } = new(1280, 720);
+
+    public Color[] PaintPalette { get; init; } = Array.Empty<Color>();
 
     public record RecentProvider(string Path, string Kind);
 

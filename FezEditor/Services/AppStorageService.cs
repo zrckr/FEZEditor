@@ -24,6 +24,8 @@ public class AppStorageService : IDisposable
 
     public IReadOnlyDictionary<string, List<string>> RecentFiles => _data.RecentFiles;
 
+    public Color[] PaintPalette => _data.PaintPalette;
+
     private Settings _data = new();
 
     private readonly Game _game;
@@ -81,6 +83,12 @@ public class AppStorageService : IDisposable
         return _data.ReferenceProviders.TryGetValue(modPath, out var list)
             ? list
             : new List<string>();
+    }
+
+    public void SavePaintPalette(Color[] palette)
+    {
+        _data = _data with { PaintPalette = palette };
+        Save();
     }
 
     public void SetReferenceProviders(string modPath, IEnumerable<string> paths)
