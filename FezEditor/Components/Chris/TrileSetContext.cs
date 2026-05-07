@@ -35,8 +35,6 @@ internal class TrileSetContext : IContext
 
     private const int AtlasColumns = AtlasWidth / AtlasTrileWidth;
 
-    public string TextureExportKey => $"{_set.Name}#{_id}";
-
     public int Id
     {
         get => _id;
@@ -68,11 +66,7 @@ internal class TrileSetContext : IContext
 
     private readonly Texture2D _missing;
 
-    private readonly Dictionary<int, byte[]> _pendingTextures = new();
-
     private Texture2D? _atlasTexture;
-
-    private Texture2D? _currentTexture;
 
     private int _id;
 
@@ -92,17 +86,26 @@ internal class TrileSetContext : IContext
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _currentTexture?.Dispose();
-        _currentTexture = null;
         _atlasTexture?.Dispose();
         _atlasTexture = null;
     }
 
     public TrixelObject Materialize()
     {
-        var obj = TrixelMaterializer.ReconstructGeometry(Trile.Size.ToXna(), Trile.Geometry.Vertices,
-            Trile.Geometry.Indices);
+        var obj = TrixelMaterializer.ReconstructGeometry(
+            Trile.Size.ToXna(), Trile.Geometry.Vertices, Trile.Geometry.Indices);
         _resized = obj.Resize;
+
+        var atlas = _set.TextureAtlas;
+        var px = (int)MathF.Round(Trile.AtlasOffset.X * atlas.Width);
+        var py = (int)MathF.Round(Trile.AtlasOffset.Y * atlas.Height);
+        obj.Texture = new RTexture2D
+        {
+            Width = TrileWidth,
+            Height = TrileHeight,
+            TextureData = ReadTrileFromAtlas(atlas.TextureData, atlas.Width, px, py)
+        };
+
         return obj;
     }
 
@@ -133,11 +136,12 @@ internal class TrileSetContext : IContext
 
         #region Rebuild Atlas Texture
 
-        RebuildAtlas(_set, _pendingTextures);
+        var overrides = new Dictionary<int, byte[]> { [Id] = obj.Texture.TextureData };
+        RebuildAtlas(_set, overrides);
+
         _atlasTexture?.Dispose();
         _atlasTexture = new Texture2D(_game.GraphicsDevice, _set.TextureAtlas.Width, _set.TextureAtlas.Height,
-            false,
-            SurfaceFormat.Color);
+            false, SurfaceFormat.Color);
         _atlasTexture.SetData(_set.TextureAtlas.TextureData);
         RepackerExtensions.SetAlpha(_atlasTexture, 1f);
 
@@ -146,61 +150,6 @@ internal class TrileSetContext : IContext
         ApplyAtlasOffsets(_set);
 
         return _set;
-    }
-
-    public void InvalidateAtlasCache()
-    {
-        _atlasTexture?.Dispose();
-        _atlasTexture = null;
-        _pendingTextures.Clear();
-    }
-
-    public Texture2D LoadTexture()
-    {
-        if (_atlasTexture == null)
-        {
-            var atlas = _set.TextureAtlas;
-            _atlasTexture = new Texture2D(_game.GraphicsDevice, atlas.Width, atlas.Height, false,
-                SurfaceFormat.Color);
-            _atlasTexture.SetData(atlas.TextureData);
-            RepackerExtensions.SetAlpha(_atlasTexture, 1f);
-        }
-
-        _currentTexture?.Dispose();
-        _currentTexture = SliceTexture(_id);
-        return _currentTexture;
-    }
-
-    public void UpdateTexture(Texture2D texture)
-    {
-        var pixels = new byte[texture.Width * texture.Height * 4];
-        texture.GetData(pixels);
-        _pendingTextures[_id] = pixels;
-
-        _currentTexture?.Dispose();
-        _currentTexture = texture;
-    }
-
-    private Texture2D SliceTexture(int id)
-    {
-        byte[] pixels;
-        if (_pendingTextures.TryGetValue(id, out var pending))
-        {
-            pixels = pending;
-        }
-        else
-        {
-            var trile = _set.Triles[id];
-            var atlas = _set.TextureAtlas;
-            var px = (int)MathF.Round(trile.AtlasOffset.X * atlas.Width);
-            var py = (int)MathF.Round(trile.AtlasOffset.Y * atlas.Height);
-            pixels = ReadTrileFromAtlas(atlas.TextureData, atlas.Width, px, py);
-        }
-
-        var tex2D = new Texture2D(_game.GraphicsDevice, TrileWidth, TrileHeight, false, SurfaceFormat.Color);
-        tex2D.SetData(pixels);
-        RepackerExtensions.SetAlpha(tex2D, 1f);
-        return tex2D;
     }
 
     // Reads the 96x16 border-stripped pixels from a 108x18 atlas slot at (px, py).
@@ -415,18 +364,25 @@ internal class TrileSetContext : IContext
                 continue;
             }
 
+            if (_atlasTexture == null)
+            {
+                var atlas = _set.TextureAtlas;
+                _atlasTexture = new Texture2D(_game.GraphicsDevice, atlas.Width, atlas.Height, false, SurfaceFormat.Color);
+                _atlasTexture.SetData(atlas.TextureData);
+                RepackerExtensions.SetAlpha(_atlasTexture, 1f);
+            }
+
             // Thumbnail shows the front face (face 0) usable area, skipping the 1px border.
-            var atlasHeight = _atlasTexture?.Height ?? _set.TextureAtlas.Height;
             var uv0 = new Vector2(
                 trile.AtlasOffset.X + (1f / AtlasWidth),
-                trile.AtlasOffset.Y + (1f / atlasHeight)
+                trile.AtlasOffset.Y + (1f / _atlasTexture.Height)
             );
             var uv1 = new Vector2(
                 uv0.X + ((float)FaceSize / AtlasWidth),
-                uv0.Y + ((float)FaceSize / atlasHeight)
+                uv0.Y + ((float)FaceSize / _atlasTexture.Height)
             );
 
-            yield return new Entry(id, trile.Name, _atlasTexture ?? _missing, uv0, uv1);
+            yield return new Entry(id, trile.Name, _atlasTexture, uv0, uv1);
         }
     }
 
@@ -527,7 +483,6 @@ internal class TrileSetContext : IContext
         };
 
         _set.Triles[newId] = newTrile;
-        _pendingTextures[newId] = new byte[TrileWidth * TrileHeight * 4];
         return newId;
     }
 
@@ -536,7 +491,6 @@ internal class TrileSetContext : IContext
         foreach (var id in ids)
         {
             _set.Triles.Remove(id);
-            _pendingTextures.Remove(id);
         }
 
         if (_set.Triles.Count == 0)
@@ -579,19 +533,6 @@ internal class TrileSetContext : IContext
                 }
             };
 
-            if (_pendingTextures.TryGetValue(sourceId, out var srcPixels))
-            {
-                var copyPixels = new byte[srcPixels.Length];
-                Buffer.BlockCopy(srcPixels, 0, copyPixels, 0, srcPixels.Length);
-                _pendingTextures[newId] = copyPixels;
-            }
-            else
-            {
-                var atlas = _set.TextureAtlas;
-                var px = (int)MathF.Round(source.AtlasOffset.X * atlas.Width);
-                var py = (int)MathF.Round(source.AtlasOffset.Y * atlas.Height);
-                _pendingTextures[newId] = ReadTrileFromAtlas(atlas.TextureData, atlas.Width, px, py);
-            }
 
             lastId = newId;
         }
@@ -610,20 +551,10 @@ internal class TrileSetContext : IContext
                 continue;
             }
 
-            byte[] pixels;
-            if (_pendingTextures.TryGetValue(id, out var pending))
-            {
-                pixels = pending;
-            }
-            else
-            {
-                var atlas = _set.TextureAtlas;
-                var px = (int)MathF.Round(trile.AtlasOffset.X * atlas.Width);
-                var py = (int)MathF.Round(trile.AtlasOffset.Y * atlas.Height);
-                pixels = ReadTrileFromAtlas(atlas.TextureData, atlas.Width, px, py);
-            }
-
-            slices.Add((trile, pixels));
+            var atlas = _set.TextureAtlas;
+            var px = (int)MathF.Round(trile.AtlasOffset.X * atlas.Width);
+            var py = (int)MathF.Round(trile.AtlasOffset.Y * atlas.Height);
+            slices.Add((trile, ReadTrileFromAtlas(atlas.TextureData, atlas.Width, px, py)));
         }
 
         // Assign new non-conflicting IDs in the target set

@@ -8,7 +8,6 @@ using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using PrimitiveType = Microsoft.Xna.Framework.Graphics.PrimitiveType;
 
 namespace FezEditor.Components;
@@ -45,7 +44,11 @@ public class ChrisEditor : EditorComponent
 
     private TrixelObject _obj = null!;
 
-    private TempTextureTracker? _texture;
+    private Color _paintColor = Color.White;
+
+    private Color _backupPaintColor = Color.White;
+
+    private readonly Color[] _palette = InitPalette();
 
     private bool _showProperties;
 
@@ -128,6 +131,7 @@ public class ChrisEditor : EditorComponent
             EditMode.Select => [("LMB Drag", "Select Faces")],
             EditMode.Add => [("LMB", "Add Trixels")],
             EditMode.Remove => [("LMB", "Remove Trixels")],
+            EditMode.Paint => [("LMB", "Paint Trixel Face")],
             _ => throw new InvalidOperationException()
         });
         _nowTime = gameTime.TotalGameTime;
@@ -139,6 +143,7 @@ public class ChrisEditor : EditorComponent
         ImGuiX.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 8));
 
         DrawToolbar();
+        DrawPaintPopup();
 
         DrawSceneViewport();
         EditTrixelObject();
@@ -156,59 +161,93 @@ public class ChrisEditor : EditorComponent
 
     private void DrawToolbar()
     {
-        ImGui.BeginDisabled(_editMode == EditMode.Select);
-        if (ImGui.Button($"{Lucide.MousePointer2} Select"))
         {
-            _editMode = EditMode.Select;
-        }
+            ImGui.BeginDisabled(_editMode == EditMode.Select);
+            if (ImGui.Button($"{Lucide.MousePointer2} Select"))
+            {
+                _editMode = EditMode.Select;
+            }
 
-        ImGui.EndDisabled();
+            ImGui.EndDisabled();
+        }
 
         ImGui.SameLine();
-        ImGui.BeginDisabled(_editMode == EditMode.Remove);
-        if (ImGui.Button($"{Lucide.Eraser} Remove"))
         {
-            _editMode = EditMode.Remove;
-        }
+            ImGui.BeginDisabled(_editMode == EditMode.Remove);
+            if (ImGui.Button($"{Lucide.Eraser} Remove"))
+            {
+                _editMode = EditMode.Remove;
+            }
 
-        ImGui.EndDisabled();
+            ImGui.EndDisabled();
+        }
 
         ImGui.SameLine();
-        ImGui.BeginDisabled(_editMode == EditMode.Add);
-        if (ImGui.Button($"{Lucide.Pencil} Add"))
         {
-            _editMode = EditMode.Add;
+            ImGui.BeginDisabled(_editMode == EditMode.Add);
+            if (ImGui.Button($"{Lucide.Pencil} Add"))
+            {
+                _editMode = EditMode.Add;
+            }
+
+            ImGui.EndDisabled();
         }
 
-        ImGui.EndDisabled();
+        ImGui.SameLine();
+        {
+            ImGui.BeginDisabled(_editMode == EditMode.Paint);
+            if (ImGui.Button($"{Lucide.Paintbrush} Paint"))
+            {
+                _editMode = EditMode.Paint;
+            }
+
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        {
+            var openPopup = ImGuiX.ColorButton("##PaintButton", _paintColor);
+            if (openPopup)
+            {
+                ImGui.OpenPopup("##PaintPicker");
+                _backupPaintColor = _paintColor;
+            }
+        }
 
         ImGui.SameLine();
         ImGui.TextDisabled("|");
 
         ImGui.SameLine();
-        ImGui.BeginDisabled(_showProperties);
-        if (ImGui.Button($"{Lucide.Wrench} Properties"))
         {
-            _showProperties = true;
+            ImGui.BeginDisabled(_showProperties);
+            if (ImGui.Button($"{Lucide.Wrench} Properties"))
+            {
+                _showProperties = true;
+            }
+
+            ImGui.EndDisabled();
         }
 
-        ImGui.EndDisabled();
-
         ImGui.SameLine();
-        ImGui.BeginDisabled(_showTexture);
-        if (ImGui.Button($"{Lucide.Image} Texture"))
         {
-            _showTexture = true;
+            ImGui.BeginDisabled(_showTexture);
+            if (ImGui.Button($"{Lucide.Image} Texture"))
+            {
+                _showTexture = true;
+            }
+
+            ImGui.EndDisabled();
         }
 
-        ImGui.EndDisabled();
 
-        var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        var wireFrame = mesh.Wireframe;
         ImGui.SameLine();
-        if (ImGui.Checkbox("Wireframe", ref wireFrame))
         {
-            mesh.Wireframe = wireFrame;
+            var mesh = _meshActor.GetComponent<TrixelsMesh>();
+            var wireFrame = mesh.Wireframe;
+            if (ImGui.Checkbox("Wireframe", ref wireFrame))
+            {
+                mesh.Wireframe = wireFrame;
+            }
         }
 
         if (_context is TrileSetContext)
@@ -222,16 +261,87 @@ public class ChrisEditor : EditorComponent
             }
 
             ImGui.SameLine();
-            ImGui.BeginDisabled(_showTrileList);
-            if (ImGui.Button($"{Lucide.List} Trile Set"))
             {
-                _showTrileList = true;
-            }
+                ImGui.BeginDisabled(_showTrileList);
+                if (ImGui.Button($"{Lucide.List} Trile Set"))
+                {
+                    _showTrileList = true;
+                }
 
-            ImGui.EndDisabled();
+                ImGui.EndDisabled();
+            }
         }
 
         ImGui.Separator();
+    }
+
+    private void DrawPaintPopup()
+    {
+        if (!ImGui.BeginPopup("##PaintPicker"))
+        {
+            return;
+        }
+
+        ImGuiX.ColorPicker4("##Picker", ref _paintColor,
+            ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.NoSmallPreview);
+
+        ImGui.SameLine();
+        ImGui.BeginGroup();
+        ImGui.Text("Current");
+        ImGuiX.ColorButton("##Current", _paintColor,
+            ImGuiColorEditFlags.NoPicker | ImGuiColorEditFlags.AlphaPreviewHalf, new Vector2(60, 40));
+
+        ImGui.Text("Previous");
+        if (ImGuiX.ColorButton("##Previous", _backupPaintColor,
+                ImGuiColorEditFlags.NoPicker | ImGuiColorEditFlags.AlphaPreviewHalf, new Vector2(60, 40)))
+        {
+            _paintColor = _backupPaintColor;
+        }
+
+        ImGui.Separator();
+        ImGui.Text("Palette");
+        for (var n = 0; n < _palette.Length; n++)
+        {
+            ImGui.PushID(n);
+            if (n % 8 != 0)
+            {
+                ImGui.SameLine(0f, ImGui.GetStyle().ItemSpacing.Y);
+            }
+
+            const ImGuiColorEditFlags paletteFlags = ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoPicker |
+                                                     ImGuiColorEditFlags.NoTooltip;
+            if (ImGuiX.ColorButton("##Palette", _palette[n], paletteFlags, new Vector2(20, 20)))
+            {
+                _paintColor = new Color(_palette[n].R, _palette[n].G, _palette[n].B, _paintColor.A);
+            }
+
+            if (ImGui.BeginDragDropTarget())
+            {
+                unsafe
+                {
+                    var payload = ImGui.AcceptDragDropPayload("_COL3F");
+                    if (payload.NativePtr != null)
+                    {
+                        var data = (float*)payload.Data;
+                        _palette[n] = new Color(data[0], data[1], data[2], 1f);
+                    }
+
+                    payload = ImGui.AcceptDragDropPayload("_COL4F");
+                    if (payload.NativePtr != null)
+                    {
+                        var data = (float*)payload.Data;
+                        _palette[n] = new Color(data[0], data[1], data[2], data[3]);
+                    }
+                }
+
+                ImGui.EndDragDropTarget();
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.EndGroup();
+        ImGui.EndPopup();
     }
 
     private void DrawTrileListWindow(TrileSetContext setContext)
@@ -254,7 +364,7 @@ public class ChrisEditor : EditorComponent
 
         var name = setContext.Name;
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputText("##trileset_name", ref name, 255))
+        if (ImGui.InputText("##TrileSetName", ref name, 255))
         {
             using (History.BeginScope("Rename Trile Set"))
             {
@@ -387,7 +497,7 @@ public class ChrisEditor : EditorComponent
             }
 
             ImGui.SetNextItemWidth(filterWidth);
-            ImGui.InputTextWithHint("##filter", "Filter", ref _filterTriles, 255);
+            ImGui.InputTextWithHint("##Filter", "Filter", ref _filterTriles, 255);
             if (!string.IsNullOrEmpty(_filterTriles))
             {
                 ImGui.SameLine();
@@ -563,9 +673,53 @@ public class ChrisEditor : EditorComponent
                     break;
                 }
 
+            case EditMode.Paint:
+                {
+                    if (!hit.HasValue ||
+                        !(ImGui.IsMouseClicked(ImGuiMouseButton.Left) ||
+                          (ImGui.IsMouseDown(ImGuiMouseButton.Left) && _nowTime - _lastEditTime >= EditStep)))
+                    {
+                        break;
+                    }
+
+                    _lastEditTime = _nowTime;
+                    using (History.BeginScope("Paint Trixel"))
+                    {
+                        PaintPixel(hit.Value);
+                    }
+
+                    break;
+                }
+
             default:
                 throw new InvalidOperationException();
         }
+    }
+
+    private void PaintPixel(TrixelFace face)
+    {
+        var (lx, y) = face.Face switch
+        {
+            FaceOrientation.Front => (face.Emplacement.X, _obj.Height - 1 - face.Emplacement.Y),
+            FaceOrientation.Right => (_obj.Depth - 1 - face.Emplacement.Z, (_obj.Height - 1 - face.Emplacement.Y)),
+            FaceOrientation.Back => (_obj.Width - 1 - face.Emplacement.X, (_obj.Height - 1 - face.Emplacement.Y)),
+            FaceOrientation.Left => (face.Emplacement.Z, (_obj.Height - 1 - face.Emplacement.Y)),
+            FaceOrientation.Top => (face.Emplacement.X, face.Emplacement.Z),
+            FaceOrientation.Down => (face.Emplacement.X, (_obj.Depth - 1 - face.Emplacement.Z)),
+            _ => throw new InvalidOperationException()
+        };
+
+        var faceIndex = Array.IndexOf(FaceExtensions.NaturalOrder, face.Face);
+        var x = faceIndex * _obj.Texture.Width / 6 + lx;
+        var idx = (y * _obj.Texture.Width + x) * 4;
+
+        _obj.Texture.TextureData[idx + 0] = _paintColor.R;
+        _obj.Texture.TextureData[idx + 1] = _paintColor.G;
+        _obj.Texture.TextureData[idx + 2] = _paintColor.B;
+        _obj.Texture.TextureData[idx + 3] = byte.MaxValue;
+
+        var mesh = _meshActor.GetComponent<TrixelsMesh>();
+        mesh.Texture!.SetData(_obj.Texture.TextureData);
     }
 
     private void DrawPropertiesWindow()
@@ -596,23 +750,6 @@ public class ChrisEditor : EditorComponent
             ImGuiX.SetNextWindowSize(new Vector2(640, 160), ImGuiCond.Appearing);
             if (ImGui.Begin($"Texture Viewer##{Title}", ref _showTexture, flags))
             {
-                if (!ResourceService.IsReadonly)
-                {
-                    var exportPath = ResourceService.GetFullPath(_context.TextureExportKey);
-                    if (ImGui.Button("Edit Externally"))
-                    {
-                        _texture = new TempTextureTracker(Game, texture, exportPath);
-                        _texture.Changed += OnTextureReload;
-                        {
-                            _confirm.Title = "Export";
-                            _confirm.Text = $"The texture has been exported to\n'{exportPath}'";
-                            _confirm.ConfirmButtonText = "Ok";
-                            _confirm.DenyButtonText = "";
-                            _confirm.Confirmed = () => _texture!.OpenInEditor();
-                        }
-                    }
-                }
-
                 var sizeText = $"Texture Size: {texture.Width}x{texture.Height}px";
                 var textWidth = ImGui.CalcTextSize(sizeText).X;
                 var availWidth = ImGui.GetContentRegionAvail().X;
@@ -657,7 +794,6 @@ public class ChrisEditor : EditorComponent
     public override void Dispose()
     {
         Game.RemoveComponent(_confirm);
-        _texture?.Dispose();
         _scene.Dispose();
         _context.Dispose();
         base.Dispose();
@@ -703,13 +839,16 @@ public class ChrisEditor : EditorComponent
             _obj = _context.Materialize();
             History.Track(_obj);
         }
-        else if (_context is TrileSetContext trileCtx)
-        {
-            trileCtx.InvalidateAtlasCache();
-        }
 
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        mesh.Texture = _context.LoadTexture();
+        if (materialize)
+        {
+            // Convert texture and upload it to GPU mesh
+            mesh.Texture?.Dispose();
+            mesh.Texture = RepackerExtensions.ConvertToTexture2D(_obj.Texture);
+            RepackerExtensions.SetAlpha(mesh.Texture, 1f);
+        }
+
         mesh.Visualize(_obj);
 
         var cursor = _cursorActor.GetComponent<CursorMesh>();
@@ -726,22 +865,6 @@ public class ChrisEditor : EditorComponent
         var bounds = _boundsActor.GetComponent<BoundsMesh>();
         bounds.Size = _obj.Size;
         _boundsActor.Transform.Position = -_obj.Size / 2f;
-    }
-
-    private void OnTextureReload(Texture2D newTexture)
-    {
-        _context.UpdateTexture(newTexture);
-
-        var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        mesh.Texture = newTexture;
-        mesh.Visualize(_obj);
-
-        _confirm.Title = "Confirm texture overriding";
-        _confirm.Text = $"The texture has been changed externally. Save it to the bundle '{Title}'?";
-        _confirm.ConfirmButtonText = "Yes";
-        _confirm.DenyButtonText = "No";
-        _confirm.Confirmed = () => ResourceService.Save(Title, _context.GetAsset(_obj));
-        _confirm.Denied = null;
     }
 
     private TrixelFace? RaycastTrixelFace(Ray ray)
@@ -874,7 +997,7 @@ public class ChrisEditor : EditorComponent
         foreach (var emp in selected)
         {
             var next = emp + ni;
-            if (next.LengthSquared() > 0 && next < size)
+            if (next >= Vector3I.Zero && next < size)
             {
                 toAdd.Add(next);
             }
@@ -959,10 +1082,23 @@ public class ChrisEditor : EditorComponent
         return trileSet;
     }
 
+    private static Color[] InitPalette()
+    {
+        var palette = new Color[32];
+        for (var n = 0; n < palette.Length; n++)
+        {
+            ImGui.ColorConvertHSVtoRGB(n / 31f, 0.8f, 0.8f, out var r, out var g, out var b);
+            palette[n] = new Color(r, g, b, 1f);
+        }
+
+        return palette;
+    }
+
     private enum EditMode
     {
         Select,
         Remove,
-        Add
+        Add,
+        Paint
     }
 }

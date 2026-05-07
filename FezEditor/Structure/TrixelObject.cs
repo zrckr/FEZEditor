@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.IO.Compression;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using FezEditor.Tools;
 using Microsoft.Xna.Framework;
@@ -11,6 +12,9 @@ public class TrixelObject
 
     [JsonConverter(typeof(Base64Converter))]
     public byte[] MissingTrixels { get; private set; } = Array.Empty<byte>();
+
+    [JsonConverter(typeof(CompressConverter))]
+    public RTexture2D Texture { get; set; } = new RTexture2D();
 
     public int Width => (int)(Size.X / Mathz.TrixelSize);
 
@@ -112,6 +116,37 @@ public class TrixelObject
         public override void Write(Utf8JsonWriter writer, byte[] value, JsonSerializerOptions options)
         {
             writer.WriteStringValue(Convert.ToBase64String(value));
+        }
+    }
+
+    private class CompressConverter : JsonConverter<RTexture2D>
+    {
+        public override RTexture2D Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var base64 = reader.GetString();
+            if (string.IsNullOrEmpty(base64))
+            {
+                return new RTexture2D();
+            }
+
+            var compressed = Convert.FromBase64String(base64);
+            using var ms = new MemoryStream(compressed);
+            using var deflate = new DeflateStream(ms, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+            deflate.CopyTo(output);
+            return JsonSerializer.Deserialize<RTexture2D>(output.ToArray())!;
+        }
+
+        public override void Write(Utf8JsonWriter writer, RTexture2D value, JsonSerializerOptions options)
+        {
+            var json = JsonSerializer.SerializeToUtf8Bytes(value);
+            using var ms = new MemoryStream();
+            using (var deflate = new DeflateStream(ms, CompressionLevel.Fastest, leaveOpen: true))
+            {
+                deflate.Write(json);
+            }
+
+            writer.WriteStringValue(Convert.ToBase64String(ms.ToArray()));
         }
     }
 }

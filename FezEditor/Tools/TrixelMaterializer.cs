@@ -188,7 +188,7 @@ public static class TrixelMaterializer
                            + (bitangentVec * rect.StartBitangent)
                            + (normalVec * rect.Depth);
 
-            // Vertex formula — mirrors TrileMaterializer/ArtObjectMaterializer
+            // Vertex formula - mirrors TrileMaterializer/ArtObjectMaterializer
             var v0 = (startPos / 16f) + ((isPositive ? 1 : 0) * normalVec / 16f) - offset;
             var v1 = v0 + (tangentVec * rect.TangentSize / 16f);
             var v2 = v1 + (bitangentVec * rect.BitangentSize / 16f);
@@ -221,7 +221,7 @@ public static class TrixelMaterializer
         return (vertices.ToArray(), indices.ToArray());
     }
 
-    public static List<MeshRect> GreedyMesh(IEnumerable<TrixelFace> faces)
+    private static List<MeshRect> GreedyMesh(IEnumerable<TrixelFace> faces)
     {
         var groups = new Dictionary<(FaceOrientation, int), List<(int t, int b)>>();
         foreach (var face in faces)
@@ -365,7 +365,7 @@ public static class TrixelMaterializer
         return new Vector2(faceOffset.X + (u / 8f), faceOffset.Y + v);
     }
 
-    public record struct MeshRect(
+    private record struct MeshRect(
         FaceOrientation Orientation,
         int StartTangent,
         int StartBitangent,
@@ -443,7 +443,7 @@ public static class TrixelMaterializer
         }
 
         // Inner faces: exposed when a missing trixel is adjacent to an existing one.
-        // For each missing trixel, check all 6 neighbors — if the neighbor exists and
+        // For each missing trixel, check all 6 neighbors - if the neighbor exists and
         // is within bounds, emit a face on that neighbor pointing toward the void.
         // The face orientation is the direction FROM the neighbor TOWARD the missing trixel
         for (var x = 0; x < w; x++)

@@ -1,36 +1,26 @@
-﻿using FezEditor.Structure;
+using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
 using FEZRepacker.Core.Definitions.Game.Common;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace FezEditor.Components.Chris;
 
 internal class ArtObjectContext : IContext
 {
-    private const int BytesPerPixel = 4;
-
-    public string TextureExportKey { get; }
-
     private readonly ArtObject _ao;
 
     private Action<Vector3>? _resized;
 
-    private Texture2D? _texture;
-
     public ArtObjectContext(ArtObject ao)
     {
         _ao = ao;
-        TextureExportKey = ao.Name;
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _texture?.Dispose();
-        _texture = null;
     }
 
     public TrixelObject Materialize()
@@ -38,6 +28,7 @@ internal class ArtObjectContext : IContext
         var obj = TrixelMaterializer.ReconstructGeometry(_ao.Size.ToXna(), _ao.Geometry.Vertices,
             _ao.Geometry.Indices);
         _resized = obj.Resize;
+        obj.Texture = _ao.Cubemap;
         return obj;
     }
 
@@ -48,25 +39,8 @@ internal class ArtObjectContext : IContext
         ao.Name = _ao.Name;
         ao.ActorType = _ao.ActorType;
         ao.NoSihouette = _ao.NoSihouette;
-        ao.Cubemap = _ao.Cubemap; // kept in sync
+        ao.Cubemap = obj.Texture;
         return ao;
-    }
-
-    public Texture2D LoadTexture()
-    {
-        _texture?.Dispose();
-        _texture = RepackerExtensions.ConvertToTexture2D(_ao.Cubemap);
-        RepackerExtensions.SetAlpha(_texture, 1f);
-        return _texture;
-    }
-
-    public void UpdateTexture(Texture2D texture)
-    {
-        var pixels = new byte[texture.Width * texture.Height * BytesPerPixel];
-        texture.GetData(pixels);
-        _ao.Cubemap.TextureData = pixels;
-        _ao.Cubemap.Width = texture.Width;
-        _ao.Cubemap.Height = texture.Height;
     }
 
     public bool DrawProperties(History history)
