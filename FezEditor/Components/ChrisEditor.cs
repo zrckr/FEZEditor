@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using FezEditor.Actors;
 using FezEditor.Components.Chris;
 using FezEditor.Structure;
@@ -8,19 +8,32 @@ using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
-using PrimitiveType = Microsoft.Xna.Framework.Graphics.PrimitiveType;
 
 namespace FezEditor.Components;
 
-public class ChrisEditor : EditorComponent
+public class ChrisEditor : EditorComponent, IChrisEditor
 {
-    private static readonly TimeSpan EditStep = TimeSpan.FromMilliseconds(100);
+    public override object Asset => _context.GetAsset(Obj);
 
-    private static readonly Color HoverColor = Color.Blue with { A = 85 };
+    public bool IsViewportHovered { get; private set; }
 
-    private static readonly Color SelectionColor = Color.Red with { A = 85 };
+    public TrixelObject Obj { get; private set; } = null!;
 
-    public override object Asset => _context.GetAsset(_obj);
+    public TrixelFace? Hit { get; private set; }
+
+    public CursorMesh Cursor => _cursorActor.GetComponent<CursorMesh>();
+
+    public TrixelsMesh Trixels => _meshActor.GetComponent<TrixelsMesh>();
+
+    public Gizmo Gizmo => _gizmoActor.GetComponent<Gizmo>();
+
+    public Color PaintColor { get; set; } = Color.White;
+
+    public ChrisTool CurrentTool { get; set; } = ChrisTool.Select;
+
+    public HashSet<TrixelFace> SelectedFaces { get; } = new();
+
+    public FaceOrientation? SelectionOrientation { get; set; }
 
     private readonly IContext _context;
 
@@ -42,33 +55,17 @@ public class ChrisEditor : EditorComponent
 
     private Actor _boundsActor = null!;
 
-    private TrixelObject _obj = null!;
+    private Actor _gizmoActor = null!;
 
-    private Color _paintColor = Color.White;
-
-    private Color _backupPaintColor = Color.White;
-
-    private readonly Color[] _palette = InitPalette();
+    private Actor _collisionActor = null!;
 
     private bool _showProperties;
 
     private bool _showTexture;
 
-    private bool _showTrileList = true;
+    private bool _showTrileSetList = true;
 
-    private EditMode _editMode = EditMode.Select;
-
-    private TrixelFace? _hoveredFace;
-
-    private readonly HashSet<TrixelFace> _selectedFaces = new();
-
-    private FaceOrientation? _selectionOrientation;
-
-    private TrixelFace? _dragStartFace;
-
-    private TimeSpan _nowTime;
-
-    private TimeSpan _lastEditTime;
+    private readonly List<BaseTool> _tools = new();
 
     public ChrisEditor(Game game, string title, ArtObject ao) : this(game, title, new ArtObjectContext(ao))
     {
@@ -85,6 +82,14 @@ public class ChrisEditor : EditorComponent
         _context = context;
         History.StateChanged += _ => RevisualizeSubject(false);
         Game.AddComponent(_confirm = new ConfirmWindow(game));
+    }
+
+    public override void Dispose()
+    {
+        Game.RemoveComponent(_confirm);
+        _scene.Dispose();
+        _context.Dispose();
+        base.Dispose();
     }
 
     public override void LoadContent()
@@ -108,7 +113,10 @@ public class ChrisEditor : EditorComponent
         {
             _meshActor = _scene.CreateActor();
             _meshActor.AddComponent<TrixelsMesh>();
-            _meshActor.AddComponent<TrileCollisionMesh>();
+        }
+        {
+            _collisionActor = _scene.CreateActor();
+            _collisionActor.AddComponent<TrileCollisionMesh>();
         }
         {
             _boundsActor = _scene.CreateActor();
@@ -118,436 +126,42 @@ public class ChrisEditor : EditorComponent
             _cursorActor = _scene.CreateActor();
             _cursorActor.AddComponent<CursorMesh>();
         }
+        {
+            _gizmoActor = _scene.CreateActor();
+            var gizmo = _gizmoActor.AddComponent<Gizmo>();
+            gizmo.Camera = _cameraActor.GetComponent<Camera>();
+        }
+        {
+            _tools.Add(new SelectTool(Game, this));
+            _tools.Add(new ExtrudeTool(Game, this));
+            _tools.Add(new PaintTool(Game, this));
+            _tools.Add(new PickTool(Game, this));
+        }
 
         RevisualizeSubject();
         var zoom1 = _cameraActor.GetComponent<ZoomControl>();
-        zoom1.Distance = _obj.Size.X * 1.1f;
+        zoom1.Distance = Obj.Size.X * 1.1f;
     }
 
     public override void Update(GameTime gameTime)
     {
-        StatusService.AddHints(_editMode switch
+        Gizmo.Hide();
+        Cursor.ClearHover();
+        Cursor.ClearSelection();
+        StatusService.ClearHints();
+
+        foreach (var tool in _tools)
         {
-            EditMode.Select => [("LMB Drag", "Select Faces")],
-            EditMode.Add => [("LMB", "Add Trixels")],
-            EditMode.Remove => [("LMB", "Remove Trixels")],
-            EditMode.Paint => [("LMB", "Paint Trixel Face")],
-            _ => throw new InvalidOperationException()
-        });
-        _nowTime = gameTime.TotalGameTime;
+            tool.Update();
+        }
+
         _scene.Update(gameTime);
     }
 
     public override void Draw()
     {
-        ImGuiX.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 8));
-
         DrawToolbar();
-        DrawPaintPopup();
 
-        DrawSceneViewport();
-        EditTrixelObject();
-
-        if (_context is TrileSetContext subject)
-        {
-            DrawTrileListWindow(subject);
-        }
-
-        DrawPropertiesWindow();
-        DrawTextureWindow();
-
-        ImGui.PopStyleVar();
-    }
-
-    private void DrawToolbar()
-    {
-        {
-            ImGui.BeginDisabled(_editMode == EditMode.Select);
-            if (ImGui.Button($"{Lucide.MousePointer2} Select"))
-            {
-                _editMode = EditMode.Select;
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_editMode == EditMode.Remove);
-            if (ImGui.Button($"{Lucide.Eraser} Remove"))
-            {
-                _editMode = EditMode.Remove;
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_editMode == EditMode.Add);
-            if (ImGui.Button($"{Lucide.Pencil} Add"))
-            {
-                _editMode = EditMode.Add;
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_editMode == EditMode.Paint);
-            if (ImGui.Button($"{Lucide.Paintbrush} Paint"))
-            {
-                _editMode = EditMode.Paint;
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            var openPopup = ImGuiX.ColorButton("##PaintButton", _paintColor);
-            if (openPopup)
-            {
-                ImGui.OpenPopup("##PaintPicker");
-                _backupPaintColor = _paintColor;
-            }
-        }
-
-        ImGui.SameLine();
-        ImGui.TextDisabled("|");
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_showProperties);
-            if (ImGui.Button($"{Lucide.Wrench} Properties"))
-            {
-                _showProperties = true;
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_showTexture);
-            if (ImGui.Button($"{Lucide.Image} Texture"))
-            {
-                _showTexture = true;
-            }
-
-            ImGui.EndDisabled();
-        }
-
-
-        ImGui.SameLine();
-        {
-            var mesh = _meshActor.GetComponent<TrixelsMesh>();
-            var wireFrame = mesh.Wireframe;
-            if (ImGui.Checkbox("Wireframe", ref wireFrame))
-            {
-                mesh.Wireframe = wireFrame;
-            }
-        }
-
-        if (_context is TrileSetContext)
-        {
-            var collision = _meshActor.GetComponent<TrileCollisionMesh>();
-            var icon = collision.Visible ? Lucide.EyeOff : Lucide.Eye;
-            ImGui.SameLine();
-            if (ImGui.Button($"{icon} Collision"))
-            {
-                collision.Visible = !collision.Visible;
-            }
-
-            ImGui.SameLine();
-            {
-                ImGui.BeginDisabled(_showTrileList);
-                if (ImGui.Button($"{Lucide.List} Trile Set"))
-                {
-                    _showTrileList = true;
-                }
-
-                ImGui.EndDisabled();
-            }
-        }
-
-        ImGui.Separator();
-    }
-
-    private void DrawPaintPopup()
-    {
-        if (!ImGui.BeginPopup("##PaintPicker"))
-        {
-            return;
-        }
-
-        ImGuiX.ColorPicker4("##Picker", ref _paintColor,
-            ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.NoSmallPreview);
-
-        ImGui.SameLine();
-        ImGui.BeginGroup();
-        ImGui.Text("Current");
-        ImGuiX.ColorButton("##Current", _paintColor,
-            ImGuiColorEditFlags.NoPicker | ImGuiColorEditFlags.AlphaPreviewHalf, new Vector2(60, 40));
-
-        ImGui.Text("Previous");
-        if (ImGuiX.ColorButton("##Previous", _backupPaintColor,
-                ImGuiColorEditFlags.NoPicker | ImGuiColorEditFlags.AlphaPreviewHalf, new Vector2(60, 40)))
-        {
-            _paintColor = _backupPaintColor;
-        }
-
-        ImGui.Separator();
-        ImGui.Text("Palette");
-        for (var n = 0; n < _palette.Length; n++)
-        {
-            ImGui.PushID(n);
-            if (n % 8 != 0)
-            {
-                ImGui.SameLine(0f, ImGui.GetStyle().ItemSpacing.Y);
-            }
-
-            const ImGuiColorEditFlags paletteFlags = ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoPicker |
-                                                     ImGuiColorEditFlags.NoTooltip;
-            if (ImGuiX.ColorButton("##Palette", _palette[n], paletteFlags, new Vector2(20, 20)))
-            {
-                _paintColor = new Color(_palette[n].R, _palette[n].G, _palette[n].B, _paintColor.A);
-            }
-
-            if (ImGui.BeginDragDropTarget())
-            {
-                unsafe
-                {
-                    var payload = ImGui.AcceptDragDropPayload("_COL3F");
-                    if (payload.NativePtr != null)
-                    {
-                        var data = (float*)payload.Data;
-                        _palette[n] = new Color(data[0], data[1], data[2], 1f);
-                    }
-
-                    payload = ImGui.AcceptDragDropPayload("_COL4F");
-                    if (payload.NativePtr != null)
-                    {
-                        var data = (float*)payload.Data;
-                        _palette[n] = new Color(data[0], data[1], data[2], data[3]);
-                    }
-                }
-
-                ImGui.EndDragDropTarget();
-            }
-
-            ImGui.PopID();
-        }
-
-        ImGui.EndGroup();
-        ImGui.EndPopup();
-    }
-
-    private void DrawTrileListWindow(TrileSetContext setContext)
-    {
-        if (!_showTrileList)
-        {
-            return;
-        }
-
-        const ImGuiWindowFlags flags = ImGuiWindowFlags.NoCollapse;
-        ImGuiX.SetNextWindowSize(new Vector2(320, 480), ImGuiCond.Appearing);
-        if (!ImGui.Begin($"Trile Set##{Title}", ref _showTrileList, flags))
-        {
-            ImGui.End();
-            return;
-        }
-
-        ImGui.Text("Name:");
-        ImGui.SameLine();
-
-        var name = setContext.Name;
-        ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputText("##TrileSetName", ref name, 255))
-        {
-            using (History.BeginScope("Rename Trile Set"))
-            {
-                setContext.Name = name;
-            }
-        }
-
-        // Toolbar
-        {
-            if (ImGui.Button($"{Lucide.Plus}"))
-            {
-                using (History.BeginScope("Add Trile"))
-                {
-                    var newId = setContext.AddTrile();
-                    _selectedTriles.Clear();
-                    _selectedTriles.Add(newId);
-                    _currentTrile = newId;
-                    setContext.Id = newId;
-                    RevisualizeSubject();
-                }
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip("Add Trile");
-            }
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_selectedTriles.Count == 0);
-            if (ImGui.Button($"{Lucide.Minus}"))
-            {
-                using (History.BeginScope("Remove Trile"))
-                {
-                    var nextId = setContext.RemoveTriles(_selectedTriles);
-                    _selectedTriles.Clear();
-                    _selectedTriles.Add(nextId);
-                    _currentTrile = nextId;
-                    setContext.Id = nextId;
-                    RevisualizeSubject();
-                }
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip("Remove Selected");
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_selectedTriles.Count == 0);
-            if (ImGui.Button($"{Lucide.Copy}"))
-            {
-                using (History.BeginScope("Copy Triles"))
-                {
-                    var newId = setContext.CopyTriles(_selectedTriles);
-                    _selectedTriles.Clear();
-                    _selectedTriles.Add(newId);
-                    _currentTrile = newId;
-                    setContext.Id = newId;
-                    RevisualizeSubject();
-                }
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip("Copy Selected");
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_selectedTriles.Count == 0);
-            if (ImGui.Button($"{Lucide.ListX}"))
-            {
-                _selectedTriles.Clear();
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip("Clear Selection");
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            ImGui.BeginDisabled(_selectedTriles.Count == 0);
-            if (ImGui.Button($"{Lucide.ArrowRightFromLine}"))
-            {
-                var options = new FileDialog.Options
-                {
-                    Title = "Choose trile set file...",
-                    Filters = new FileDialog.Filter[]
-                    {
-                        new("FEZTS files", "fezts.glb")
-                    }
-                };
-
-                FileDialog.Show(FileDialog.Type.OpenFile, files =>
-                {
-                    var path = files[0];
-                    var targetSet = (TrileSet)ResourceService.Load(path);
-                    setContext.AppendTriles(_selectedTriles, targetSet);
-                    ResourceService.Save(path, targetSet);
-                }, options);
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip("Export Selected to File");
-            }
-
-            ImGui.EndDisabled();
-        }
-
-        ImGui.SameLine();
-        {
-            var filterWidth = ImGui.GetContentRegionAvail().X;
-            if (!string.IsNullOrEmpty(_filterTriles))
-            {
-                filterWidth -= ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X;
-            }
-
-            ImGui.SetNextItemWidth(filterWidth);
-            ImGui.InputTextWithHint("##Filter", "Filter", ref _filterTriles, 255);
-            if (!string.IsNullOrEmpty(_filterTriles))
-            {
-                ImGui.SameLine();
-                if (ImGui.Button(Lucide.X))
-                {
-                    _filterTriles = "";
-                }
-            }
-        }
-
-        ImGui.Separator();
-        if (ImGuiX.BeginChild("##TrileSetList", Vector2.Zero))
-        {
-            foreach (var entry in setContext.EnumerateTriles(_filterTriles))
-            {
-                var toggled = _selectedTriles.Contains(entry.Id);
-                if (ImGui.Checkbox($"##chk_{entry.Id}", ref toggled))
-                {
-                    if (toggled)
-                    {
-                        _selectedTriles.Add(entry.Id);
-                    }
-                    else
-                    {
-                        _selectedTriles.Remove(entry.Id);
-                    }
-                }
-
-                ImGui.SameLine();
-
-                var sel = _currentTrile == entry.Id;
-                var size = new Vector2(32f);
-                var text = $"{entry.Id}: {entry.Name}";
-
-                if (ImGuiX.SelectableWithImage(entry.Texture, size, entry.Uv0, entry.Uv1, text, sel))
-                {
-                    _currentTrile = entry.Id;
-                    setContext.Id = _currentTrile;
-                    RevisualizeSubject();
-                }
-            }
-
-            ImGui.EndChild();
-        }
-
-        ImGui.End();
-    }
-
-    private void DrawSceneViewport()
-    {
         var size = ImGuiX.GetContentRegionAvail();
         var w = (int)size.X;
         var h = (int)size.Y;
@@ -563,167 +177,237 @@ public class ChrisEditor : EditorComponent
             if (texture is { IsDisposed: false })
             {
                 ImGuiX.Image(texture, size);
-                InputService.IsViewportHovered = ImGui.IsItemHovered();
+                const ImGuiHoveredFlags hoverFlags = ImGuiHoveredFlags.AllowWhenBlockedByActiveItem |
+                                                     ImGuiHoveredFlags.AllowWhenBlockedByPopup;
+                InputService.IsViewportHovered = ImGui.IsItemHovered(hoverFlags);
 
-                var imageMin = ImGuiX.GetItemRectMin();
-                var gizmo = _cameraActor.GetComponent<OrientationGizmo>();
-                gizmo.UseFaceLabels = true;
-                gizmo.Draw(imageMin + new Vector2(size.X - 8f, 8f));
-                ImGuiX.DrawStats(imageMin + new Vector2(8, 8), RenderingService.GetStats());
-            }
-        }
-    }
+                var viewportMin = ImGuiX.GetItemRectMin();
+                _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;
 
-    private void EditTrixelObject()
-    {
-        var viewportMin = ImGuiX.GetItemRectMin();
-        var mesh = _meshActor.GetComponent<TrixelsMesh>();
-
-        if (!ImGui.IsItemHovered())
-        {
-            if (_hoveredFace.HasValue)
-            {
-                _hoveredFace = null;
-                UpdateHoverCursor();
-            }
-
-            return;
-        }
-
-        var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
-        var hit = RaycastTrixelFace(ray);
-        if (hit != _hoveredFace)
-        {
-            _hoveredFace = hit;
-            UpdateHoverCursor();
-        }
-
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-        {
-            _dragStartFace = hit;
-            if (!hit.HasValue)
-            {
-                _selectedFaces.Clear();
-                _selectionOrientation = null;
-                _editMode = EditMode.Select;
-                UpdateSelectionCursor();
-                return;
-            }
-        }
-
-        if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
-        {
-            _dragStartFace = null;
-            return;
-        }
-
-        switch (_editMode)
-        {
-            case EditMode.Select:
+                Hit = null;
+                IsViewportHovered = ImGui.IsItemHovered(hoverFlags) && !ImGui.IsMouseDragging(ImGuiMouseButton.Middle);
+                if (IsViewportHovered)
                 {
-                    if (!hit.HasValue || !_dragStartFace.HasValue)
-                    {
-                        break;
-                    }
+                    var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
+                    Hit = RaycastTrixelFace(ray);
+                }
 
-                    var orientation = _dragStartFace.Value.Face;
-                    if (orientation != hit.Value.Face)
-                    {
-                        break;
-                    }
+                foreach (var tool in _tools)
+                {
+                    tool.DrawOverlay();
+                }
 
-                    var newSelection = BuildRectSelection(orientation, _dragStartFace.Value.Emplacement,
-                        hit.Value.Emplacement);
-                    if (orientation != _selectionOrientation || !newSelection.SetEquals(_selectedFaces))
+                var orientation = _cameraActor.GetComponent<OrientationGizmo>();
+                orientation.UseFaceLabels = true;
+                orientation.Draw(viewportMin + new Vector2(size.X - 8f, 8f));
+                ImGuiX.DrawStats(viewportMin + new Vector2(8, 8), RenderingService.GetStats());
+            }
+        }
+
+        #region Trile Set List
+
+        if (_context is TrileSetContext subject && _showTrileSetList)
+        {
+            const ImGuiWindowFlags flags = ImGuiWindowFlags.NoCollapse;
+            ImGuiX.SetNextWindowSize(new Vector2(320, 480), ImGuiCond.Appearing);
+            if (!ImGui.Begin($"Trile Set##{Title}", ref _showTrileSetList, flags))
+            {
+                ImGui.End();
+            }
+            else
+            {
+                ImGui.Text("Name:");
+                ImGui.SameLine();
+
+                var name = subject.Name;
+                ImGui.SetNextItemWidth(-1);
+                if (ImGui.InputText("##TrileSetName", ref name, 255))
+                {
+                    using (History.BeginScope("Rename Trile Set"))
                     {
-                        _selectionOrientation = orientation;
-                        _selectedFaces.Clear();
-                        foreach (var f in newSelection)
+                        subject.Name = name;
+                    }
+                }
+
+                // Toolbar
+                {
+                    if (ImGui.Button($"{Lucide.Plus}"))
+                    {
+                        using (History.BeginScope("Add Trile"))
                         {
-                            _selectedFaces.Add(f);
+                            var newId = subject.AddTrile();
+                            _selectedTriles.Clear();
+                            _selectedTriles.Add(newId);
+                            _currentTrile = newId;
+                            subject.Id = newId;
+                            RevisualizeSubject();
+                        }
+                    }
+
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Add Trile");
+                    }
+                }
+
+                ImGui.SameLine();
+                {
+                    ImGui.BeginDisabled(_selectedTriles.Count == 0);
+                    if (ImGui.Button($"{Lucide.Minus}"))
+                    {
+                        using (History.BeginScope("Remove Trile"))
+                        {
+                            var nextId = subject.RemoveTriles(_selectedTriles);
+                            _selectedTriles.Clear();
+                            _selectedTriles.Add(nextId);
+                            _currentTrile = nextId;
+                            subject.Id = nextId;
+                            RevisualizeSubject();
+                        }
+                    }
+
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Remove Selected");
+                    }
+
+                    ImGui.EndDisabled();
+                }
+
+                ImGui.SameLine();
+                {
+                    ImGui.BeginDisabled(_selectedTriles.Count == 0);
+                    if (ImGui.Button($"{Lucide.Copy}"))
+                    {
+                        using (History.BeginScope("Copy Triles"))
+                        {
+                            var newId = subject.CopyTriles(_selectedTriles);
+                            _selectedTriles.Clear();
+                            _selectedTriles.Add(newId);
+                            _currentTrile = newId;
+                            subject.Id = newId;
+                            RevisualizeSubject();
+                        }
+                    }
+
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Copy Selected");
+                    }
+
+                    ImGui.EndDisabled();
+                }
+
+                ImGui.SameLine();
+                {
+                    ImGui.BeginDisabled(_selectedTriles.Count == 0);
+                    if (ImGui.Button($"{Lucide.ListX}"))
+                    {
+                        _selectedTriles.Clear();
+                    }
+
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Clear Selection");
+                    }
+
+                    ImGui.EndDisabled();
+                }
+
+                ImGui.SameLine();
+                {
+                    ImGui.BeginDisabled(_selectedTriles.Count == 0);
+                    if (ImGui.Button($"{Lucide.ArrowRightFromLine}"))
+                    {
+                        var options = new FileDialog.Options
+                        {
+                            Title = "Choose trile set file...",
+                            Filters = new FileDialog.Filter[]
+                            {
+                                new("FEZTS files", "fezts.glb")
+                            }
+                        };
+
+                        FileDialog.Show(FileDialog.Type.OpenFile, files =>
+                        {
+                            var path = files[0];
+                            var targetSet = (TrileSet)ResourceService.Load(path);
+                            subject.AppendTriles(_selectedTriles, targetSet);
+                            ResourceService.Save(path, targetSet);
+                        }, options);
+                    }
+
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Export Selected to File");
+                    }
+
+                    ImGui.EndDisabled();
+                }
+
+                ImGui.SameLine();
+                {
+                    var filterWidth = ImGui.GetContentRegionAvail().X;
+                    if (!string.IsNullOrEmpty(_filterTriles))
+                    {
+                        filterWidth -= ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.X;
+                    }
+
+                    ImGui.SetNextItemWidth(filterWidth);
+                    ImGui.InputTextWithHint("##Filter", "Filter", ref _filterTriles, 255);
+                    if (!string.IsNullOrEmpty(_filterTriles))
+                    {
+                        ImGui.SameLine();
+                        if (ImGui.Button(Lucide.X))
+                        {
+                            _filterTriles = "";
+                        }
+                    }
+                }
+
+                ImGui.Separator();
+                if (ImGuiX.BeginChild("##TrileSetList", Vector2.Zero))
+                {
+                    foreach (var entry in subject.EnumerateTriles(_filterTriles))
+                    {
+                        var toggled = _selectedTriles.Contains(entry.Id);
+                        if (ImGui.Checkbox($"##chk_{entry.Id}", ref toggled))
+                        {
+                            if (toggled)
+                            {
+                                _selectedTriles.Add(entry.Id);
+                            }
+                            else
+                            {
+                                _selectedTriles.Remove(entry.Id);
+                            }
                         }
 
-                        UpdateSelectionCursor();
+                        ImGui.SameLine();
+
+                        var sel = _currentTrile == entry.Id;
+                        var size1 = new Vector2(32f);
+                        var text = $"{entry.Id}: {entry.Name}";
+
+                        if (ImGuiX.SelectableWithImage(entry.Texture, size1, entry.Uv0, entry.Uv1, text, sel))
+                        {
+                            _currentTrile = entry.Id;
+                            subject.Id = _currentTrile;
+                            RevisualizeSubject();
+                        }
                     }
 
-                    break;
+                    ImGui.EndChild();
                 }
 
-            case EditMode.Remove:
-            case EditMode.Add:
-                {
-                    if (!hit.HasValue || _selectedFaces.Count == 0 ||
-                        !(ImGui.IsMouseClicked(ImGuiMouseButton.Left) || _nowTime - _lastEditTime >= EditStep))
-                    {
-                        break;
-                    }
-
-                    _lastEditTime = _nowTime;
-                    var edit = _editMode == EditMode.Remove;
-
-                    using (History.BeginScope(edit ? "Remove Trixels" : "Add Trixels"))
-                    {
-                        ApplyChanges(hit.Value.Face, edit);
-                    }
-
-                    mesh.Visualize(_obj);
-                    RemapSelectionAfterCarve(hit.Value.Face, edit);
-                    UpdateSelectionCursor();
-
-                    break;
-                }
-
-            case EditMode.Paint:
-                {
-                    if (!hit.HasValue ||
-                        !(ImGui.IsMouseClicked(ImGuiMouseButton.Left) ||
-                          (ImGui.IsMouseDown(ImGuiMouseButton.Left) && _nowTime - _lastEditTime >= EditStep)))
-                    {
-                        break;
-                    }
-
-                    _lastEditTime = _nowTime;
-                    using (History.BeginScope("Paint Trixel"))
-                    {
-                        PaintPixel(hit.Value);
-                    }
-
-                    break;
-                }
-
-            default:
-                throw new InvalidOperationException();
+                ImGui.End();
+            }
         }
-    }
 
-    private void PaintPixel(TrixelFace face)
-    {
-        var (lx, y) = face.Face switch
-        {
-            FaceOrientation.Front => (face.Emplacement.X, _obj.Height - 1 - face.Emplacement.Y),
-            FaceOrientation.Right => (_obj.Depth - 1 - face.Emplacement.Z, (_obj.Height - 1 - face.Emplacement.Y)),
-            FaceOrientation.Back => (_obj.Width - 1 - face.Emplacement.X, (_obj.Height - 1 - face.Emplacement.Y)),
-            FaceOrientation.Left => (face.Emplacement.Z, (_obj.Height - 1 - face.Emplacement.Y)),
-            FaceOrientation.Top => (face.Emplacement.X, face.Emplacement.Z),
-            FaceOrientation.Down => (face.Emplacement.X, (_obj.Depth - 1 - face.Emplacement.Z)),
-            _ => throw new InvalidOperationException()
-        };
+        #endregion
 
-        var faceIndex = Array.IndexOf(FaceExtensions.NaturalOrder, face.Face);
-        var x = faceIndex * _obj.Texture.Width / 6 + lx;
-        var idx = (y * _obj.Texture.Width + x) * 4;
+        #region Properties Window
 
-        _obj.Texture.TextureData[idx + 0] = _paintColor.R;
-        _obj.Texture.TextureData[idx + 1] = _paintColor.G;
-        _obj.Texture.TextureData[idx + 2] = _paintColor.B;
-        _obj.Texture.TextureData[idx + 3] = byte.MaxValue;
-
-        var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        mesh.Texture!.SetData(_obj.Texture.TextureData);
-    }
-
-    private void DrawPropertiesWindow()
-    {
         if (_showProperties)
         {
             const ImGuiWindowFlags flags = ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize |
@@ -738,28 +422,29 @@ public class ChrisEditor : EditorComponent
                 ImGui.End();
             }
         }
-    }
 
-    private void DrawTextureWindow()
-    {
+        #endregion
+
+        #region Texture Window
+
         if (_showTexture)
         {
-            var texture = _meshActor.GetComponent<TrixelsMesh>().Texture!;
-            const ImGuiWindowFlags flags = ImGuiWindowFlags.NoCollapse;
+            var texture1 = _meshActor.GetComponent<TrixelsMesh>().Texture!;
+            const ImGuiWindowFlags flags1 = ImGuiWindowFlags.NoCollapse;
 
             ImGuiX.SetNextWindowSize(new Vector2(640, 160), ImGuiCond.Appearing);
-            if (ImGui.Begin($"Texture Viewer##{Title}", ref _showTexture, flags))
+            if (ImGui.Begin($"Texture Viewer##{Title}", ref _showTexture, flags1))
             {
-                var sizeText = $"Texture Size: {texture.Width}x{texture.Height}px";
+                var sizeText = $"Texture Size: {texture1.Width}x{texture1.Height}px";
                 var textWidth = ImGui.CalcTextSize(sizeText).X;
                 var availWidth = ImGui.GetContentRegionAvail().X;
                 ImGui.SameLine(ImGui.GetCursorPosX() + availWidth - textWidth);
                 ImGui.TextDisabled(sizeText);
 
                 var availW = ImGuiX.GetContentRegionAvail().X;
-                var scale = availW / texture.Width;
-                var displaySize = new Vector2(texture.Width, texture.Height) * scale;
-                ImGuiX.Image(texture, displaySize);
+                var scale = availW / texture1.Width;
+                var displaySize = new Vector2(texture1.Width, texture1.Height) * scale;
+                ImGuiX.Image(texture1, displaySize);
 
                 var drawList = ImGui.GetWindowDrawList();
                 var imageMin = ImGuiX.GetItemRectMin();
@@ -789,88 +474,142 @@ public class ChrisEditor : EditorComponent
                 ImGui.End();
             }
         }
+
+        #endregion
     }
 
-    public override void Dispose()
+    private void DrawModeButton(string icon, ChrisTool tool)
     {
-        Game.RemoveComponent(_confirm);
-        _scene.Dispose();
-        _context.Dispose();
-        base.Dispose();
-    }
-
-    private void UpdateHoverCursor()
-    {
-        var cursor = _cursorActor.GetComponent<CursorMesh>();
-        cursor.ClearHover();
-        if (_hoveredFace.HasValue)
+        ImGui.BeginDisabled(CurrentTool == tool);
+        if (ImGui.Button(icon))
         {
-            var tf = _hoveredFace.Value;
-            var surface = BuildTrixelFaceQuad(tf);
-            cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
+            CurrentTool = tool;
         }
-    }
 
-    private void UpdateSelectionCursor()
-    {
-        var cursor = _cursorActor.GetComponent<CursorMesh>();
-        cursor.ClearSelection();
-        if (_selectedFaces.Count != 0)
+        if (ImGui.IsItemHovered())
         {
-            var surfaces = _selectedFaces.Select(tf => (BuildTrixelFaceQuad(tf), PrimitiveType.TriangleList));
-            cursor.SetSelectionSurfaces(surfaces, SelectionColor);
+            ImGui.SetTooltip(tool.GetLabel());
         }
+
+        ImGui.EndDisabled();
     }
 
-    private MeshSurface BuildTrixelFaceQuad(TrixelFace tf)
+    private static void DrawToggleButton(ref bool flag, string icon, string tooltip)
     {
-        var meshOffset = Vector3.Zero - (_obj.Size / 2f);
-        var faceCenter = (tf.Emplacement.ToVector3() + ((Vector3.One + tf.Face.AsVector()) * 0.5f))
-            * Mathz.TrixelSize + meshOffset;
-        var origin = faceCenter + tf.Face.AsVector() * CursorMesh.OverlayOffset;
-        return MeshSurface.CreateFaceQuad(Vector3.One * Mathz.TrixelSize, origin, tf.Face);
+        ImGui.BeginDisabled(flag);
+        if (ImGui.Button(icon))
+        {
+            flag = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(tooltip);
+        }
+
+        ImGui.EndDisabled();
+    }
+
+    private void DrawToolbar()
+    {
+        DrawModeButton(Lucide.MousePointer2, ChrisTool.Select);
+
+        ImGui.SameLine();
+        DrawModeButton(Lucide.ArrowUpFromLine, ChrisTool.Extrude);
+
+        ImGui.SameLine();
+        DrawModeButton(Lucide.Paintbrush, ChrisTool.Paint);
+
+        ImGui.SameLine();
+        if (ImGuiX.ColorButton("##PaintButton", PaintColor))
+        {
+            ImGui.OpenPopup("##PaintPicker");
+            CurrentTool = ChrisTool.Paint;
+        }
+
+        ImGui.SameLine();
+        DrawModeButton(Lucide.Pipette, ChrisTool.Pick);
+
+        ImGui.SameLine();
+        ImGui.TextDisabled("|");
+
+        ImGui.SameLine();
+        DrawToggleButton(ref _showProperties, Lucide.Wrench, "Properties");
+
+        ImGui.SameLine();
+        DrawToggleButton(ref _showTexture, Lucide.Image, "Texture");
+
+        var mesh = _meshActor.GetComponent<TrixelsMesh>();
+        var wireFrame = mesh.Wireframe ? Lucide.BugOff : Lucide.Bug;
+        ImGui.SameLine();
+        if (ImGui.Button(wireFrame))
+        {
+            mesh.Wireframe = !mesh.Wireframe;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Wireframe");
+        }
+
+        if (_context is TrileSetContext)
+        {
+            var collision = _collisionActor.GetComponent<TrileCollisionMesh>();
+            var icon = collision.Visible ? Lucide.EyeOff : Lucide.Eye;
+            ImGui.SameLine();
+            if (ImGui.Button(icon))
+            {
+                collision.Visible = !collision.Visible;
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Collision");
+            }
+
+            ImGui.SameLine();
+            DrawToggleButton(ref _showTrileSetList, Lucide.List, "Trile Set");
+        }
+
+        ImGui.Separator();
     }
 
     private void RevisualizeSubject(bool materialize = true)
     {
         if (materialize)
         {
-            History.Untrack(_obj);
-            _obj = _context.Materialize();
-            History.Track(_obj);
+            History.Untrack(Obj);
+            Obj = _context.Materialize();
+            History.Track(Obj);
         }
 
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
         if (materialize)
         {
-            // Convert texture and upload it to GPU mesh
             mesh.Texture?.Dispose();
-            mesh.Texture = RepackerExtensions.ConvertToTexture2D(_obj.Texture);
+            mesh.Texture = RepackerExtensions.ConvertToTexture2D(Obj.Texture);
             RepackerExtensions.SetAlpha(mesh.Texture, 1f);
         }
 
-        mesh.Visualize(_obj);
-
-        var cursor = _cursorActor.GetComponent<CursorMesh>();
-        cursor.ClearHover();
-        cursor.ClearSelection();
-
+        mesh.Visualize(Obj);
         if (_context is TrileSetContext subject)
         {
-            var collision = _meshActor.GetComponent<TrileCollisionMesh>();
+            var collision = _collisionActor.GetComponent<TrileCollisionMesh>();
             collision.ClearInstanceData();
-            collision.AddInstanceData(Vector3.Zero, subject.GetTrileCollision(), _obj.Size);
+            collision.AddInstanceData(Vector3.Zero, subject.GetTrileCollision(), Obj.Size);
+            _collisionActor.Transform.Position = -Obj.Size / 2f;
+            subject.FlushThumbnail(Obj);
         }
 
         var bounds = _boundsActor.GetComponent<BoundsMesh>();
-        bounds.Size = _obj.Size;
-        _boundsActor.Transform.Position = -_obj.Size / 2f;
+        bounds.Size = Obj.Size;
+        _boundsActor.Transform.Position = -Obj.Size / 2f;
     }
 
     private TrixelFace? RaycastTrixelFace(Ray ray)
     {
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        var meshOffset = Vector3.Zero - (_obj.Size / 2f);
+        var meshOffset = Vector3.Zero - (Obj.Size / 2f);
         var best = default(TrixelFace?);
         var bestT = float.MaxValue;
 
@@ -906,107 +645,6 @@ public class ChrisEditor : EditorComponent
         }
 
         return best;
-    }
-
-    private void RemapSelectionAfterCarve(FaceOrientation orientation, bool inward)
-    {
-        if (_selectionOrientation != orientation || _selectedFaces.Count == 0)
-        {
-            return;
-        }
-
-        var normal = orientation.AsVector();
-        var step = inward ? -normal : normal;
-        var ni = new Vector3I((int)step.X, (int)step.Y, (int)step.Z);
-
-        var newFaces = new HashSet<TrixelFace>(_meshActor.GetComponent<TrixelsMesh>().Faces);
-        var remapped = new HashSet<TrixelFace>();
-        foreach (var tf in _selectedFaces)
-        {
-            var shifted = new TrixelFace(
-                new Vector3I(tf.Emplacement.X + ni.X, tf.Emplacement.Y + ni.Y, tf.Emplacement.Z + ni.Z),
-                orientation);
-            if (newFaces.Contains(shifted))
-            {
-                remapped.Add(shifted);
-            }
-        }
-
-        _selectedFaces.Clear();
-        foreach (var f in remapped)
-        {
-            _selectedFaces.Add(f);
-        }
-    }
-
-    private HashSet<TrixelFace> BuildRectSelection(FaceOrientation orientation, Vector3I start, Vector3I end)
-    {
-        var tan = orientation.GetTangent().AsVector();
-        var bitan = orientation.GetBitangent().AsVector();
-
-        var startT = (int)((start.X * tan.X) + (start.Y * tan.Y) + (start.Z * tan.Z));
-        var startB = (int)((start.X * bitan.X) + (start.Y * bitan.Y) + (start.Z * bitan.Z));
-        var endT = (int)((end.X * tan.X) + (end.Y * tan.Y) + (end.Z * tan.Z));
-        var endB = (int)((end.X * bitan.X) + (end.Y * bitan.Y) + (end.Z * bitan.Z));
-
-        var minT = Math.Min(startT, endT);
-        var maxT = Math.Max(startT, endT);
-        var minB = Math.Min(startB, endB);
-        var maxB = Math.Max(startB, endB);
-
-        var result = new HashSet<TrixelFace>();
-        var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        foreach (var tf in mesh.Faces)
-        {
-            if (tf.Face != orientation)
-            {
-                continue;
-            }
-
-            var t = (int)((tf.Emplacement.X * tan.X) + (tf.Emplacement.Y * tan.Y) + (tf.Emplacement.Z * tan.Z));
-            var b = (int)((tf.Emplacement.X * bitan.X) + (tf.Emplacement.Y * bitan.Y) + (tf.Emplacement.Z * bitan.Z));
-            if (t >= minT && t <= maxT && b >= minB && b <= maxB)
-            {
-                result.Add(tf);
-            }
-        }
-
-        return result;
-    }
-
-    private void ApplyChanges(FaceOrientation orientation, bool missing)
-    {
-        var selected = new HashSet<Vector3I>(_selectedFaces
-            .Where(tf => tf.Face == orientation)
-            .Select(tf => tf.Emplacement));
-
-        if (missing)
-        {
-            foreach (var emp in selected)
-            {
-                _obj.SetMissing(emp, true);
-            }
-
-            return;
-        }
-
-        var ni = new Vector3I(orientation.AsVector());
-        var toAdd = new HashSet<Vector3I>();
-        var size = new Vector3I(_obj.Width, _obj.Height, _obj.Depth);
-
-        foreach (var emp in selected)
-        {
-            var next = emp + ni;
-            if (next >= Vector3I.Zero && next < size)
-            {
-                toAdd.Add(next);
-            }
-        }
-
-        foreach (var emp in toAdd)
-        {
-            _obj.SetMissing(emp, false);
-        }
     }
 
     public static object CreateAo(string name)
@@ -1059,46 +697,11 @@ public class ChrisEditor : EditorComponent
             }
         };
 
-        var trile = new Trile
-        {
-            Name = "Trile",
-            CubemapPath = name,
-            AtlasOffset = new RVector2(0, 0),
-            Size = new RVector3(1, 1, 1),
-            Faces = new Dictionary<FaceOrientation, CollisionType>
-            {
-                [FaceOrientation.Front] = CollisionType.None,
-                [FaceOrientation.Right] = CollisionType.None,
-                [FaceOrientation.Back] = CollisionType.None,
-                [FaceOrientation.Left] = CollisionType.None
-            }
-        };
-
-        var obj = new TrixelObject(Vector3.One);
-        (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
+        var trile = TrileSetContext.CreateDefaultTrile("Trile");
+        trile.CubemapPath = name;
         TrileSetContext.ApplyAtlasOffsets(trileSet);
         trileSet.Triles.Add(0, trile);
 
         return trileSet;
-    }
-
-    private static Color[] InitPalette()
-    {
-        var palette = new Color[32];
-        for (var n = 0; n < palette.Length; n++)
-        {
-            ImGui.ColorConvertHSVtoRGB(n / 31f, 0.8f, 0.8f, out var r, out var g, out var b);
-            palette[n] = new Color(r, g, b, 1f);
-        }
-
-        return palette;
-    }
-
-    private enum EditMode
-    {
-        Select,
-        Remove,
-        Add,
-        Paint
     }
 }

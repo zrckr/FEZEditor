@@ -66,7 +66,7 @@ internal class TrileSetContext : IContext
 
     private readonly Texture2D _missing;
 
-    private Texture2D? _atlasTexture;
+    private Texture2D? _thumbnailsTexture;
 
     private int _id;
 
@@ -86,8 +86,8 @@ internal class TrileSetContext : IContext
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _atlasTexture?.Dispose();
-        _atlasTexture = null;
+        _thumbnailsTexture?.Dispose();
+        _thumbnailsTexture = null;
     }
 
     public TrixelObject Materialize()
@@ -109,10 +109,17 @@ internal class TrileSetContext : IContext
         return obj;
     }
 
+    public void FlushThumbnail(TrixelObject obj)
+    {
+        var atlas = _set.TextureAtlas;
+        var px = (int)MathF.Round(Trile.AtlasOffset.X * atlas.Width);
+        var py = (int)MathF.Round(Trile.AtlasOffset.Y * atlas.Height);
+        WriteTrileToAtlas(obj.Texture.TextureData, atlas.TextureData, AtlasWidth, px, py);
+        _thumbnailsTexture?.SetData(atlas.TextureData);
+    }
+
     public object GetAsset(TrixelObject obj)
     {
-        #region Apply New Properties
-
         var trile = new Trile
         {
             Size = obj.Size.ToRepacker(),
@@ -132,21 +139,7 @@ internal class TrileSetContext : IContext
         (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
         _set.Triles[Id] = trile;
 
-        #endregion
-
-        #region Rebuild Atlas Texture
-
-        var overrides = new Dictionary<int, byte[]> { [Id] = obj.Texture.TextureData };
-        RebuildAtlas(_set, overrides);
-
-        _atlasTexture?.Dispose();
-        _atlasTexture = new Texture2D(_game.GraphicsDevice, _set.TextureAtlas.Width, _set.TextureAtlas.Height,
-            false, SurfaceFormat.Color);
-        _atlasTexture.SetData(_set.TextureAtlas.TextureData);
-        RepackerExtensions.SetAlpha(_atlasTexture, 1f);
-
-        #endregion
-
+        RebuildAtlas(_set, new Dictionary<int, byte[]> { [Id] = obj.Texture.TextureData });
         ApplyAtlasOffsets(_set);
 
         return _set;
@@ -364,25 +357,25 @@ internal class TrileSetContext : IContext
                 continue;
             }
 
-            if (_atlasTexture == null)
+            if (_thumbnailsTexture == null)
             {
                 var atlas = _set.TextureAtlas;
-                _atlasTexture = new Texture2D(_game.GraphicsDevice, atlas.Width, atlas.Height, false, SurfaceFormat.Color);
-                _atlasTexture.SetData(atlas.TextureData);
-                RepackerExtensions.SetAlpha(_atlasTexture, 1f);
+                _thumbnailsTexture = new Texture2D(_game.GraphicsDevice, atlas.Width, atlas.Height, false, SurfaceFormat.Color);
+                _thumbnailsTexture.SetData(atlas.TextureData);
+                RepackerExtensions.SetAlpha(_thumbnailsTexture, 1f);
             }
 
             // Thumbnail shows the front face (face 0) usable area, skipping the 1px border.
             var uv0 = new Vector2(
                 trile.AtlasOffset.X + (1f / AtlasWidth),
-                trile.AtlasOffset.Y + (1f / _atlasTexture.Height)
+                trile.AtlasOffset.Y + (1f / _thumbnailsTexture.Height)
             );
             var uv1 = new Vector2(
                 uv0.X + ((float)FaceSize / AtlasWidth),
-                uv0.Y + ((float)FaceSize / _atlasTexture.Height)
+                uv0.Y + ((float)FaceSize / _thumbnailsTexture.Height)
             );
 
-            yield return new Entry(id, trile.Name, _atlasTexture, uv0, uv1);
+            yield return new Entry(id, trile.Name, _thumbnailsTexture, uv0, uv1);
         }
     }
 
@@ -463,15 +456,11 @@ internal class TrileSetContext : IContext
         };
     }
 
-    public int AddTrile()
+    public static Trile CreateDefaultTrile(string name = "UNTITLED")
     {
-        var newId = _set.Triles.Count > 0
-            ? _set.Triles.Keys.Max() + 1
-            : 0;
-
-        var newTrile = new Trile
+        var trile = new Trile
         {
-            Name = "UNTITLED",
+            Name = name,
             Size = Vector3.One.ToRepacker(),
             Faces = new Dictionary<FaceOrientation, CollisionType>
             {
@@ -482,7 +471,18 @@ internal class TrileSetContext : IContext
             }
         };
 
-        _set.Triles[newId] = newTrile;
+        var obj = new TrixelObject(Vector3.One);
+        (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
+        return trile;
+    }
+
+    public int AddTrile()
+    {
+        var newId = _set.Triles.Count > 0
+            ? _set.Triles.Keys.Max() + 1
+            : 0;
+
+        _set.Triles[newId] = CreateDefaultTrile();
         return newId;
     }
 
