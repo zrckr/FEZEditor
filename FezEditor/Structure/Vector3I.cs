@@ -140,22 +140,32 @@ public struct Vector3I : IEquatable<Vector3I>, IComparable<Vector3I>
 
     public static bool operator <(Vector3I lhs, Vector3I rhs)
     {
-        return lhs.CompareTo(rhs) < 0;
+        return lhs.X < rhs.X && lhs.Y < rhs.Y && lhs.Z < rhs.Z;
     }
 
     public static bool operator >(Vector3I lhs, Vector3I rhs)
     {
-        return lhs.CompareTo(rhs) > 0;
+        return lhs.X > rhs.X && lhs.Y > rhs.Y && lhs.Z > rhs.Z;
+    }
+
+    public static bool operator <=(Vector3I lhs, Vector3I rhs)
+    {
+        return lhs.X <= rhs.X && lhs.Y <= rhs.Y && lhs.Z <= rhs.Z;
+    }
+
+    public static bool operator >=(Vector3I lhs, Vector3I rhs)
+    {
+        return lhs.X >= rhs.X && lhs.Y >= rhs.Y && lhs.Z >= rhs.Z;
     }
 
     public static bool operator <(Vector3I lhs, Vector3 rhs)
     {
-        return lhs.CompareTo(new Vector3I(rhs)) < 0;
+        return lhs.X < rhs.X && lhs.Y < rhs.Y && lhs.Z < rhs.Z;
     }
 
     public static bool operator >(Vector3I lhs, Vector3 rhs)
     {
-        return lhs.CompareTo(new Vector3I(rhs)) > 0;
+        return lhs.X > rhs.X && lhs.Y > rhs.Y && lhs.Z > rhs.Z;
     }
 
     public static Vector3I Zero { get; } = new(0, 0, 0);
