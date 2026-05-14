@@ -170,7 +170,7 @@ internal class SelectTool : BaseTool
     {
         var meshOffset = Vector3.Zero - (Chris.Obj.Size / 2f);
         var faceCenter = (tf.Emplacement.ToVector3() + ((Vector3.One + tf.Face.AsVector()) * 0.5f)) * Mathz.TrixelSize + meshOffset;
-        var origin = faceCenter + tf.Face.AsVector() * CursorMesh.OverlayOffset;
+        var origin = faceCenter + tf.Face.AsVector() * CursorMesh.OverlayOffset * Mathz.TrixelSize;
         return MeshSurface.CreateFaceQuad(Vector3.One * Mathz.TrixelSize, origin, tf.Face);
     }
 }
