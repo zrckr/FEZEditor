@@ -26,9 +26,16 @@ VS_OUTPUT VS(VS_INPUT input)
     return output;
 }
 
+bool ShowEmission;
+
 float4 PS(VS_OUTPUT input) : COLOR0
 {
     float4 texColor = SAMPLE_TEXTURE(BaseTexture, input.TexCoord);
+
+    if (ShowEmission)
+    {
+        return float4(texColor.aaa, 1.0);
+    }
 
     float3 color = texColor.rgb;
     color *= ComputeLight(input.Normal, 0.0);
