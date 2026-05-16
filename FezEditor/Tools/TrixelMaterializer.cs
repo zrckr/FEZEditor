@@ -146,7 +146,6 @@ public static class TrixelMaterializer
         var rects = GreedyMesh(BuildVisibleFaces(obj));
         var offset = obj.Size / 2f;
         var texSize = obj.Size;
-        var texScale = new Vector2(1.3333334f, 1f);
 
         // Vertex deduplication: Position+Normal pair shares same index
         var vertexMap = new Dictionary<(Vector3 vertex, Vector3 normal), ushort>();
@@ -165,7 +164,7 @@ public static class TrixelMaterializer
             idx = (ushort)vertices.Count;
             vertexMap[key] = idx;
 
-            var texCoord = ComputeTexCoord(vertex, normal, texSize, face) * texScale;
+            var texCoord = ComputeTexCoord(vertex, normal, texSize, face);
             vertices.Add(new VertexInstance
             {
                 Position = vertex.ToRepacker(),
@@ -337,7 +336,7 @@ public static class TrixelMaterializer
         return rects;
     }
 
-    private static Vector2 ComputeTexCoord(
+    public static Vector2 ComputeTexCoord(
         Vector3 position,
         Vector3 normal,
         Vector3 trileSize,
@@ -362,7 +361,7 @@ public static class TrixelMaterializer
             v = 1f - v;
         }
 
-        return new Vector2(faceOffset.X + (u / 8f), faceOffset.Y + v);
+        return new Vector2(faceOffset.X + (u / 8f), faceOffset.Y + v) * new Vector2(1.3333334f, 1f);
     }
 
     private record struct MeshRect(
