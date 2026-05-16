@@ -332,10 +332,10 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
                         FileDialog.Show(FileDialog.Type.OpenFile, files =>
                         {
-                            var path = files[0];
-                            var targetSet = (TrileSet)ResourceService.Load(path);
+                            var relativePath = ResourceService.GetRelativePath(files[0]).Replace(".fezts.glb", "");
+                            var targetSet = (TrileSet)ResourceService.Load(relativePath);
                             subject.AppendTriles(_selectedTriles, targetSet);
-                            ResourceService.Save(path, targetSet);
+                            ResourceService.Save(relativePath, targetSet);
                         }, options);
                     }
 
