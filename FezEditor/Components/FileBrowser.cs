@@ -764,32 +764,30 @@ public class FileBrowser : DrawableGameComponent
                 continue;
             }
 
-            node.Children = _sortMode switch
+            var childrenOrderedByContainer = node.Children
+                .OrderBy(n => n.IsReference)
+                .ThenByDescending(n => n.IsDirectory);
+
+            var childrenOrdered = _sortMode switch
             {
-                SortMode.NameAscending => node.Children
-                    .OrderByDescending(n => n.IsDirectory)
-                    .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
+                SortMode.NameAscending => childrenOrderedByContainer
+                    .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase),
 
-                SortMode.NameDescending => node.Children
-                    .OrderByDescending(n => n.IsDirectory)
-                    .ThenByDescending(n => n.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
+                SortMode.NameDescending => childrenOrderedByContainer
+                    .ThenByDescending(n => n.Name, StringComparer.OrdinalIgnoreCase),
 
-                SortMode.TypeAscending => node.Children
-                    .OrderByDescending(n => n.IsDirectory)
+                SortMode.TypeAscending => childrenOrderedByContainer
                     .ThenBy(n => n.Extension, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
+                    .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase),
 
-                SortMode.TypeDescending => node.Children
-                    .OrderByDescending(n => n.IsDirectory)
+                SortMode.TypeDescending => childrenOrderedByContainer
                     .ThenByDescending(n => n.Extension, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
+                    .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase),
 
-                _ => node.Children
+                _ => childrenOrderedByContainer
             };
+
+            node.Children = childrenOrdered.ToList();
 
             for (var i = node.Children.Count - 1; i >= 0; i--)
             {
