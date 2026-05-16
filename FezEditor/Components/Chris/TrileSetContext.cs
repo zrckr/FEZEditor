@@ -389,16 +389,24 @@ internal class TrileSetContext : IContext
         {
             foreach (var vertex in trile.Geometry.Vertices)
             {
+                // We don't know if vertex is in trile space or atlas space, so we should recompute it completely.
+                var trileSpaceUv = TrixelMaterializer.ComputeTexCoord(
+                    vertex.Position.ToXna(),
+                    vertex.Normal.ToXna(),
+                    trile.Size.ToXna(),
+                    FaceExtensions.OrientationFromDirection(vertex.Normal.ToXna())
+                );
+
                 // Vertex U is in [0,1] spanning all 6 faces packed without borders.
                 // Map each face's [f/6, (f+1)/6] range into atlas space, inserting per-face borders.
-                var u = vertex.TextureCoordinate.X;
+                var u = trileSpaceUv.X;
                 var faceIndex = Math.Clamp((int)(u * FaceCount), 0, FaceCount - 1);
                 var uWithinFace = (u * FaceCount) - faceIndex;
 
                 var faceAtlasX = trile.AtlasOffset.X + (((faceIndex * AtlasFaceSize) + 1f) / atlasW);
                 var mappedU = faceAtlasX + (uWithinFace * FaceSize / atlasW);
                 var mappedV = trile.AtlasOffset.Y + (1f / atlasH) +
-                              (vertex.TextureCoordinate.Y * FaceSize / atlasH);
+                              (trileSpaceUv.Y * FaceSize / atlasH);
 
                 vertex.TextureCoordinate = new RVector2(mappedU, mappedV);
             }
