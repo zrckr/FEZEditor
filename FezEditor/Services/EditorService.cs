@@ -115,6 +115,7 @@ public partial class EditorService
                 {
                     tracking.HasChanges = true;
                     _tracking[editor] = tracking;
+                    _resourceService.InvalidateCacheFor(tracking.Path);
                 }
 
                 UpdateFlags();

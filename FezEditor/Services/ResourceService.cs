@@ -202,7 +202,7 @@ public class ResourceService : IDisposable
         }
 
         _provider!.Save(path, asset);
-        _cache.Remove(path);
+        InvalidateCacheFor(path);
         _provider.Refresh();
         ProviderChanged?.Invoke();
         Logger.Information("Saved - {0}", path);
@@ -219,7 +219,7 @@ public class ResourceService : IDisposable
     public void Move(string path, string newPath)
     {
         _provider!.Move(path, newPath);
-        _cache.Remove(path);
+        InvalidateCacheFor(path);
         _provider.Refresh();
         ProviderChanged?.Invoke();
         Logger.Information("Moved - {0} -> {1}", path, newPath);
@@ -228,10 +228,15 @@ public class ResourceService : IDisposable
     public void Delete(string path)
     {
         _provider!.Remove(path);
-        _cache.Remove(path);
+        InvalidateCacheFor(path);
         _provider.Refresh();
         ProviderChanged?.Invoke();
         Logger.Information("Deleted - {0}", path);
+    }
+
+    public void InvalidateCacheFor(string path)
+    {
+        _cache.Remove(path);
     }
 
     public void OpenInFileManager(string path)
