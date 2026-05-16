@@ -104,9 +104,11 @@ public class MainLayout : DrawableGameComponent
                                     title = $"{Lucide.Asterisk} {title}";
                                 }
 
-                                var tabFlags = _editorService.ShouldFocusEditor(editor)
-                                    ? ImGuiTabItemFlags.SetSelected
-                                    : ImGuiTabItemFlags.None;
+                                var tabFlags = ImGuiTabItemFlags.NoAssumedClosure;
+                                if (_editorService.ShouldFocusEditor(editor))
+                                {
+                                    tabFlags |= ImGuiTabItemFlags.SetSelected;
+                                }
 
                                 var tabLabel = title + "###" + editor.Title;
                                 var isOpen = true;
