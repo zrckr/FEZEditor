@@ -237,7 +237,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                     {
                         using (History.BeginScope("Add Trile"))
                         {
-                            var newId = subject.AddTrile();
+                            var newId = subject.AddDefaultTrile();
                             _selectedTriles.Clear();
                             _selectedTriles.Add(newId);
                             _currentTrile = newId;
@@ -677,32 +677,13 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public static object CreateTs(string name)
     {
-        var colors = new Color[TrileSetContext.AtlasWidth * TrileSetContext.AtlasStartingHeight];
-        Array.Fill(colors, Color.Black);
-        for (var row = 0; row < TrileSetContext.AtlasTrileHeight; row++)
-        {
-            for (var col = 0; col < TrileSetContext.AtlasTrileWidth; col++)
-            {
-                colors[(row * TrileSetContext.AtlasWidth) + col] = Color.White;
-            }
-        }
-
         var trileSet = new TrileSet
         {
             Name = name,
             Triles = new Dictionary<int, Trile>(),
-            TextureAtlas = new RTexture2D
-            {
-                Width = TrileSetContext.AtlasWidth,
-                Height = TrileSetContext.AtlasStartingHeight,
-                TextureData = MemoryMarshal.AsBytes(colors.AsSpan()).ToArray()
-            }
+            TextureAtlas = new RTexture2D(),
         };
-
-        var trile = TrileSetContext.CreateDefaultTrile("Trile");
-        trile.CubemapPath = name;
-        TrileSetContext.ApplyAtlasOffsets(trileSet);
-        trileSet.Triles.Add(0, trile);
+        TrileSetContext.AddDefaultTrile(trileSet, "Trile");
 
         return trileSet;
     }
