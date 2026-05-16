@@ -107,6 +107,8 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
             camera.Projection = Camera.ProjectionType.Perspective;
             camera.FieldOfView = 90f;
+            camera.Near = 0.01f;
+            camera.Far = 50f;
             zoom.MinDistance = 10f / 16f;
             zoom.MaxDistance = 16f;
         }
