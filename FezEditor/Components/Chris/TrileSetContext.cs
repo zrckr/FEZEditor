@@ -1,4 +1,5 @@
-﻿using FezEditor.Structure;
+﻿using System.Runtime.InteropServices;
+using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
 using FEZRepacker.Core.Definitions.Game.Common;
@@ -456,8 +457,19 @@ internal class TrileSetContext : IContext
         };
     }
 
-    public static Trile CreateDefaultTrile(string name = "UNTITLED")
+    private static byte[] GenerateDefaultTrileTextureData()
     {
+        var colors = new Color[AtlasTrileWidth * AtlasTrileHeight];
+        Array.Fill(colors, Color.White);
+        return MemoryMarshal.AsBytes(colors.AsSpan()).ToArray();
+    }
+
+    public static int AddDefaultTrile(TrileSet set, string name = "UNTITLED")
+    {
+        var newId = set.Triles.Count > 0
+            ? set.Triles.Keys.Max() + 1
+            : 0;
+
         var trile = new Trile
         {
             Name = name,
@@ -473,17 +485,18 @@ internal class TrileSetContext : IContext
 
         var obj = new TrixelObject(Vector3.One);
         (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
-        return trile;
+
+        set.Triles[newId] = trile;
+
+        RebuildAtlas(set, new Dictionary<int, byte[]> { [newId] = GenerateDefaultTrileTextureData() });
+        ApplyAtlasOffsets(set);
+
+        return newId;
     }
 
-    public int AddTrile()
+    public int AddDefaultTrile()
     {
-        var newId = _set.Triles.Count > 0
-            ? _set.Triles.Keys.Max() + 1
-            : 0;
-
-        _set.Triles[newId] = CreateDefaultTrile();
-        return newId;
+        return AddDefaultTrile(_set);
     }
 
     public int RemoveTriles(HashSet<int> ids)
@@ -495,7 +508,7 @@ internal class TrileSetContext : IContext
 
         if (_set.Triles.Count == 0)
         {
-            return AddTrile();
+            return AddDefaultTrile();
         }
 
         // Return last remaining id before the removed range, or first available
