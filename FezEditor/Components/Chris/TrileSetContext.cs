@@ -468,7 +468,7 @@ internal class TrileSetContext : IContext
     private static byte[] GenerateDefaultTrileTextureData()
     {
         var colors = new Color[AtlasTrileWidth * AtlasTrileHeight];
-        Array.Fill(colors, Color.White);
+        Array.Fill(colors, new Color(255, 255, 255, 0));
         return MemoryMarshal.AsBytes(colors.AsSpan()).ToArray();
     }
 

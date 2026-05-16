@@ -25,6 +25,8 @@ internal interface IChrisEditor
 
     ChrisTool CurrentTool { get; set; }
 
+    PaintMode CurrentPaintMode { get; set; }
+
     HashSet<TrixelFace> SelectedFaces { get; }
 
     FaceOrientation? SelectionOrientation { get; set; }

@@ -1,7 +1,6 @@
 using FezEditor.Services;
 using FezEditor.Structure;
 using FezEditor.Tools;
-using FEZRepacker.Core.Definitions.Game.Common;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -27,6 +26,19 @@ public class TrixelsMesh : ActorComponent
         }
     }
 
+    public bool ShowEmission
+    {
+        get => _showEmission;
+        set
+        {
+            if (_showEmission != value)
+            {
+                _showEmission = value;
+                _rendering.MaterialShaderSetParam(_material, "ShowEmission", value);
+            }
+        }
+    }
+
     private readonly RenderingService _rendering;
 
     private readonly Rid _mesh;
@@ -34,6 +46,8 @@ public class TrixelsMesh : ActorComponent
     private readonly Rid _material;
 
     private bool _wireframe;
+
+    private bool _showEmission;
 
     private TrixelFace[] _faces = [];
 

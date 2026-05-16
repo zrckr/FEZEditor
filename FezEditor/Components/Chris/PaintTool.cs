@@ -45,9 +45,18 @@ internal class PaintTool : BaseTool
             return;
         }
 
+        if (Chris.CurrentPaintMode is PaintMode.Emission)
+        {
+            int paintAlpha = Chris.PaintColor.A;
+            ImGui.SliderInt("##PaintEmissionValue", ref paintAlpha, byte.MinValue, byte.MaxValue);
+            Chris.PaintColor = new Color(Chris.PaintColor.R, Chris.PaintColor.G, Chris.PaintColor.B, paintAlpha);
+            ImGui.EndPopup();
+            return;
+        }
+
         var paintColor = Chris.PaintColor;
 
-        if (ImGuiX.ColorPicker4("##Picker", ref paintColor,
+        if (ImGuiX.ColorPicker3("##Picker", ref paintColor,
                 ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.NoSmallPreview))
         {
             Chris.PaintColor = paintColor;
@@ -174,10 +183,16 @@ internal class PaintTool : BaseTool
         var x = faceIndex * obj.Texture.Width / 6 + lx;
         var idx = (y * obj.Texture.Width + x) * 4;
 
-        obj.Texture.TextureData[idx + 0] = color.R;
-        obj.Texture.TextureData[idx + 1] = color.G;
-        obj.Texture.TextureData[idx + 2] = color.B;
-        obj.Texture.TextureData[idx + 3] = byte.MaxValue;
+        if (Chris.CurrentPaintMode is PaintMode.Color)
+        {
+            obj.Texture.TextureData[idx + 0] = color.R;
+            obj.Texture.TextureData[idx + 1] = color.G;
+            obj.Texture.TextureData[idx + 2] = color.B;
+        }
+        else if (Chris.CurrentPaintMode is PaintMode.Emission)
+        {
+            obj.Texture.TextureData[idx + 3] = color.A;
+        }
 
         Chris.Trixels.Texture!.SetData(obj.Texture.TextureData);
     }

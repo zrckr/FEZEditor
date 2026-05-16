@@ -27,13 +27,15 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public Gizmo Gizmo => _gizmoActor.GetComponent<Gizmo>();
 
-    public Color PaintColor { get; set; } = Color.White;
+    public Color PaintColor { get; set; } = new(255, 255, 255, 0);
 
     public ChrisTool CurrentTool { get; set; } = ChrisTool.Select;
 
     public HashSet<TrixelFace> SelectedFaces { get; } = new();
 
     public FaceOrientation? SelectionOrientation { get; set; }
+
+    public PaintMode CurrentPaintMode { get; set; } = PaintMode.Color;
 
     private readonly IContext _context;
 
@@ -520,13 +522,39 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         DrawModeButton(Lucide.ArrowUpFromLine, ChrisTool.Extrude);
 
         ImGui.SameLine();
+        ImGui.TextDisabled("|");
+
+        ImGui.SameLine();
         DrawModeButton(Lucide.Paintbrush, ChrisTool.Paint);
 
         ImGui.SameLine();
-        if (ImGuiX.ColorButton("##PaintButton", PaintColor))
+        var colorButtonFlags = CurrentPaintMode is PaintMode.Emission
+            ? ImGuiColorEditFlags.NoTooltip
+            : ImGuiColorEditFlags.NoAlpha;
+        var colorButtonColor = CurrentPaintMode is PaintMode.Emission
+            ? new Color(PaintColor.A, PaintColor.A, PaintColor.A, PaintColor.A)
+            : PaintColor;
+        if (ImGuiX.ColorButton("##PaintButton", colorButtonColor, colorButtonFlags))
         {
             ImGui.OpenPopup("##PaintPicker");
             CurrentTool = ChrisTool.Paint;
+        }
+
+        if (CurrentPaintMode is PaintMode.Emission && ImGui.IsItemHovered())
+        {
+            ImGui.BeginTooltip();
+            ImGui.Text($"Emission: {PaintColor.A}");
+            ImGui.EndTooltip();
+        }
+
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(100);
+        var paintMode = (int)CurrentPaintMode;
+        var paintModesList = Enum.GetNames<PaintMode>();
+        if (ImGui.Combo("##PaintMode", ref paintMode, paintModesList, paintModesList.Length))
+        {
+            CurrentPaintMode = (PaintMode)paintMode;
+            Trixels.ShowEmission = CurrentPaintMode is PaintMode.Emission;
         }
 
         ImGui.SameLine();
@@ -590,7 +618,6 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         {
             mesh.Texture?.Dispose();
             mesh.Texture = RepackerExtensions.ConvertToTexture2D(Obj.Texture);
-            RepackerExtensions.SetAlpha(mesh.Texture, 1f);
         }
 
         mesh.Visualize(Obj);
