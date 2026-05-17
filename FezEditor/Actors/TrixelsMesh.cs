@@ -35,6 +35,7 @@ public class TrixelsMesh : ActorComponent
             {
                 _showEmission = value;
                 _rendering.MaterialShaderSetParam(_material, "ShowEmission", value);
+                _rendering.MaterialSetAlbedo(_wiring, _showEmission ? Color.LightGray : Color.Transparent);
             }
         }
     }
@@ -45,6 +46,8 @@ public class TrixelsMesh : ActorComponent
 
     private readonly Rid _material;
 
+    private readonly Rid _wiring;
+
     private bool _wireframe;
 
     private bool _showEmission;
@@ -54,6 +57,7 @@ public class TrixelsMesh : ActorComponent
         _rendering = game.GetService<RenderingService>();
         _mesh = _rendering.MeshCreate();
         _material = _rendering.MaterialCreate();
+        _wiring = _rendering.MaterialCreate();
         _rendering.InstanceSetMesh(actor.InstanceRid, _mesh);
     }
 
@@ -63,6 +67,9 @@ public class TrixelsMesh : ActorComponent
         _rendering.MaterialAssignEffect(_material, effect);
         _rendering.MaterialSetFillMode(_material, FillMode.Solid);
         _rendering.MaterialSetCullMode(_material, CullMode.CullCounterClockwiseFace);
+
+        _rendering.MaterialAssignEffect(_wiring, _rendering.BasicEffect);
+        _rendering.MaterialSetAlbedo(_wiring, Color.Transparent);
     }
 
     public void SetTexture(RTexture2D texture)
@@ -98,6 +105,13 @@ public class TrixelsMesh : ActorComponent
         if (vertices.Length > 0)
         {
             var surface = RepackerExtensions.ConvertToMesh(vertices, indices);
+            if (_showEmission)
+            {
+                var (lineVerts, lineIndices) = TrixelMaterializer.DematerializeLines(obj);
+                var lineSurface = new MeshSurface { Vertices = lineVerts, Indices = lineIndices };
+                _rendering.MeshAddSurface(_mesh, PrimitiveType.LineList, lineSurface, _wiring);
+            }
+
             _rendering.MeshAddSurface(_mesh, PrimitiveType.TriangleList, surface, _material);
         }
     }
@@ -107,6 +121,7 @@ public class TrixelsMesh : ActorComponent
         GC.SuppressFinalize(this);
         _rendering.FreeRid(_mesh);
         _rendering.FreeRid(_material);
+        _rendering.FreeRid(_wiring);
         Texture?.Dispose();
         ColorTexture?.Dispose();
         EmissionTexture?.Dispose();

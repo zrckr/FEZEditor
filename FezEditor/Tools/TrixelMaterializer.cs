@@ -220,6 +220,60 @@ public static class TrixelMaterializer
         return (vertices.ToArray(), indices.ToArray());
     }
 
+    public static (Vector3[] Vertices, int[] Indices) DematerializeLines(TrixelObject obj)
+    {
+        var rects = GreedyMesh(obj.VisibleFaces);
+        var offset = obj.Size / 2f;
+
+        var vertexMap = new Dictionary<Vector3, int>();
+        var vertices = new List<Vector3>();
+        var indices = new List<int>();
+
+        int AddVertex(Vector3 v)
+        {
+            v = v.Round(4);
+            if (vertexMap.TryGetValue(v, out var idx))
+                return idx;
+            idx = vertices.Count;
+            vertexMap[v] = idx;
+            vertices.Add(v);
+            return idx;
+        }
+
+        foreach (var rect in rects)
+        {
+            var normalVec = rect.Orientation.AsVector();
+            var tangentVec = rect.Orientation.GetTangent().AsVector();
+            var bitangentVec = rect.Orientation.GetBitangent().AsVector();
+            var isPositive = rect.Orientation >= FaceOrientation.Right;
+
+            var startPos = (tangentVec * rect.StartTangent)
+                           + (bitangentVec * rect.StartBitangent)
+                           + (normalVec * rect.Depth);
+
+            var v0 = (startPos / 16f) + ((isPositive ? 1 : 0) * normalVec / 16f) - offset;
+            var v1 = v0 + (tangentVec * rect.TangentSize / 16f);
+            var v2 = v1 + (bitangentVec * rect.BitangentSize / 16f);
+            var v3 = v0 + (bitangentVec * rect.BitangentSize / 16f);
+
+            var i0 = AddVertex(v0);
+            var i1 = AddVertex(v1);
+            var i2 = AddVertex(v2);
+            var i3 = AddVertex(v3);
+
+            indices.Add(i0);
+            indices.Add(i1);
+            indices.Add(i1);
+            indices.Add(i2);
+            indices.Add(i2);
+            indices.Add(i3);
+            indices.Add(i3);
+            indices.Add(i0);
+        }
+
+        return (vertices.ToArray(), indices.ToArray());
+    }
+
     private static List<MeshRect> GreedyMesh(IEnumerable<TrixelFace> faces)
     {
         var groups = new Dictionary<(FaceOrientation, int), List<(int t, int b)>>();
