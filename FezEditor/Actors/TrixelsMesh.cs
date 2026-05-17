@@ -12,8 +12,6 @@ public class TrixelsMesh : ActorComponent
     public Texture2D? ColorTexture { get; private set; }
     public Texture2D? EmissionTexture { get; private set; }
 
-    public IReadOnlyList<TrixelFace> Faces => _faces;
-
     public bool Wireframe
     {
         get => _wireframe;
@@ -50,8 +48,6 @@ public class TrixelsMesh : ActorComponent
     private bool _wireframe;
 
     private bool _showEmission;
-
-    private TrixelFace[] _faces = [];
 
     internal TrixelsMesh(Game game, Actor actor) : base(game, actor)
     {
@@ -95,7 +91,6 @@ public class TrixelsMesh : ActorComponent
 
     public void Visualize(TrixelObject obj)
     {
-        _faces = TrixelMaterializer.BuildVisibleFaces(obj).ToArray();
         _rendering.MeshClear(_mesh);
         _rendering.MaterialAssignBaseTexture(_material, Texture!);
 

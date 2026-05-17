@@ -126,7 +126,7 @@ internal class SelectTool : BaseTool
         var maxB = Math.Max(startB, endB);
 
         var result = new HashSet<TrixelFace>();
-        foreach (var tf in Chris.Trixels.Faces)
+        foreach (var tf in Chris.Obj.VisibleFaces)
         {
             if (tf.Face != orientation)
             {
@@ -158,7 +158,7 @@ internal class SelectTool : BaseTool
             .Select(tf => tf.Emplacement)
             .ToHashSet();
 
-        var totalTrixels = Chris.Trixels.Faces
+        var totalTrixels = Chris.Obj.VisibleFaces
             .Select(tf => tf.Emplacement)
             .Distinct()
             .Count();

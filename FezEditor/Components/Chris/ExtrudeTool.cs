@@ -76,7 +76,7 @@ internal class ExtrudeTool : BaseTool
 
             if (!op.Add)
             {
-                var totalTrixels = Chris.Trixels.Faces.Select(tf => tf.Emplacement).Distinct().Count();
+                var totalTrixels = Chris.Obj.VisibleFaces.Select(tf => tf.Emplacement).Distinct().Count();
                 if (totalTrixels - targets.Count < 1)
                 {
                     targets.RemoveAt(targets.Count - 1);
