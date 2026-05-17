@@ -97,6 +97,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
     public override void LoadContent()
     {
         _scene = new Scene(Game, ContentManager);
+        _scene.Viewport.SetClearColor(new Color(0.04f, 0.04f, 0.045f));
         _scene.Lighting.Ambient = Color.LightGray;
         {
             _cameraActor = _scene.CreateActor();
