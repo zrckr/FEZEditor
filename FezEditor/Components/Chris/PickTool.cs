@@ -1,12 +1,11 @@
 using FezEditor.Services;
 using FezEditor.Tools;
-using FEZRepacker.Core.Definitions.Game.Common;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Chris;
 
-internal class PickTool : BaseTool
+internal class PickTool : TextureTool
 {
     private readonly AppStorageService _storage;
 
@@ -120,25 +119,8 @@ internal class PickTool : BaseTool
             return;
         }
 
-        var obj = Chris.Obj;
         var face = Chris.Hit!.Value;
-        var (lx, y) = face.Face switch
-        {
-            FaceOrientation.Front => (face.Emplacement.X, obj.Height - 1 - face.Emplacement.Y),
-            FaceOrientation.Right => (obj.Depth - 1 - face.Emplacement.Z, obj.Height - 1 - face.Emplacement.Y),
-            FaceOrientation.Back => (obj.Width - 1 - face.Emplacement.X, obj.Height - 1 - face.Emplacement.Y),
-            FaceOrientation.Left => (face.Emplacement.Z, obj.Height - 1 - face.Emplacement.Y),
-            FaceOrientation.Top => (face.Emplacement.X, face.Emplacement.Z),
-            FaceOrientation.Down => (face.Emplacement.X, obj.Depth - 1 - face.Emplacement.Z),
-            _ => throw new InvalidOperationException()
-        };
-
-        var faceIndex = Array.IndexOf(FaceExtensions.NaturalOrder, face.Face);
-        var x = faceIndex * obj.Texture.Width / 6 + lx;
-        var idx = (y * obj.Texture.Width + x) * 4;
-
-        var data = obj.Texture.TextureData;
-        Chris.PaintColor = new Color(data[idx], data[idx + 1], data[idx + 2], 255);
+        Chris.PaintColor = GetTrixelColor(face);
         Chris.CurrentTool = ChrisTool.Paint;
     }
 
