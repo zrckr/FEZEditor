@@ -11,6 +11,7 @@ internal class PickTool : TextureTool
 
     private readonly Color[] _palette;
 
+    private ChrisTool _lastUsedTool;
 
     public PickTool(Game game, IChrisEditor chris) : base(game, chris)
     {
@@ -22,12 +23,13 @@ internal class PickTool : TextureTool
     {
         if (Chris.CurrentTool != ChrisTool.Pick)
         {
+            _lastUsedTool = Chris.CurrentTool;
             return;
         }
 
         if (ImGui.IsKeyPressed(ImGuiKey.Escape))
         {
-            Chris.CurrentTool = ChrisTool.Select;
+            Chris.CurrentTool = _lastUsedTool;
         }
     }
 
@@ -121,7 +123,10 @@ internal class PickTool : TextureTool
 
         var face = Chris.Hit!.Value;
         Chris.PaintColor = GetTrixelColor(face);
-        Chris.CurrentTool = ChrisTool.Paint;
+
+        Chris.CurrentTool = _lastUsedTool.IsTextureTool()
+            ? _lastUsedTool
+            : ChrisTool.Paint;
     }
 
     protected override bool IsToolAllowed(ChrisTool tool)
