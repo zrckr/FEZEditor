@@ -5,6 +5,7 @@ public enum ChrisTool
     Select,
     Extrude,
     Paint,
+    Bucket,
     Pick
 }
 
@@ -17,6 +18,7 @@ public static class ChrisToolExtensions
             ChrisTool.Select => "Select",
             ChrisTool.Extrude => "Extrude",
             ChrisTool.Paint => "Paint",
+            ChrisTool.Bucket => "Bucket",
             ChrisTool.Pick => "Pick",
             _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, null)
         };

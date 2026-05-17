@@ -139,6 +139,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             _tools.Add(new SelectTool(Game, this));
             _tools.Add(new ExtrudeTool(Game, this));
             _tools.Add(new PaintTool(Game, this));
+            _tools.Add(new BucketTool(Game, this));
             _tools.Add(new PickTool(Game, this));
         }
 
@@ -529,6 +530,9 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
         ImGui.SameLine();
         DrawModeButton(Lucide.Paintbrush, ChrisTool.Paint);
+
+        ImGui.SameLine();
+        DrawModeButton(Lucide.PaintBucket, ChrisTool.Bucket);
 
         ImGui.SameLine();
         var colorButtonFlags = CurrentPaintMode is PaintMode.Emission

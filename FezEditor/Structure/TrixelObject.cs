@@ -180,7 +180,15 @@ public class TrixelObject
         }
     }
 
-    private bool IsMissing(Vector3I emplacement)
+    public bool SizeContains(Vector3I emplacement)
+    {
+        return
+            emplacement.X >= 0 && emplacement.X < Width &&
+            emplacement.Y >= 0 && emplacement.Y < Height &&
+            emplacement.Z >= 0 && emplacement.Z < Depth;
+    }
+
+    public bool IsMissing(Vector3I emplacement)
     {
         var i = BitIndex(emplacement);
         return (MissingTrixels[i >> 3] & (1 << (i & 7))) != 0;
