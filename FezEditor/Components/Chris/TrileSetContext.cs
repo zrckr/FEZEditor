@@ -116,7 +116,11 @@ internal class TrileSetContext : IContext
         var px = (int)MathF.Round(Trile.AtlasOffset.X * atlas.Width);
         var py = (int)MathF.Round(Trile.AtlasOffset.Y * atlas.Height);
         WriteTrileToAtlas(obj.Texture.TextureData, atlas.TextureData, AtlasWidth, px, py);
-        _thumbnailsTexture?.SetData(atlas.TextureData);
+
+        if (_thumbnailsTexture != null)
+        {
+            RepackerExtensions.ExtractColorToTexture2D(atlas, _thumbnailsTexture);
+        }
     }
 
     public object GetAsset(TrixelObject obj)
@@ -360,10 +364,7 @@ internal class TrileSetContext : IContext
 
             if (_thumbnailsTexture == null)
             {
-                var atlas = _set.TextureAtlas;
-                _thumbnailsTexture = new Texture2D(_game.GraphicsDevice, atlas.Width, atlas.Height, false, SurfaceFormat.Color);
-                _thumbnailsTexture.SetData(atlas.TextureData);
-                RepackerExtensions.SetAlpha(_thumbnailsTexture, 1f);
+                _thumbnailsTexture = RepackerExtensions.ExtractColorToTexture2D(_set.TextureAtlas);
             }
 
             // Thumbnail shows the front face (face 0) usable area, skipping the 1px border.
