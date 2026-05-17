@@ -622,7 +622,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             mesh.SetTexture(Obj.Texture);
         }
 
-        mesh.Visualize(Obj);
+        _meshActor.GetComponent<TrixelsMesh>().Visualize(Obj);
         if (_context is TrileSetContext subject)
         {
             var collision = _collisionActor.GetComponent<TrileCollisionMesh>();
@@ -639,12 +639,11 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     private TrixelFace? RaycastTrixelFace(Ray ray)
     {
-        var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        var meshOffset = Vector3.Zero - (Obj.Size / 2f);
+        var offset = Vector3.Zero - (Obj.Size / 2f);
         var best = default(TrixelFace?);
         var bestT = float.MaxValue;
 
-        foreach (var tf in mesh.Faces)
+        foreach (var tf in Obj.VisibleFaces)
         {
             var normal = tf.Face.AsVector();
             var denom = Vector3.Dot(normal, ray.Direction);
@@ -654,7 +653,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             }
 
             var faceCenter = ((tf.Emplacement.ToVector3() + ((Vector3.One + normal) * 0.5f))
-                              * Mathz.TrixelSize) + meshOffset;
+                              * Mathz.TrixelSize) + offset;
 
             var t = (Vector3.Dot(normal, faceCenter) - Vector3.Dot(normal, ray.Position)) / denom;
             if (t < 0f || t >= bestT)
@@ -710,7 +709,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         {
             Name = name,
             Triles = new Dictionary<int, Trile>(),
-            TextureAtlas = new RTexture2D(),
+            TextureAtlas = new RTexture2D()
         };
         TrileSetContext.AddDefaultTrile(trileSet, "Trile");
 
