@@ -23,4 +23,9 @@ public static class ChrisToolExtensions
             _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, null)
         };
     }
+
+    public static bool IsTextureTool(this ChrisTool tool)
+    {
+        return tool is ChrisTool.Paint or ChrisTool.Bucket or ChrisTool.Pick;
+    }
 }
