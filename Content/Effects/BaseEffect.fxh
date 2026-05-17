@@ -61,12 +61,12 @@ float ApplyFog(float distance)
     {
         return 1.0;
     }
-    
+
     if (Fog_Type == FOG_TYPE_EXP_SQR)
     {
         return Exp2Fog(distance, Fog_Density);
     }
-    
+
     // NOTE: FOG_TYPE_EXP and FOG_TYPE_LINEAR not implemented
     return 1.0;
 }
@@ -176,22 +176,37 @@ float3 PerAxisShading(float3 normal, float emissive)
 {
     float3 shade = saturate(BaseAmbient + emissive);
     float3 remainder = 1.0 - BaseAmbient;
-    
-    // Front lighting for surfaces lit directly
-    shade += saturate(dot(normal, 1.0)) * remainder;
-    
-    // Back lighting for surfaces facing away (60% contribution)
+
+    // Top lighting (100% contribution)
+    if (normal.y > 0.01)
+    {
+        shade += normal.y * remainder;
+    }
+
+    // Front lighting (60% contribution)
+    if (normal.z > 0.01)
+    {
+        shade += normal.z * remainder * 0.6;
+    }
+
+    // Back lighting (60% contribution)
     if (normal.z < -0.01)
     {
         shade += abs(normal.z) * remainder * 0.6;
     }
-    
-    // Side lighting for surfaces facing left/right (30% contribution)
+
+    // Right lighting (30% contribution)
+    if (normal.x > 0.01)
+    {
+        shade += normal.x * remainder * 0.3;
+    }
+
+    // Left lighting (30% contribution)
     if (normal.x < -0.01)
     {
         shade += abs(normal.x) * remainder * 0.3;
     }
-    
+
     return saturate(shade);
 }
 
