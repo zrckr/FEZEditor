@@ -1,6 +1,7 @@
 ﻿using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FezEditor.Components.Chris;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Common;
 using Microsoft.Xna.Framework;
@@ -9,13 +10,30 @@ namespace FezEditor.Structure;
 
 public class TrixelObject
 {
-    public Vector3 Size { get; private set; }
+    public Vector3 Size
+    {
+        get => _size;
+        set
+        {
+            if (_size != value)
+            {
+                _size = value;
+                var needed = ((Width * Height * Depth) + 7) / 8;
+                if (MissingTrixels.Length != needed)
+                {
+                    MissingTrixels = new byte[needed];
+                }
+            }
+        }
+    }
 
     [JsonConverter(typeof(Base64Converter))]
-    public byte[] MissingTrixels { get; private set; } = Array.Empty<byte>();
+    public byte[] MissingTrixels { get; set; } = Array.Empty<byte>();
 
     [JsonConverter(typeof(CompressConverter))]
-    public RTexture2D Texture { get; set; } = new RTexture2D();
+    public RTexture2D Texture { get; set; } = new();
+
+    public TrixelProperties? Properties { get; set; }
 
     public int Width => (int)(Size.X / Mathz.TrixelSize);
 
@@ -140,14 +158,14 @@ public class TrixelObject
         }
     }
 
-    public TrixelObject(Vector3 size)
+    private Vector3 _size;
+
+    public void CopyFrom(TrixelObject other)
     {
-        Size = size;
-        var needed = ((Width * Height * Depth) + 7) / 8;
-        if (MissingTrixels.Length != needed)
-        {
-            MissingTrixels = new byte[needed];
-        }
+        _size = other._size;
+        MissingTrixels = other.MissingTrixels;
+        Texture = other.Texture;
+        Properties = other.Properties;
     }
 
     public void Resize(Vector3 newSize)
@@ -162,7 +180,7 @@ public class TrixelObject
         }
     }
 
-    public bool IsMissing(Vector3I emplacement)
+    private bool IsMissing(Vector3I emplacement)
     {
         var i = BitIndex(emplacement);
         return (MissingTrixels[i >> 3] & (1 << (i & 7))) != 0;

@@ -13,11 +13,11 @@ namespace FezEditor.Components;
 
 public class ChrisEditor : EditorComponent, IChrisEditor
 {
-    public override object Asset => _context.GetAsset(Obj);
+    public override object Asset => _context.Dematerialize(Obj);
 
     public bool IsViewportHovered { get; private set; }
 
-    public TrixelObject Obj { get; private set; } = null!;
+    public TrixelObject Obj { get; }
 
     public TrixelFace? Hit { get; private set; }
 
@@ -71,18 +71,18 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public ChrisEditor(Game game, string title, ArtObject ao) : this(game, title, new ArtObjectContext(ao))
     {
-        History.Track(ao);
     }
 
     public ChrisEditor(Game game, string title, TrileSet set) : this(game, title, new TrileSetContext(set, game))
     {
-        History.Track(set);
     }
 
     private ChrisEditor(Game game, string title, IContext context) : base(game, title)
     {
         _context = context;
-        History.StateChanged += _ => RevisualizeSubject(false);
+        Obj = context.Materialize();
+        History.Track(Obj);
+        History.StateChanged += _ => RevisualizeSubject();
         Game.AddComponent(_confirm = new ConfirmWindow(game));
     }
 
@@ -244,7 +244,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                             _selectedTriles.Add(newId);
                             _currentTrile = newId;
                             subject.Id = newId;
-                            RevisualizeSubject();
+                            SwitchTrileSubject();
                         }
                     }
 
@@ -266,7 +266,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                             _selectedTriles.Add(nextId);
                             _currentTrile = nextId;
                             subject.Id = nextId;
-                            RevisualizeSubject();
+                            SwitchTrileSubject();
                         }
                     }
 
@@ -290,7 +290,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                             _selectedTriles.Add(newId);
                             _currentTrile = newId;
                             subject.Id = newId;
-                            RevisualizeSubject();
+                            SwitchTrileSubject();
                         }
                     }
 
@@ -397,7 +397,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                         {
                             _currentTrile = entry.Id;
                             subject.Id = _currentTrile;
-                            RevisualizeSubject();
+                            SwitchTrileSubject();
                         }
                     }
 
@@ -607,22 +607,19 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         ImGui.Separator();
     }
 
-    private void RevisualizeSubject(bool materialize = true)
+    private void SwitchTrileSubject()
     {
-        if (materialize)
-        {
-            History.Untrack(Obj);
-            Obj = _context.Materialize();
-            History.Track(Obj);
-        }
+        Obj.CopyFrom(_context.Materialize());
+        History.Clear();
+        RevisualizeSubject();
+    }
 
+    private void RevisualizeSubject()
+    {
+        _context.SyncProperties(Obj);
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
-        if (materialize)
-        {
-            mesh.SetTexture(Obj.Texture);
-        }
-
-        _meshActor.GetComponent<TrixelsMesh>().Visualize(Obj);
+        mesh.SetTexture(Obj.Texture);
+        mesh.Visualize(Obj);
         if (_context is TrileSetContext subject)
         {
             var collision = _collisionActor.GetComponent<TrileCollisionMesh>();
@@ -697,7 +694,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         Array.Fill(colors, Color.White);
         ao.Cubemap.TextureData = MemoryMarshal.AsBytes(colors.AsSpan()).ToArray();
 
-        var obj = new TrixelObject(Vector3.One);
+        var obj = new TrixelObject { Size = Vector3.One };
         (ao.Geometry.Vertices, ao.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
 
         return ao;
