@@ -437,7 +437,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             var texture = CurrentPaintMode is PaintMode.Emission
                 ? trixelMesh.EmissionTexture!
                 : trixelMesh.ColorTexture!;
-            const ImGuiWindowFlags flags1 = ImGuiWindowFlags.NoCollapse;
+            const ImGuiWindowFlags flags1 = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar;
 
             ImGuiX.SetNextWindowSize(new Vector2(640, 160), ImGuiCond.Appearing);
             if (ImGui.Begin($"Texture Viewer##{Title}", ref _showTexture, flags1))
