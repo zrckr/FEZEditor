@@ -26,13 +26,13 @@ internal class TrileSetContext : IContext
 
     private const int AtlasFaceSize = 18;
 
-    public const int AtlasTrileWidth = AtlasFaceSize * FaceCount;
+    private const int AtlasTrileWidth = AtlasFaceSize * FaceCount;
 
-    public const int AtlasTrileHeight = AtlasFaceSize;
+    private const int AtlasTrileHeight = AtlasFaceSize;
 
-    public const int AtlasWidth = 1024;
+    private const int AtlasWidth = 1024;
 
-    public const int AtlasStartingHeight = 32;
+    private const int AtlasStartingHeight = 32;
 
     private const int AtlasColumns = AtlasWidth / AtlasTrileWidth;
 
@@ -63,9 +63,9 @@ internal class TrileSetContext : IContext
 
     private readonly TrileSet _set;
 
-    private readonly Game _game;
-
     private readonly Texture2D _missing;
+
+    private TrileProperties _properties = null!;
 
     private Texture2D? _thumbnailsTexture;
 
@@ -76,7 +76,6 @@ internal class TrileSetContext : IContext
     public TrileSetContext(TrileSet set, Game game)
     {
         _set = set;
-        _game = game;
         _missing = game.Content.Load<Texture2D>("Textures/Missing");
         _id = set.Triles
             .OrderBy(kv => kv.Key)
@@ -93,9 +92,7 @@ internal class TrileSetContext : IContext
 
     public TrixelObject Materialize()
     {
-        var obj = TrixelMaterializer.ReconstructGeometry(
-            Trile.Size.ToXna(), Trile.Geometry.Vertices, Trile.Geometry.Indices);
-        _resized = obj.Resize;
+        var obj = TrixelMaterializer.ReconstructGeometry(Trile.Size.ToXna(), Trile.Geometry.Vertices, Trile.Geometry.Indices);
 
         var atlas = _set.TextureAtlas;
         var px = (int)MathF.Round(Trile.AtlasOffset.X * atlas.Width);
@@ -106,6 +103,9 @@ internal class TrileSetContext : IContext
             Height = TrileHeight,
             TextureData = ReadTrileFromAtlas(atlas.TextureData, atlas.Width, px, py)
         };
+
+        obj.Properties = _properties = new TrileProperties(Trile);
+        _resized = obj.Resize;
 
         return obj;
     }
@@ -123,29 +123,27 @@ internal class TrileSetContext : IContext
         }
     }
 
-    public object GetAsset(TrixelObject obj)
+    public void SyncProperties(TrixelObject obj)
     {
-        var trile = new Trile
+        if (obj.Properties is TrileProperties properties)
         {
-            Size = obj.Size.ToRepacker(),
-            Name = Trile.Name,
-            Offset = Trile.Offset,
-            AtlasOffset = Trile.AtlasOffset,
-            Immaterial = Trile.Immaterial,
-            SeeThrough = Trile.SeeThrough,
-            Thin = Trile.Thin,
-            ForceHugging = Trile.ForceHugging,
-            Type = Trile.Type,
-            Face = Trile.Face,
-            SurfaceType = Trile.SurfaceType,
-            Faces = new Dictionary<FaceOrientation, CollisionType>(Trile.Faces)
-        };
+            _properties = properties;
+        }
+    }
 
+    public object Dematerialize(TrixelObject obj)
+    {
+        var trile = new Trile { Size = obj.Size.ToRepacker() };
         (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
         _set.Triles[Id] = trile;
 
         RebuildAtlas(_set, new Dictionary<int, byte[]> { [Id] = obj.Texture.TextureData });
         ApplyAtlasOffsets(_set);
+
+        if (obj.Properties is TrileProperties properties)
+        {
+            properties.CopyTo(trile);
+        }
 
         return _set;
     }
@@ -206,109 +204,109 @@ internal class TrileSetContext : IContext
     {
         var revisualize = false;
 
-        var name = Trile.Name;
+        var name = _properties.Name;
         if (ImGui.InputText("Name", ref name, 255))
         {
             using (history.BeginScope("Edit Name"))
             {
-                Trile.Name = name;
+                _properties.Name = name;
             }
         }
 
-        var size = Trile.Size.ToXna();
+        var size = _properties.Size.ToXna();
         if (ImGuiX.DragFloat3("Size", ref size))
         {
             using (history.BeginScope("Edit Size"))
             {
-                Trile.Size = size.ToRepacker();
+                _properties.Size = size.ToRepacker();
                 _resized?.Invoke(size);
                 revisualize = true;
             }
         }
 
-        var offset = Trile.Offset.ToXna();
+        var offset = _properties.Offset.ToXna();
         if (ImGuiX.DragFloat3("Offset", ref offset))
         {
             using (history.BeginScope("Edit Offset"))
             {
-                Trile.Offset = offset.ToRepacker();
+                _properties.Offset = offset.ToRepacker();
             }
         }
 
-        var immaterial = Trile.Immaterial;
+        var immaterial = _properties.Immaterial;
         if (ImGui.Checkbox("Immaterial", ref immaterial))
         {
             using (history.BeginScope("Edit Immaterial"))
             {
-                Trile.Immaterial = immaterial;
+                _properties.Immaterial = immaterial;
             }
         }
 
-        var seeThrough = Trile.SeeThrough;
+        var seeThrough = _properties.SeeThrough;
         if (ImGui.Checkbox("See Through", ref seeThrough))
         {
             using (history.BeginScope("Edit See Through"))
             {
-                Trile.SeeThrough = seeThrough;
+                _properties.SeeThrough = seeThrough;
             }
         }
 
-        var thin = Trile.Thin;
+        var thin = _properties.Thin;
         if (ImGui.Checkbox("Thin", ref thin))
         {
             using (history.BeginScope("Edit Thin"))
             {
-                Trile.Thin = thin;
+                _properties.Thin = thin;
             }
         }
 
-        var forceHugging = Trile.ForceHugging;
+        var forceHugging = _properties.ForceHugging;
         if (ImGui.Checkbox("Force Hugging", ref forceHugging))
         {
             using (history.BeginScope("Edit Force Hugging"))
             {
-                Trile.ForceHugging = forceHugging;
+                _properties.ForceHugging = forceHugging;
             }
         }
 
-        var actorType = (int)Trile.Type;
+        var actorType = (int)_properties.Type;
         var actorTypes = Enum.GetNames<ActorType>();
         if (ImGui.Combo("Actor Type", ref actorType, actorTypes, actorTypes.Length))
         {
             using (history.BeginScope("Edit Actor Type"))
             {
-                Trile.Type = (ActorType)actorType;
+                _properties.Type = (ActorType)actorType;
             }
         }
 
-        var actorFace = (int)Trile.Face;
+        var actorFace = (int)_properties.Face;
         var actorFaces = Enum.GetNames<FaceOrientation>();
         if (ImGui.Combo("Initial Face", ref actorFace, actorFaces, actorFaces.Length))
         {
             using (history.BeginScope("Edit Initial Face"))
             {
-                Trile.Face = (FaceOrientation)actorFace;
+                _properties.Face = (FaceOrientation)actorFace;
             }
         }
 
-        var surfaceType = (int)Trile.SurfaceType;
+        var surfaceType = (int)_properties.SurfaceType;
         var surfaceTypes = Enum.GetNames<SurfaceType>();
         if (ImGui.Combo("Surface Type", ref surfaceType, surfaceTypes, surfaceTypes.Length))
         {
             using (history.BeginScope("Edit Surface Type"))
             {
-                Trile.SurfaceType = (SurfaceType)surfaceType;
+                _properties.SurfaceType = (SurfaceType)surfaceType;
             }
         }
 
         // FaceOrientation is not IEquatable, so string key is being used
-        var collisionFaces = Trile.Faces.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value);
+        var collisionFaces = _properties.Faces.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value);
         if (ImGuiX.EditableDict("Collision Faces", ref collisionFaces, RenderFace, AddCollisionType,
                 () => CollisionType.None))
         {
             using (history.BeginScope("Edit Collision Faces"))
             {
-                Trile.Faces =
+                _properties.Faces =
                     collisionFaces.ToDictionary(kv => Enum.Parse<FaceOrientation>(kv.Key), kv => kv.Value);
                 revisualize = true;
             }
@@ -492,7 +490,7 @@ internal class TrileSetContext : IContext
             }
         };
 
-        var obj = new TrixelObject(Vector3.One);
+        var obj = new TrixelObject() { Size = Vector3.One };
         (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
 
         set.Triles[newId] = trile;
@@ -614,4 +612,5 @@ internal class TrileSetContext : IContext
     }
 
     public readonly record struct Entry(int Id, string Name, Texture2D Texture, Vector2 Uv0, Vector2 Uv1);
+
 }

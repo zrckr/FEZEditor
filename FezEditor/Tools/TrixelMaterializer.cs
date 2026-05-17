@@ -69,7 +69,7 @@ public static class TrixelMaterializer
 
         // Step 2: Flood-fill empty space from boundary inward
         // Any trixel NOT reached by the flood = present (either on surface or enclosed interior)
-        var obj = new TrixelObject(size);
+        var obj = new TrixelObject() { Size = size };
         var w = obj.Width;
         var h = obj.Height;
         var d = obj.Depth;

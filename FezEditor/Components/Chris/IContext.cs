@@ -6,7 +6,9 @@ internal interface IContext : IDisposable
 {
     TrixelObject Materialize();
 
-    object GetAsset(TrixelObject obj);
+    object Dematerialize(TrixelObject obj);
+
+    void SyncProperties(TrixelObject obj);
 
     bool DrawProperties(History history);
 }
