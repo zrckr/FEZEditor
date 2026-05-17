@@ -110,9 +110,11 @@ internal class SelectTool : BaseTool
 
     private HashSet<TrixelFace> BuildRectSelection(FaceOrientation orientation, Vector3I start, Vector3I end)
     {
+        var normal = orientation.AsVector();
         var tan = orientation.GetTangent().AsVector();
         var bitan = orientation.GetBitangent().AsVector();
 
+        var startN = (int)((start.X * normal.X) + (start.Y * normal.Y) + (start.Z * normal.Z));
         var startT = (int)((start.X * tan.X) + (start.Y * tan.Y) + (start.Z * tan.Z));
         var startB = (int)((start.X * bitan.X) + (start.Y * bitan.Y) + (start.Z * bitan.Z));
         var endT = (int)((end.X * tan.X) + (end.Y * tan.Y) + (end.Z * tan.Z));
@@ -127,6 +129,12 @@ internal class SelectTool : BaseTool
         foreach (var tf in Chris.Trixels.Faces)
         {
             if (tf.Face != orientation)
+            {
+                continue;
+            }
+
+            var n = (int)((tf.Emplacement.X * normal.X) + (tf.Emplacement.Y * normal.Y) + (tf.Emplacement.Z * normal.Z));
+            if (n != startN)
             {
                 continue;
             }
