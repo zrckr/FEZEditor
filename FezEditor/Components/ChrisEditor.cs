@@ -558,6 +558,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         {
             CurrentPaintMode = (PaintMode)paintMode;
             Trixels.ShowEmission = CurrentPaintMode is PaintMode.Emission;
+            Trixels.Visualize(Obj);
         }
 
         ImGui.SameLine();
