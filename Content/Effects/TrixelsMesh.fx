@@ -1,5 +1,7 @@
 #include "BaseEffect.fxh"
 
+bool ShowEmission;
+
 struct VS_INPUT
 {
     float4 Position : POSITION0;
@@ -26,18 +28,11 @@ VS_OUTPUT VS(VS_INPUT input)
     return output;
 }
 
-bool ShowEmission;
-
 float4 PS(VS_OUTPUT input) : COLOR0
 {
     float4 texColor = SAMPLE_TEXTURE(BaseTexture, input.TexCoord);
 
-    if (ShowEmission)
-    {
-        return float4(texColor.aaa, 1.0);
-    }
-
-    float3 color = texColor.rgb;
+    float3 color = (ShowEmission) ? texColor.aaa : texColor.rgb;
     color *= ComputeLight(input.Normal, 0.0);
 
     return float4(color, 1.0);
