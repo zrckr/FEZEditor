@@ -8,7 +8,9 @@ namespace FezEditor.Actors;
 
 public class TrixelsMesh : ActorComponent
 {
-    public Texture2D? Texture { get; set; }
+    public Texture2D? Texture { get; private set; }
+    public Texture2D? ColorTexture { get; private set; }
+    public Texture2D? EmissionTexture { get; private set; }
 
     public IReadOnlyList<TrixelFace> Faces => _faces;
 
@@ -67,6 +69,30 @@ public class TrixelsMesh : ActorComponent
         _rendering.MaterialSetCullMode(_material, CullMode.CullCounterClockwiseFace);
     }
 
+    public void SetTexture(RTexture2D texture)
+    {
+        Texture?.Dispose();
+        Texture = RepackerExtensions.ConvertToTexture2D(texture);
+
+        ColorTexture?.Dispose();
+        ColorTexture = RepackerExtensions.ExtractColorToTexture2D(texture);
+
+        EmissionTexture?.Dispose();
+        EmissionTexture = RepackerExtensions.ExtractEmissionToTexture2D(texture);
+    }
+
+    public void UpdateTextureDataFrom(RTexture2D texture)
+    {
+        if (Texture == null || ColorTexture == null || EmissionTexture == null)
+        {
+            return;
+        }
+
+        Texture.SetData(texture.TextureData);
+        RepackerExtensions.ExtractColorToTexture2D(texture, ColorTexture);
+        RepackerExtensions.ExtractColorToTexture2D(texture, EmissionTexture);
+    }
+
     public void Visualize(TrixelObject obj)
     {
         _faces = TrixelMaterializer.BuildVisibleFaces(obj).ToArray();
@@ -87,5 +113,7 @@ public class TrixelsMesh : ActorComponent
         _rendering.FreeRid(_mesh);
         _rendering.FreeRid(_material);
         Texture?.Dispose();
+        ColorTexture?.Dispose();
+        EmissionTexture?.Dispose();
     }
 }

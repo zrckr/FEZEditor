@@ -194,7 +194,7 @@ internal class PaintTool : BaseTool
             obj.Texture.TextureData[idx + 3] = color.A;
         }
 
-        Chris.Trixels.Texture!.SetData(obj.Texture.TextureData);
+        Chris.Trixels.UpdateTextureDataFrom(obj.Texture);
     }
 
     private Color[] LoadPalette()

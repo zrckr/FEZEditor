@@ -41,16 +41,52 @@ public static class RepackerExtensions
         return tex2D;
     }
 
-    public static void SetAlpha(in Texture2D texture, float alpha)
+    public static Texture2D ExtractColorToTexture2D(RTexture2D texture)
     {
-        var rgba = new byte[texture.Width * texture.Height * 4];
-        texture.GetData(rgba);
+        var tex2D = new Texture2D(Gd, texture.Width, texture.Height, false, SurfaceFormat.Color);
+        ExtractColorToTexture2D(texture, tex2D);
+        return tex2D;
+    }
 
-        for (var i = 3; i < rgba.Length; i += 4)
+    public static void ExtractColorToTexture2D(RTexture2D sourceTexture, in Texture2D texture)
+    {
+        if (sourceTexture.Format != RSurfaceFormat.Color)
         {
-            rgba[i] = (byte)(alpha * 255f);
+            throw new FormatException($"Cannot extract color layer from Texture2D with format {sourceTexture.Format}");
         }
 
+        var rgba = new byte[texture.Width * texture.Height * 4];
+        Buffer.BlockCopy(sourceTexture.TextureData, 0, rgba, 0, rgba.Length);
+        for (var i = 3; i < rgba.Length; i += 4)
+        {
+            rgba[i] = 255;
+        }
+        texture.SetData(rgba);
+    }
+
+    public static Texture2D ExtractEmissionToTexture2D(RTexture2D texture)
+    {
+        var tex2D = new Texture2D(Gd, texture.Width, texture.Height, false, SurfaceFormat.Color);
+        ExtractEmissionToTexture2D(texture, tex2D);
+        return tex2D;
+    }
+
+    public static void ExtractEmissionToTexture2D(RTexture2D sourceTexture, in Texture2D texture)
+    {
+        if (sourceTexture.Format != RSurfaceFormat.Color)
+        {
+            throw new FormatException($"Cannot extract emission layer from Texture2D with format {sourceTexture.Format}");
+        }
+
+        var rgba = new byte[texture.Width * texture.Height * 4];
+        for (var i = 0; i + 3 < rgba.Length; i += 4)
+        {
+            var alpha = sourceTexture.TextureData[i + 3];
+            rgba[i] = alpha;
+            rgba[i + 1] = alpha;
+            rgba[i + 2] = alpha;
+            rgba[i + 3] = 255;
+        }
         texture.SetData(rgba);
     }
 

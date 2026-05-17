@@ -433,22 +433,25 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
         if (_showTexture)
         {
-            var texture1 = _meshActor.GetComponent<TrixelsMesh>().Texture!;
+            var trixelMesh = _meshActor.GetComponent<TrixelsMesh>();
+            var texture = CurrentPaintMode is PaintMode.Emission
+                ? trixelMesh.EmissionTexture!
+                : trixelMesh.ColorTexture!;
             const ImGuiWindowFlags flags1 = ImGuiWindowFlags.NoCollapse;
 
             ImGuiX.SetNextWindowSize(new Vector2(640, 160), ImGuiCond.Appearing);
             if (ImGui.Begin($"Texture Viewer##{Title}", ref _showTexture, flags1))
             {
-                var sizeText = $"Texture Size: {texture1.Width}x{texture1.Height}px";
+                var sizeText = $"Texture Size: {texture.Width}x{texture.Height}px";
                 var textWidth = ImGui.CalcTextSize(sizeText).X;
                 var availWidth = ImGui.GetContentRegionAvail().X;
                 ImGui.SameLine(ImGui.GetCursorPosX() + availWidth - textWidth);
                 ImGui.TextDisabled(sizeText);
 
                 var availW = ImGuiX.GetContentRegionAvail().X;
-                var scale = availW / texture1.Width;
-                var displaySize = new Vector2(texture1.Width, texture1.Height) * scale;
-                ImGuiX.Image(texture1, displaySize);
+                var scale = availW / texture.Width;
+                var displaySize = new Vector2(texture.Width, texture.Height) * scale;
+                ImGuiX.Image(texture, displaySize);
 
                 var drawList = ImGui.GetWindowDrawList();
                 var imageMin = ImGuiX.GetItemRectMin();
@@ -616,8 +619,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         var mesh = _meshActor.GetComponent<TrixelsMesh>();
         if (materialize)
         {
-            mesh.Texture?.Dispose();
-            mesh.Texture = RepackerExtensions.ConvertToTexture2D(Obj.Texture);
+            mesh.SetTexture(Obj.Texture);
         }
 
         mesh.Visualize(Obj);
