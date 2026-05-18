@@ -27,7 +27,8 @@ internal class ArtObjectContext : IContext
 
     public TrixelObject Materialize()
     {
-        var obj = TrixelMaterializer.ReconstructGeometry(_ao.Size.ToXna(), _ao.Geometry.Vertices, _ao.Geometry.Indices);
+        var obj = TrixelMaterializer.ReconstructGeometry(
+            _ao.Size.ToXna(), _ao.Geometry.Vertices, _ao.Geometry.Indices, _ao.Size.ToXna() / 2f);
         obj.Texture = _ao.Cubemap;
         obj.Properties = _properties = new ArtObjectProperties(_ao);
         _resized = obj.Resize;

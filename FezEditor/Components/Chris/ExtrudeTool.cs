@@ -43,10 +43,8 @@ internal class ExtrudeTool : BaseTool
         var emps = Chris.SelectedFaces.Select(tf => tf.Emplacement).ToList();
         var orientation = Chris.SelectionOrientation!.Value;
 
-        var meshOffset = Vector3.Zero - (Chris.Obj.Size / 2f);
         var centroid = emps.Aggregate(Vector3.Zero, (s, e) => s + e.ToVector3()) / emps.Count;
-        var origin = centroid * Mathz.TrixelSize + meshOffset
-                                                 + orientation.AsVector() * Mathz.TrixelSize;
+        var origin = centroid * Mathz.TrixelSize - Chris.Obj.Offset + orientation.AsVector() * Mathz.TrixelSize;
 
         if (Chris.Gizmo.ScaleFace(origin, orientation, out var delta))
         {

@@ -92,7 +92,8 @@ internal class TrileSetContext : IContext
 
     public TrixelObject Materialize()
     {
-        var obj = TrixelMaterializer.ReconstructGeometry(Trile.Size.ToXna(), Trile.Geometry.Vertices, Trile.Geometry.Indices);
+        var obj = TrixelMaterializer.ReconstructGeometry(
+            Trile.Size.ToXna(), Trile.Geometry.Vertices, Trile.Geometry.Indices, new Vector3(0.5f));
 
         var atlas = _set.TextureAtlas;
         var px = (int)MathF.Round(Trile.AtlasOffset.X * atlas.Width);
@@ -360,10 +361,7 @@ internal class TrileSetContext : IContext
                 continue;
             }
 
-            if (_thumbnailsTexture == null)
-            {
-                _thumbnailsTexture = RepackerExtensions.ExtractColorToTexture2D(_set.TextureAtlas);
-            }
+            _thumbnailsTexture ??= RepackerExtensions.ExtractColorToTexture2D(_set.TextureAtlas);
 
             // Thumbnail shows the front face (face 0) usable area, skipping the 1px border.
             var uv0 = new Vector2(
@@ -379,7 +377,7 @@ internal class TrileSetContext : IContext
         }
     }
 
-    public static void ApplyAtlasOffsets(TrileSet set)
+    private static void ApplyAtlasOffsets(TrileSet set)
     {
         var atlasW = set.TextureAtlas.Width;
         var atlasH = set.TextureAtlas.Height;
@@ -388,21 +386,26 @@ internal class TrileSetContext : IContext
         {
             foreach (var vertex in trile.Geometry.Vertices)
             {
-                // We don't know if vertex is in trile space or atlas space, so we should recompute it completely.
+                var orientation = FaceExtensions.OrientationFromDirection(vertex.Normal.ToXna());
                 var trileSpaceUv = TrixelMaterializer.ComputeTexCoord(
                     vertex.Position.ToXna(),
                     vertex.Normal.ToXna(),
-                    trile.Size.ToXna(),
-                    FaceExtensions.OrientationFromDirection(vertex.Normal.ToXna())
+                    trileSize: Vector3.One,
+                    orientation
                 );
 
-                // Vertex U is in [0,1] spanning all 6 faces packed without borders.
-                // Map each face's [f/6, (f+1)/6] range into atlas space, inserting per-face borders.
-                var u = trileSpaceUv.X;
-                var faceIndex = Math.Clamp((int)(u * FaceCount), 0, FaceCount - 1);
-                var uWithinFace = (u * FaceCount) - faceIndex;
+                var faceSlotIndex = Array.IndexOf(FaceExtensions.NaturalOrder, orientation);
+                var faceSlotU = orientation switch
+                {
+                    FaceOrientation.Front => 0f,
+                    FaceOrientation.Right => 0.25f,
+                    FaceOrientation.Back or FaceOrientation.Left => 0.375f,
+                    FaceOrientation.Top => 0.5f,
+                    _ => 0.625f
+                };
 
-                var faceAtlasX = trile.AtlasOffset.X + (((faceIndex * AtlasFaceSize) + 1f) / atlasW);
+                var uWithinFace = (trileSpaceUv.X / (4f / 3f) - faceSlotU) * 8f;
+                var faceAtlasX = trile.AtlasOffset.X + (((faceSlotIndex * AtlasFaceSize) + 1f) / atlasW);
                 var mappedU = faceAtlasX + (uWithinFace * FaceSize / atlasW);
                 var mappedV = trile.AtlasOffset.Y + (1f / atlasH) +
                               (trileSpaceUv.Y * FaceSize / atlasH);
@@ -490,7 +493,7 @@ internal class TrileSetContext : IContext
             }
         };
 
-        var obj = new TrixelObject() { Size = Vector3.One };
+        var obj = new TrixelObject { Size = Vector3.One, Offset = new Vector3(0.5f) };
         (trile.Geometry.Vertices, trile.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
 
         set.Triles[newId] = trile;

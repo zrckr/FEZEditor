@@ -631,18 +631,17 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             var collision = _collisionActor.GetComponent<TrileCollisionMesh>();
             collision.ClearInstanceData();
             collision.AddInstanceData(Vector3.Zero, subject.GetTrileCollision(), Obj.Size);
-            _collisionActor.Transform.Position = -Obj.Size / 2f;
+            _collisionActor.Transform.Position = -Obj.Offset;
             subject.FlushThumbnail(Obj);
         }
 
         var bounds = _boundsActor.GetComponent<BoundsMesh>();
         bounds.Size = Obj.Size;
-        _boundsActor.Transform.Position = -Obj.Size / 2f;
+        _boundsActor.Transform.Position = -Obj.Offset;
     }
 
     private TrixelFace? RaycastTrixelFace(Ray ray)
     {
-        var offset = Vector3.Zero - (Obj.Size / 2f);
         var best = default(TrixelFace?);
         var bestT = float.MaxValue;
 
@@ -655,8 +654,8 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                 continue;
             }
 
-            var faceCenter = ((tf.Emplacement.ToVector3() + ((Vector3.One + normal) * 0.5f))
-                              * Mathz.TrixelSize) + offset;
+            var faceCenter = ((tf.Emplacement.ToVector3() +
+                               ((Vector3.One + normal) * 0.5f)) * Mathz.TrixelSize) - Obj.Offset;
 
             var t = (Vector3.Dot(normal, faceCenter) - Vector3.Dot(normal, ray.Position)) / denom;
             if (t < 0f || t >= bestT)
@@ -700,7 +699,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         Array.Fill(colors, Color.White);
         ao.Cubemap.TextureData = MemoryMarshal.AsBytes(colors.AsSpan()).ToArray();
 
-        var obj = new TrixelObject { Size = Vector3.One };
+        var obj = new TrixelObject { Size = Vector3.One, Offset = Vector3.One / 2f };
         (ao.Geometry.Vertices, ao.Geometry.Indices) = TrixelMaterializer.Dematerialize(obj);
 
         return ao;
