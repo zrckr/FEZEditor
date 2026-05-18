@@ -1,6 +1,5 @@
 using FezEditor.Actors;
 using FezEditor.Structure;
-using FEZRepacker.Core.Definitions.Game.Common;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Components.Chris;
@@ -23,7 +22,9 @@ internal interface IChrisEditor
 
     ChrisTool CurrentTool { get; set; }
 
-    PaintMode CurrentPaintMode { get; set; }
+    PaintMode PaintMode { get; }
 
     HashSet<TrixelFace> SelectedFaces { get; }
+
+    SymmetryMode SymmetryMode { get; }
 }

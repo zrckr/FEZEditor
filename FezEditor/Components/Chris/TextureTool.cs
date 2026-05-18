@@ -7,7 +7,7 @@ namespace FezEditor.Components.Chris;
 
 internal abstract class TextureTool : BaseTool
 {
-    private bool _dirty = false;
+    private bool _dirty;
 
     protected TextureTool(Game game, IChrisEditor chris) : base(game, chris) { }
 
@@ -26,18 +26,27 @@ internal abstract class TextureTool : BaseTool
 
     protected void PaintTrixel(TrixelFace face)
     {
+        PaintFace(face);
+        foreach (var mirrored in Chris.SymmetryMode.GetSymmetricFaces(face, Chris.Obj))
+        {
+            PaintFace(mirrored);
+        }
+    }
+
+    private void PaintFace(TrixelFace face)
+    {
         var textureData = Chris.Obj.Texture.TextureData;
         var color = Chris.PaintColor;
 
         var idx = GetTrixelFaceTextureDataIndex(face);
 
-        if (Chris.CurrentPaintMode is PaintMode.Color)
+        if (Chris.PaintMode is PaintMode.Color)
         {
             textureData[idx + 0] = color.R;
             textureData[idx + 1] = color.G;
             textureData[idx + 2] = color.B;
         }
-        else if (Chris.CurrentPaintMode is PaintMode.Emission)
+        else if (Chris.PaintMode is PaintMode.Emission)
         {
             textureData[idx + 3] = color.A;
         }
