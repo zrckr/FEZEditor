@@ -8,7 +8,9 @@ public class OrbitControl : ActorComponent
 {
     private const float MouseSensitivity = 0.005f;
 
-    public float Yaw { get; set; } = 0f;
+    private delegate bool CaptureMouseDelta(out Vector2 delta);
+
+    public float Yaw { get; set; } // 0f
 
     public float Pitch
     {
@@ -17,6 +19,8 @@ public class OrbitControl : ActorComponent
     }
 
     public Vector2 PitchClamp { get; set; } = new Vector2(-1f, 1f) * MathHelper.PiOver2;
+
+    public bool UseRightMouseButton { get; set; } = false;
 
     private readonly InputService _input;
 
@@ -35,8 +39,12 @@ public class OrbitControl : ActorComponent
 
     public override void Update(GameTime gameTime)
     {
-        _status.AddHints(("MMB", "Orbit"));
-        if (_input.CaptureMiddleMouseDelta(out var delta))
+        _status.AddHints((UseRightMouseButton ? "RMB" : "MMB", "Orbit"));
+        CaptureMouseDelta captureMouseDelta = UseRightMouseButton
+            ? _input.CaptureRightMouseDelta
+            : _input.CaptureMiddleMouseDelta;
+
+        if (captureMouseDelta(out var delta))
         {
             Yaw -= delta.X * MouseSensitivity;
             Pitch -= delta.Y * MouseSensitivity;
