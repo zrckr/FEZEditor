@@ -1,7 +1,6 @@
 using FezEditor.Actors;
 using FezEditor.Structure;
 using FezEditor.Tools;
-using FEZRepacker.Core.Definitions.Game.Common;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -52,7 +51,7 @@ internal class SelectTool : BaseTool
             _dragStartFace = Chris.Hit;
             if (!Chris.Hit.HasValue)
             {
-                ClearSelection();
+                Chris.SelectedFaces.Clear();
                 return;
             }
         }
@@ -63,18 +62,26 @@ internal class SelectTool : BaseTool
         }
         else if (Chris.Hit.HasValue && _dragStartFace.HasValue)
         {
-            var orientation = _dragStartFace.Value.Face;
-            if (orientation == Chris.Hit.Value.Face)
+            var min = Vector3I.Min(_dragStartFace.Value.Emplacement, Chris.Hit.Value.Emplacement);
+            var max = Vector3I.Max(_dragStartFace.Value.Emplacement, Chris.Hit.Value.Emplacement);
+            var result = new HashSet<TrixelFace>();
+
+            foreach (var tf in Chris.Obj.VisibleFaces)
             {
-                var newSelection = BuildRectSelection(orientation, _dragStartFace.Value.Emplacement, Chris.Hit.Value.Emplacement);
-                if (orientation != Chris.SelectionOrientation || !newSelection.SetEquals(Chris.SelectedFaces))
+                if ((tf.Face == _dragStartFace.Value.Face || tf.Face == Chris.Hit.Value.Face) &&
+                    tf.Emplacement >= min &&
+                    tf.Emplacement <= max)
                 {
-                    Chris.SelectionOrientation = orientation;
-                    Chris.SelectedFaces.Clear();
-                    foreach (var f in newSelection)
-                    {
-                        Chris.SelectedFaces.Add(f);
-                    }
+                    result.Add(tf);
+                }
+            }
+
+            if (!result.SetEquals(Chris.SelectedFaces))
+            {
+                Chris.SelectedFaces.Clear();
+                foreach (var f in result)
+                {
+                    Chris.SelectedFaces.Add(f);
                 }
             }
         }
@@ -83,54 +90,6 @@ internal class SelectTool : BaseTool
     protected override bool IsToolAllowed(ChrisTool tool)
     {
         return true;
-    }
-
-    private void ClearSelection()
-    {
-        Chris.SelectedFaces.Clear();
-        Chris.SelectionOrientation = null;
-    }
-
-    private HashSet<TrixelFace> BuildRectSelection(FaceOrientation orientation, Vector3I start, Vector3I end)
-    {
-        var normal = orientation.AsVector();
-        var tan = orientation.GetTangent().AsVector();
-        var bitan = orientation.GetBitangent().AsVector();
-
-        var startN = (int)((start.X * normal.X) + (start.Y * normal.Y) + (start.Z * normal.Z));
-        var startT = (int)((start.X * tan.X) + (start.Y * tan.Y) + (start.Z * tan.Z));
-        var startB = (int)((start.X * bitan.X) + (start.Y * bitan.Y) + (start.Z * bitan.Z));
-        var endT = (int)((end.X * tan.X) + (end.Y * tan.Y) + (end.Z * tan.Z));
-        var endB = (int)((end.X * bitan.X) + (end.Y * bitan.Y) + (end.Z * bitan.Z));
-
-        var minT = Math.Min(startT, endT);
-        var maxT = Math.Max(startT, endT);
-        var minB = Math.Min(startB, endB);
-        var maxB = Math.Max(startB, endB);
-
-        var result = new HashSet<TrixelFace>();
-        foreach (var tf in Chris.Obj.VisibleFaces)
-        {
-            if (tf.Face != orientation)
-            {
-                continue;
-            }
-
-            var n = (int)((tf.Emplacement.X * normal.X) + (tf.Emplacement.Y * normal.Y) + (tf.Emplacement.Z * normal.Z));
-            if (n != startN)
-            {
-                continue;
-            }
-
-            var t = (int)((tf.Emplacement.X * tan.X) + (tf.Emplacement.Y * tan.Y) + (tf.Emplacement.Z * tan.Z));
-            var b = (int)((tf.Emplacement.X * bitan.X) + (tf.Emplacement.Y * bitan.Y) + (tf.Emplacement.Z * bitan.Z));
-            if (t >= minT && t <= maxT && b >= minB && b <= maxB)
-            {
-                result.Add(tf);
-            }
-        }
-
-        return result;
     }
 
     private MeshSurface BuildTrixelFaceQuad(TrixelFace tf)
