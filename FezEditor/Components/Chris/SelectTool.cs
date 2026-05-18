@@ -41,7 +41,7 @@ internal class SelectTool : BaseTool
 
     protected override void Act()
     {
-        if (!Chris.IsViewportHovered || Chris.CurrentTool is not (ChrisTool.Add or ChrisTool.Remove or ChrisTool.Paint))
+        if (!Chris.IsViewportHovered || Chris.CurrentTool is not (ChrisTool.Add or ChrisTool.Remove or ChrisTool.Bucket))
         {
             return;
         }
