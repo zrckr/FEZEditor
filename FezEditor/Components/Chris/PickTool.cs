@@ -7,20 +7,37 @@ namespace FezEditor.Components.Chris;
 
 internal class PickTool : TextureTool
 {
+    private const int CommonCount = 12;
+
+    private const int RecentCount = 12;
+
     private readonly AppStorageService _storage;
 
-    private readonly Color[] _palette;
+    private Color[] _commonColors = new Color[CommonCount];
+
+    private byte[]? _lastTextureData;
+
+    private readonly Color[] _recentColors = new Color[RecentCount];
+
+    private int _recentCount;
 
     private ChrisTool _lastUsedTool;
 
     public PickTool(Game game, IChrisEditor chris) : base(game, chris)
     {
         _storage = game.GetService<AppStorageService>();
-        _palette = LoadPalette();
+        LoadRecentColors();
     }
 
     protected override void TestConditions()
     {
+        var textureData = Chris.Obj.Texture.TextureData;
+        if (!ReferenceEquals(textureData, _lastTextureData))
+        {
+            _lastTextureData = textureData;
+            _commonColors = ComputeCommonColors(textureData);
+        }
+
         if (Chris.CurrentTool != ChrisTool.Pick)
         {
             _lastUsedTool = Chris.CurrentTool;
@@ -57,51 +74,48 @@ internal class PickTool : TextureTool
             Chris.PaintColor = paintColor;
         }
 
+        const ImGuiColorEditFlags swatchFlags = ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoPicker |
+                                                ImGuiColorEditFlags.NoTooltip;
+        var spacing = ImGui.GetStyle().ItemSpacing.Y;
+
         ImGui.Separator();
-        ImGui.Text("Palette");
-        for (var n = 0; n < _palette.Length; n++)
+        ImGui.Text("Common");
+        for (var n = 0; n < CommonCount; n++)
         {
-            ImGui.PushID(n);
-            if (n % 8 != 0)
+            ImGui.PushID(1000 + n);
+            if (n != 0)
             {
-                ImGui.SameLine(0f, ImGui.GetStyle().ItemSpacing.Y);
+                ImGui.SameLine(0f, spacing);
             }
 
-            const ImGuiColorEditFlags paletteFlags = ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoPicker |
-                                                     ImGuiColorEditFlags.NoTooltip;
-            if (ImGuiX.ColorButton("##Palette", _palette[n], paletteFlags, new Vector2(24, 24)))
+            if (ImGuiX.ColorButton("##Common", _commonColors[n], swatchFlags, new Vector2(24, 24)))
             {
-                Chris.PaintColor = new Color(_palette[n].R, _palette[n].G, _palette[n].B, Chris.PaintColor.A);
+                var c = _commonColors[n];
+                Chris.PaintColor = new Color(c.R, c.G, c.B, Chris.PaintColor.A);
             }
 
-            if (ImGui.BeginDragDropTarget())
+            ImGui.PopID();
+        }
+
+        ImGui.Text("Recent");
+        for (var n = 0; n < RecentCount; n++)
+        {
+            ImGui.PushID(2000 + n);
+            if (n != 0)
             {
-                var changed = false;
-                unsafe
-                {
-                    var payload = ImGui.AcceptDragDropPayload("_COL3F");
-                    if (payload.NativePtr != null)
-                    {
-                        var data = (float*)payload.Data;
-                        _palette[n] = new Color(data[0], data[1], data[2], 1f);
-                        changed = true;
-                    }
+                ImGui.SameLine(0f, spacing);
+            }
 
-                    payload = ImGui.AcceptDragDropPayload("_COL4F");
-                    if (payload.NativePtr != null)
-                    {
-                        var data = (float*)payload.Data;
-                        _palette[n] = new Color(data[0], data[1], data[2], data[3]);
-                        changed = true;
-                    }
-                }
-
-                if (changed)
-                {
-                    _storage.SavePaintPalette(_palette);
-                }
-
-                ImGui.EndDragDropTarget();
+            if (n >= _recentCount)
+            {
+                ImGui.BeginDisabled();
+                ImGuiX.ColorButton("##Recent", Color.Transparent, swatchFlags, new Vector2(24, 24));
+                ImGui.EndDisabled();
+            }
+            else if (ImGuiX.ColorButton("##Recent", _recentColors[n], swatchFlags, new Vector2(24, 24)))
+            {
+                var c = _recentColors[n];
+                Chris.PaintColor = new Color(c.R, c.G, c.B, Chris.PaintColor.A);
             }
 
             ImGui.PopID();
@@ -122,7 +136,9 @@ internal class PickTool : TextureTool
         }
 
         var face = Chris.Hit!.Value;
-        Chris.PaintColor = GetTrixelColor(face);
+        var picked = GetTrixelColor(face);
+        Chris.PaintColor = picked;
+        PushRecentColor(new Color(picked.R, picked.G, picked.B, byte.MaxValue));
 
         Chris.CurrentTool = _lastUsedTool.IsTextureTool()
             ? _lastUsedTool
@@ -134,30 +150,61 @@ internal class PickTool : TextureTool
         return tool == ChrisTool.Pick;
     }
 
-    private Color[] LoadPalette()
+    private void PushRecentColor(Color color)
     {
-        var palette = new Color[32];
-        var generated = false;
-
-        for (var n = 0; n < palette.Length; n++)
+        if (_recentCount > 0 && _recentColors[0] == color)
         {
-            if (n < _storage.PaintPalette.Length)
+            return;
+        }
+
+        var limit = Math.Min(_recentCount, RecentCount - 1);
+        for (var i = limit; i > 0; i--)
+        {
+            _recentColors[i] = _recentColors[i - 1];
+        }
+
+        _recentColors[0] = color;
+        if (_recentCount < RecentCount)
+        {
+            _recentCount++;
+        }
+
+        _storage.SavePaintPalette(_recentColors[..RecentCount]);
+    }
+
+    private void LoadRecentColors()
+    {
+        _recentCount = 0;
+        for (var n = 0; n < RecentCount && n < _storage.PaintPalette.Length; n++)
+        {
+            if (_storage.PaintPalette[n] != default)
             {
-                palette[n] = _storage.PaintPalette[n];
+                _recentColors[n] = _storage.PaintPalette[n];
+                _recentCount++;
             }
-            else
+        }
+    }
+
+    private static Color[] ComputeCommonColors(byte[] textureData)
+    {
+        var counts = new Dictionary<(byte r, byte g, byte b), int>();
+        for (var i = 0; i + 3 < textureData.Length; i += 4)
+        {
+            var key = (textureData[i], textureData[i + 1], textureData[i + 2]);
+            counts.TryGetValue(key, out var existing);
+            counts[key] = existing + 1;
+        }
+
+        var result = new Color[CommonCount];
+        var n = 0;
+        foreach (var (color, _) in counts.OrderByDescending(kv => kv.Value))
+        {
+            if (n < CommonCount)
             {
-                ImGui.ColorConvertHSVtoRGB(n / 31f, 0.8f, 0.8f, out var r, out var g, out var b);
-                palette[n] = new Color(r, g, b, 1f);
-                generated = true;
+                result[n++] = new Color(color.r, color.g, color.b, byte.MaxValue);
             }
         }
 
-        if (generated)
-        {
-            _storage.SavePaintPalette(palette);
-        }
-
-        return palette;
+        return result;
     }
 }
