@@ -2,8 +2,9 @@ namespace FezEditor.Components.Chris;
 
 public enum ChrisTool
 {
-    Select,
-    Extrude,
+    Look,
+    Add,
+    Remove,
     Paint,
     Bucket,
     Pick
@@ -15,8 +16,9 @@ public static class ChrisToolExtensions
     {
         return tool switch
         {
-            ChrisTool.Select => "Select",
-            ChrisTool.Extrude => "Extrude",
+            ChrisTool.Look => "Look",
+            ChrisTool.Add => "Add",
+            ChrisTool.Remove => "Remove",
             ChrisTool.Paint => "Paint",
             ChrisTool.Bucket => "Bucket",
             ChrisTool.Pick => "Pick",
@@ -26,6 +28,6 @@ public static class ChrisToolExtensions
 
     public static bool IsTextureTool(this ChrisTool tool)
     {
-        return tool is ChrisTool.Paint or ChrisTool.Bucket or ChrisTool.Pick;
+        return tool is ChrisTool.Paint or ChrisTool.Bucket;
     }
 }
