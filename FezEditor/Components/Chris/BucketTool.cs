@@ -37,6 +37,7 @@ internal class BucketTool : TextureTool
                 using (Chris.History.BeginScope("Fill Trixels"))
                 {
                     FloodFillTrixels(Chris.Hit.Value);
+                    Chris.SelectedFaces.Clear();
                 }
 
                 FlushPaintChanges();

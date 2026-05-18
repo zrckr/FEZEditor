@@ -22,11 +22,7 @@ internal class PaintTool : TextureTool
             return;
         }
 
-        var userWantsToPaint =
-            (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Left));
-        var cursorInSelection = Chris.SelectedFaces.Count == 0 || Chris.SelectedFaces.Contains(Chris.Hit.Value);
-
-        if (userWantsToPaint && cursorInSelection)
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Left))
         {
             _paintScope ??= Chris.History.BeginScope("Paint Trixels");
             PaintTrixel(Chris.Hit.Value);
