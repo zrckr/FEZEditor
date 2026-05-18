@@ -48,11 +48,16 @@ internal class AddRemoveTool : BaseTool
 
     private void ApplyChanges()
     {
+        var allFaces = Chris.SelectedFaces
+            .Concat(Chris.SelectedFaces.SelectMany(f => Chris.SymmetryMode.GetSymmetricFaces(f, Chris.Obj)))
+            .ToList();
+
         if (Chris.CurrentTool == ChrisTool.Add)
         {
-            var toAdd = Chris.SelectedFaces
+            var toAdd = allFaces
                 .Select(face => face.Emplacement + new Vector3I(face.Face.AsVector()))
                 .Where(emp => Chris.Obj.SizeContains(emp))
+                .Distinct()
                 .ToList();
 
             if (toAdd.Count > 0)
@@ -68,7 +73,7 @@ internal class AddRemoveTool : BaseTool
         }
         else
         {
-            var toRemove = Chris.SelectedFaces.Select(tf => tf.Emplacement).ToHashSet();
+            var toRemove = allFaces.Select(tf => tf.Emplacement).ToHashSet();
             var totalTrixels = Chris.Obj.VisibleFaces.Select(tf => tf.Emplacement).Distinct().Count();
             if (totalTrixels - toRemove.Count < 1)
             {

@@ -4,7 +4,6 @@ using FezEditor.Components.Chris;
 using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
-using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -31,7 +30,9 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public HashSet<TrixelFace> SelectedFaces { get; } = new();
 
-    public PaintMode CurrentPaintMode { get; set; } = PaintMode.Color;
+    public SymmetryMode SymmetryMode { get; set; } = SymmetryMode.None;
+
+    public PaintMode PaintMode { get; set; } = PaintMode.Color;
 
     private readonly IContext _context;
 
@@ -423,7 +424,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         if (_showTexture)
         {
             var trixelMesh = _meshActor.GetComponent<TrixelsMesh>();
-            var texture = CurrentPaintMode is PaintMode.Emission
+            var texture = PaintMode is PaintMode.Emission
                 ? trixelMesh.EmissionTexture!
                 : trixelMesh.ColorTexture!;
             const ImGuiWindowFlags flags1 = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar;
@@ -527,10 +528,10 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
         ImGui.SameLine();
         {
-            var colorButtonFlags = CurrentPaintMode is PaintMode.Emission
+            var colorButtonFlags = PaintMode is PaintMode.Emission
                 ? ImGuiColorEditFlags.NoTooltip
                 : ImGuiColorEditFlags.NoAlpha;
-            var colorButtonColor = CurrentPaintMode is PaintMode.Emission
+            var colorButtonColor = PaintMode is PaintMode.Emission
                 ? new Color(PaintColor.A, PaintColor.A, PaintColor.A, PaintColor.A)
                 : PaintColor;
             if (ImGuiX.ColorButton("##PaintButton", colorButtonColor, colorButtonFlags))
@@ -540,7 +541,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             }
         }
 
-        if (CurrentPaintMode is PaintMode.Emission && ImGui.IsItemHovered())
+        if (PaintMode is PaintMode.Emission && ImGui.IsItemHovered())
         {
             ImGui.BeginTooltip();
             ImGui.Text($"Emission: {PaintColor.A}");
@@ -549,13 +550,24 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
         ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
-        var paintMode = (int)CurrentPaintMode;
+        var paintMode = (int)PaintMode;
         var paintModesList = Enum.GetNames<PaintMode>();
         if (ImGui.Combo("##PaintMode", ref paintMode, paintModesList, paintModesList.Length))
         {
-            CurrentPaintMode = (PaintMode)paintMode;
-            Trixels.ShowEmission = CurrentPaintMode is PaintMode.Emission;
+            PaintMode = (PaintMode)paintMode;
+            Trixels.ShowEmission = PaintMode is PaintMode.Emission;
             Trixels.Visualize(Obj);
+        }
+
+        ImGui.SameLine();
+        {
+            var symmetryMode = (int)SymmetryMode;
+            var symmetryModesList = Enum.GetNames<SymmetryMode>();
+            ImGui.SetNextItemWidth(110);
+            if (ImGui.Combo("##Symmetry", ref symmetryMode, symmetryModesList, symmetryModesList.Length))
+            {
+                SymmetryMode = (SymmetryMode)symmetryMode;
+            }
         }
 
         ImGui.SameLine();

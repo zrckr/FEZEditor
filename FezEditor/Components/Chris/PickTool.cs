@@ -56,7 +56,7 @@ internal class PickTool : TextureTool
             return;
         }
 
-        if (Chris.CurrentPaintMode is PaintMode.Emission)
+        if (Chris.PaintMode is PaintMode.Emission)
         {
             int paintAlpha = Chris.PaintColor.A;
             ImGui.SliderInt("##PaintEmissionValue", ref paintAlpha, byte.MinValue, byte.MaxValue);
