@@ -14,11 +14,11 @@ public static class TrixelMaterializer
     /// Inverts the forward materialization path: GPU quads -> RectangularTrixelSurfaceParts -> trixel emplacements.
     /// Any trixel not covered by a surface face is marked as missing (subtractive storage).
     /// </summary>
-    public static TrixelObject ReconstructGeometry(Vector3 size, VertexInstance[] vertices, ushort[] indices)
+    public static TrixelObject ReconstructGeometry(Vector3 size, VertexInstance[] vertices, ushort[] indices, Vector3 offset)
     {
         // Step 1: Extract surface trixels from mesh quads
         var surface = new HashSet<Vector3I>();
-        var offset = size / 2f;
+        var obj = new TrixelObject { Size = size, Offset = offset };
 
         // Each rectangle emits 6 indices (2 triangles). Process one quad at a time.
         for (var i = 0; i < indices.Length; i += 6)
@@ -53,15 +53,21 @@ public static class TrixelMaterializer
             var normalVec = orientation.AsVector();
             var positive = orientation.IsPositive() ? 1f : 0f;
 
-            var start = new Vector3I((v0 + offset - (positive * normalVec / 16f)) * 16f);
-            var tw = (int)MathF.Round(MathF.Abs(Vector3.Dot(v2 - v0, tangentVec)) * 16f);
-            var bh = (int)MathF.Round(MathF.Abs(Vector3.Dot(v2 - v0, bitangentVec)) * 16f);
+            var start = new Vector3I((v0 + offset - (positive * normalVec * Mathz.TrixelSize)) / Mathz.TrixelSize);
+            var tw = (int)MathF.Round(MathF.Abs(Vector3.Dot(v2 - v0, tangentVec)) / Mathz.TrixelSize);
+            var bh = (int)MathF.Round(MathF.Abs(Vector3.Dot(v2 - v0, bitangentVec)) / Mathz.TrixelSize);
 
             for (var t = 0; t < tw; t++)
             {
                 for (var b = 0; b < bh; b++)
                 {
                     var pos = start.ToVector3() + (tangentVec * t) + (bitangentVec * b);
+
+                    // Clamp out-of-bounds surface trixels.
+                    pos = Vector3.Clamp(pos,
+                        min: Vector3.Zero,
+                        max: new Vector3(obj.Width, obj.Height, obj.Depth) - Vector3.One);
+
                     surface.Add(new Vector3I(pos));
                 }
             }
@@ -69,29 +75,11 @@ public static class TrixelMaterializer
 
         // Step 2: Flood-fill empty space from boundary inward
         // Any trixel NOT reached by the flood = present (either on surface or enclosed interior)
-        var obj = new TrixelObject() { Size = size };
         var w = obj.Width;
         var h = obj.Height;
         var d = obj.Depth;
         var empty = new bool[w * h * d];
         var queue = new Queue<int>();
-
-        void TrySeed(int x, int y, int z)
-        {
-            if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d)
-            {
-                return;
-            }
-
-            var idx = x + (y * w) + (z * w * h);
-            if (empty[idx] || surface.Contains(new Vector3I(x, y, z)))
-            {
-                return;
-            }
-
-            empty[idx] = true;
-            queue.Enqueue(idx);
-        }
 
         // Seed from all 6 boundary faces
         for (var x = 0; x < w; x++)
@@ -135,6 +123,23 @@ public static class TrixelMaterializer
         }
 
         return obj;
+
+        void TrySeed(int x, int y, int z)
+        {
+            if (x < 0 || y < 0 || z < 0 || x >= w || y >= h || z >= d)
+            {
+                return;
+            }
+
+            var idx = x + (y * w) + (z * w * h);
+            if (empty[idx] || surface.Contains(new Vector3I(x, y, z)))
+            {
+                return;
+            }
+
+            empty[idx] = true;
+            queue.Enqueue(idx);
+        }
     }
 
     #endregion
@@ -144,36 +149,15 @@ public static class TrixelMaterializer
     public static (VertexInstance[] Vertices, ushort[] Indices) Dematerialize(TrixelObject obj)
     {
         var rects = GreedyMesh(obj.VisibleFaces);
-        var offset = obj.Size / 2f;
-        var texSize = obj.Size;
+
+        // TrileMaterializer hardcodes Vector3.One as trile UV size regardless of actual size;
+        // ArtObjectMaterializer uses the real size. Offset stores the convention: 0.5 for triles, size/2 for art objects.
+        var texSize = obj.Offset * 2f;
 
         // Vertex deduplication: Position+Normal pair shares same index
         var vertexMap = new Dictionary<(Vector3 vertex, Vector3 normal), ushort>();
         var vertices = new List<VertexInstance>();
         var indices = new List<ushort>();
-
-        ushort AddVertexInstance(Vector3 vertex, Vector3 normal, FaceOrientation face)
-        {
-            vertex = vertex.Round(4);
-            var key = (vertex, normal);
-            if (vertexMap.TryGetValue(key, out var idx))
-            {
-                return idx;
-            }
-
-            idx = (ushort)vertices.Count;
-            vertexMap[key] = idx;
-
-            var texCoord = ComputeTexCoord(vertex, normal, texSize, face);
-            vertices.Add(new VertexInstance
-            {
-                Position = vertex.ToRepacker(),
-                Normal = normal.ToRepacker(),
-                TextureCoordinate = texCoord.ToRepacker()
-            });
-
-            return idx;
-        }
 
         foreach (var rect in rects)
         {
@@ -188,10 +172,10 @@ public static class TrixelMaterializer
                            + (normalVec * rect.Depth);
 
             // Vertex formula - mirrors TrileMaterializer/ArtObjectMaterializer
-            var v0 = (startPos / 16f) + ((isPositive ? 1 : 0) * normalVec / 16f) - offset;
-            var v1 = v0 + (tangentVec * rect.TangentSize / 16f);
-            var v2 = v1 + (bitangentVec * rect.BitangentSize / 16f);
-            var v3 = v0 + (bitangentVec * rect.BitangentSize / 16f);
+            var v0 = (startPos * Mathz.TrixelSize) + ((isPositive ? 1 : 0) * normalVec * Mathz.TrixelSize) - obj.Offset;
+            var v1 = v0 + (tangentVec * rect.TangentSize * Mathz.TrixelSize);
+            var v2 = v1 + (bitangentVec * rect.BitangentSize * Mathz.TrixelSize);
+            var v3 = v0 + (bitangentVec * rect.BitangentSize * Mathz.TrixelSize);
 
             var i0 = AddVertexInstance(v0, normalVec, rect.Orientation);
             var i1 = AddVertexInstance(v1, normalVec, rect.Orientation);
@@ -218,27 +202,37 @@ public static class TrixelMaterializer
         }
 
         return (vertices.ToArray(), indices.ToArray());
+
+        ushort AddVertexInstance(Vector3 vertex, Vector3 normal, FaceOrientation face)
+        {
+            vertex = vertex.Round(4);
+            var key = (vertex, normal);
+            if (vertexMap.TryGetValue(key, out var idx))
+            {
+                return idx;
+            }
+
+            idx = (ushort)vertices.Count;
+            vertexMap[key] = idx;
+
+            var texCoord = ComputeTexCoord(vertex, normal, texSize, face);
+            vertices.Add(new VertexInstance
+            {
+                Position = vertex.ToRepacker(),
+                Normal = normal.ToRepacker(),
+                TextureCoordinate = texCoord.ToRepacker()
+            });
+
+            return idx;
+        }
     }
 
     public static (Vector3[] Vertices, int[] Indices) DematerializeLines(TrixelObject obj)
     {
         var rects = GreedyMesh(obj.VisibleFaces);
-        var offset = obj.Size / 2f;
-
         var vertexMap = new Dictionary<Vector3, int>();
         var vertices = new List<Vector3>();
         var indices = new List<int>();
-
-        int AddVertex(Vector3 v)
-        {
-            v = v.Round(4);
-            if (vertexMap.TryGetValue(v, out var idx))
-                return idx;
-            idx = vertices.Count;
-            vertexMap[v] = idx;
-            vertices.Add(v);
-            return idx;
-        }
 
         foreach (var rect in rects)
         {
@@ -251,10 +245,10 @@ public static class TrixelMaterializer
                            + (bitangentVec * rect.StartBitangent)
                            + (normalVec * rect.Depth);
 
-            var v0 = (startPos / 16f) + ((isPositive ? 1 : 0) * normalVec / 16f) - offset;
-            var v1 = v0 + (tangentVec * rect.TangentSize / 16f);
-            var v2 = v1 + (bitangentVec * rect.BitangentSize / 16f);
-            var v3 = v0 + (bitangentVec * rect.BitangentSize / 16f);
+            var v0 = (startPos * Mathz.TrixelSize) + ((isPositive ? 1 : 0) * normalVec * Mathz.TrixelSize) - obj.Offset;
+            var v1 = v0 + (tangentVec * rect.TangentSize * Mathz.TrixelSize);
+            var v2 = v1 + (bitangentVec * rect.BitangentSize * Mathz.TrixelSize);
+            var v3 = v0 + (bitangentVec * rect.BitangentSize * Mathz.TrixelSize);
 
             var i0 = AddVertex(v0);
             var i1 = AddVertex(v1);
@@ -272,6 +266,20 @@ public static class TrixelMaterializer
         }
 
         return (vertices.ToArray(), indices.ToArray());
+
+        int AddVertex(Vector3 v)
+        {
+            v = v.Round(4);
+            if (vertexMap.TryGetValue(v, out var idx))
+            {
+                return idx;
+            }
+
+            idx = vertices.Count;
+            vertexMap[v] = idx;
+            vertices.Add(v);
+            return idx;
+        }
     }
 
     private static List<MeshRect> GreedyMesh(IEnumerable<TrixelFace> faces)
@@ -415,7 +423,7 @@ public static class TrixelMaterializer
             v = 1f - v;
         }
 
-        return new Vector2(faceOffset.X + (u / 8f), faceOffset.Y + v) * new Vector2(1.3333334f, 1f);
+        return new Vector2(faceOffset.X + (u / 8f), faceOffset.Y + v) * new Vector2(4f / 3f, 1f);
     }
 
     private record struct MeshRect(

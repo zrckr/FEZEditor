@@ -1,7 +1,6 @@
 ﻿using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FezEditor.Components.Chris;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Common;
 using Microsoft.Xna.Framework;
@@ -32,6 +31,9 @@ public class TrixelObject
 
     [JsonConverter(typeof(CompressConverter))]
     public RTexture2D Texture { get; set; } = new();
+
+    [JsonIgnore]
+    public Vector3 Offset { get; set; } = Vector3.Zero;
 
     public TrixelProperties? Properties { get; set; }
 
