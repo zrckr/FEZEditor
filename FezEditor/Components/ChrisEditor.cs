@@ -105,7 +105,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
             var camera = _cameraActor.AddComponent<Camera>();
             var zoom = _cameraActor.AddComponent<ZoomControl>();
-            _cameraActor.AddComponent<OrbitControl>();
+            var orbit = _cameraActor.AddComponent<OrbitControl>();
             _cameraActor.AddComponent<OrientationGizmo>();
 
             camera.Projection = Camera.ProjectionType.Perspective;
@@ -114,6 +114,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             camera.Far = 50f;
             zoom.MinDistance = 10f / 16f;
             zoom.MaxDistance = 16f;
+            orbit.UseRightMouseButton = true;
         }
         {
             _meshActor = _scene.CreateActor();
@@ -191,7 +192,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                 _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;
 
                 Hit = null;
-                IsViewportHovered = ImGui.IsItemHovered(hoverFlags) && !ImGui.IsMouseDragging(ImGuiMouseButton.Middle);
+                IsViewportHovered = ImGui.IsItemHovered(hoverFlags) && !ImGui.IsMouseDragging(ImGuiMouseButton.Right);
                 if (IsViewportHovered)
                 {
                     var ray = _scene.Viewport.Unproject(ImGuiX.GetMousePos(), viewportMin);
