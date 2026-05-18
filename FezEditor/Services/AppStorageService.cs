@@ -149,8 +149,9 @@ public class AppStorageService : IDisposable
             SDL.SDL_MaximizeWindow(_game.Window.Handle);
         }
 
-        gdm.PreferredBackBufferWidth = _data.Window.Width;
-        gdm.PreferredBackBufferHeight = _data.Window.Height;
+        SDL.SDL_GetWindowSizeInPixels(_game.Window.Handle, out var pixelWidth, out var pixelHeight);
+        gdm.PreferredBackBufferWidth = pixelWidth > 0 ? pixelWidth : _data.Window.Width;
+        gdm.PreferredBackBufferHeight = pixelHeight > 0 ? pixelHeight : _data.Window.Height;
         gdm.ApplyChanges();
     }
 
