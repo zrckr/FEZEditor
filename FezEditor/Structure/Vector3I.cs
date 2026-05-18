@@ -103,6 +103,24 @@ public struct Vector3I : IEquatable<Vector3I>, IComparable<Vector3I>
         return num;
     }
 
+    public static Vector3I Min(Vector3I lhs, Vector3I rhs)
+    {
+        return new Vector3I(
+            Math.Min(lhs.X, rhs.X),
+            Math.Min(lhs.Y, rhs.Y),
+            Math.Min(lhs.Z, rhs.Z)
+        );
+    }
+
+    public static Vector3I Max(Vector3I lhs, Vector3I rhs)
+    {
+        return new Vector3I(
+            Math.Max(lhs.X, rhs.X),
+            Math.Max(lhs.Y, rhs.Y),
+            Math.Max(lhs.Z, rhs.Z)
+        );
+    }
+
     public static bool operator ==(Vector3I lhs, Vector3I rhs)
     {
         return lhs.Equals(rhs);

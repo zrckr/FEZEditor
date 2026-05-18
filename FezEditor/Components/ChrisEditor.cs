@@ -31,8 +31,6 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public HashSet<TrixelFace> SelectedFaces { get; } = new();
 
-    public FaceOrientation? SelectionOrientation { get; set; }
-
     public PaintMode CurrentPaintMode { get; set; } = PaintMode.Color;
 
     private readonly IContext _context;

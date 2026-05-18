@@ -26,6 +26,4 @@ internal interface IChrisEditor
     PaintMode CurrentPaintMode { get; set; }
 
     HashSet<TrixelFace> SelectedFaces { get; }
-
-    FaceOrientation? SelectionOrientation { get; set; }
 }
