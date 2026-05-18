@@ -38,4 +38,11 @@ internal abstract class BaseTool
     }
 
     protected abstract bool IsToolAllowed(ChrisTool tool);
+
+    protected enum LmbState
+    {
+        Idle,
+        Pressed,
+        Dragging
+    }
 }

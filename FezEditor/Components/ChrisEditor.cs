@@ -25,11 +25,9 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public TrixelsMesh Trixels => _meshActor.GetComponent<TrixelsMesh>();
 
-    public Gizmo Gizmo => _gizmoActor.GetComponent<Gizmo>();
-
     public Color PaintColor { get; set; } = new(255, 255, 255, 0);
 
-    public ChrisTool CurrentTool { get; set; } = ChrisTool.Select;
+    public ChrisTool CurrentTool { get; set; } = ChrisTool.Look;
 
     public HashSet<TrixelFace> SelectedFaces { get; } = new();
 
@@ -56,8 +54,6 @@ public class ChrisEditor : EditorComponent, IChrisEditor
     private Actor _cursorActor = null!;
 
     private Actor _boundsActor = null!;
-
-    private Actor _gizmoActor = null!;
 
     private Actor _collisionActor = null!;
 
@@ -133,13 +129,8 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             _cursorActor.AddComponent<CursorMesh>();
         }
         {
-            _gizmoActor = _scene.CreateActor();
-            var gizmo = _gizmoActor.AddComponent<Gizmo>();
-            gizmo.Camera = _cameraActor.GetComponent<Camera>();
-        }
-        {
             _tools.Add(new SelectTool(Game, this));
-            _tools.Add(new ExtrudeTool(Game, this));
+            _tools.Add(new AddRemoveTool(Game, this));
             _tools.Add(new PaintTool(Game, this));
             _tools.Add(new BucketTool(Game, this));
             _tools.Add(new PickTool(Game, this));
@@ -152,7 +143,6 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     public override void Update(GameTime gameTime)
     {
-        Gizmo.Hide();
         Cursor.ClearHover();
         Cursor.ClearSelection();
         StatusService.ClearHints();
@@ -187,9 +177,7 @@ public class ChrisEditor : EditorComponent, IChrisEditor
                 const ImGuiHoveredFlags hoverFlags = ImGuiHoveredFlags.AllowWhenBlockedByActiveItem |
                                                      ImGuiHoveredFlags.AllowWhenBlockedByPopup;
                 InputService.IsViewportHovered = ImGui.IsItemHovered(hoverFlags);
-
                 var viewportMin = ImGuiX.GetItemRectMin();
-                _gizmoActor.GetComponent<Gizmo>().Viewport = viewportMin;
 
                 Hit = null;
                 IsViewportHovered = ImGui.IsItemHovered(hoverFlags) && !ImGui.IsMouseDragging(ImGuiMouseButton.Right);
@@ -522,10 +510,13 @@ public class ChrisEditor : EditorComponent, IChrisEditor
 
     private void DrawToolbar()
     {
-        DrawModeButton(Lucide.MousePointer2, ChrisTool.Select);
+        DrawModeButton(Lucide.Maximize, ChrisTool.Look);
 
         ImGui.SameLine();
-        DrawModeButton(Lucide.ArrowUpFromLine, ChrisTool.Extrude);
+        DrawModeButton(Lucide.SquarePlus, ChrisTool.Add);
+
+        ImGui.SameLine();
+        DrawModeButton(Lucide.SquareMinus, ChrisTool.Remove);
 
         ImGui.SameLine();
         ImGui.TextDisabled("|");
@@ -537,16 +528,18 @@ public class ChrisEditor : EditorComponent, IChrisEditor
         DrawModeButton(Lucide.PaintBucket, ChrisTool.Bucket);
 
         ImGui.SameLine();
-        var colorButtonFlags = CurrentPaintMode is PaintMode.Emission
-            ? ImGuiColorEditFlags.NoTooltip
-            : ImGuiColorEditFlags.NoAlpha;
-        var colorButtonColor = CurrentPaintMode is PaintMode.Emission
-            ? new Color(PaintColor.A, PaintColor.A, PaintColor.A, PaintColor.A)
-            : PaintColor;
-        if (ImGuiX.ColorButton("##PaintButton", colorButtonColor, colorButtonFlags))
         {
-            ImGui.OpenPopup("##PaintPicker");
-            CurrentTool = ChrisTool.Paint;
+            var colorButtonFlags = CurrentPaintMode is PaintMode.Emission
+                ? ImGuiColorEditFlags.NoTooltip
+                : ImGuiColorEditFlags.NoAlpha;
+            var colorButtonColor = CurrentPaintMode is PaintMode.Emission
+                ? new Color(PaintColor.A, PaintColor.A, PaintColor.A, PaintColor.A)
+                : PaintColor;
+            if (ImGuiX.ColorButton("##PaintButton", colorButtonColor, colorButtonFlags))
+            {
+                ImGui.OpenPopup("##PaintPicker");
+                CurrentTool = ChrisTool.Pick;
+            }
         }
 
         if (CurrentPaintMode is PaintMode.Emission && ImGui.IsItemHovered())
@@ -566,9 +559,6 @@ public class ChrisEditor : EditorComponent, IChrisEditor
             Trixels.ShowEmission = CurrentPaintMode is PaintMode.Emission;
             Trixels.Visualize(Obj);
         }
-
-        ImGui.SameLine();
-        DrawModeButton(Lucide.Pipette, ChrisTool.Pick);
 
         ImGui.SameLine();
         ImGui.TextDisabled("|");

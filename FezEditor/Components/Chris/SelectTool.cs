@@ -22,7 +22,12 @@ internal class SelectTool : BaseTool
 
     protected override void TestConditions()
     {
-        if (Chris is { Hit: not null, CurrentTool: not ChrisTool.Extrude })
+        if (Chris.CurrentTool == ChrisTool.Look)
+        {
+            return;
+        }
+
+        if (Chris.Hit is not null)
         {
             var surface = BuildTrixelFaceQuad(Chris.Hit.Value);
             Chris.Cursor.SetHoverSurfaces([(surface, PrimitiveType.TriangleList)], HoverColor);
@@ -37,13 +42,7 @@ internal class SelectTool : BaseTool
 
     protected override void Act()
     {
-        StatusService.AddHints(
-            ("LMB Drag", "Select Faces"),
-            ("Del", "Remove Selected"),
-            ("Esc", "Clear")
-        );
-
-        if (!Chris.IsViewportHovered)
+        if (!Chris.IsViewportHovered || Chris.CurrentTool is not (ChrisTool.Add or ChrisTool.Remove or ChrisTool.Paint))
         {
             return;
         }
@@ -79,27 +78,11 @@ internal class SelectTool : BaseTool
                 }
             }
         }
-
-        if (ImGui.IsKeyPressed(ImGuiKey.Delete) && Chris.SelectedFaces.Count > 0)
-        {
-            using (Chris.History.BeginScope("Remove Trixels"))
-            {
-                ApplyRemove();
-            }
-
-            Chris.Trixels.Visualize(Chris.Obj);
-            ClearSelection();
-        }
-
-        if (ImGui.IsKeyPressed(ImGuiKey.Escape))
-        {
-            ClearSelection();
-        }
     }
 
     protected override bool IsToolAllowed(ChrisTool tool)
     {
-        return tool == ChrisTool.Select;
+        return true;
     }
 
     private void ClearSelection()
@@ -148,30 +131,6 @@ internal class SelectTool : BaseTool
         }
 
         return result;
-    }
-
-    private void ApplyRemove()
-    {
-        var orientation = Chris.SelectionOrientation!.Value;
-        var toRemove = Chris.SelectedFaces
-            .Where(tf => tf.Face == orientation)
-            .Select(tf => tf.Emplacement)
-            .ToHashSet();
-
-        var totalTrixels = Chris.Obj.VisibleFaces
-            .Select(tf => tf.Emplacement)
-            .Distinct()
-            .Count();
-
-        if (totalTrixels - toRemove.Count < 1)
-        {
-            toRemove.Remove(toRemove.First());
-        }
-
-        foreach (var emp in toRemove)
-        {
-            Chris.Obj.SetMissing(emp, true);
-        }
     }
 
     private MeshSurface BuildTrixelFaceQuad(TrixelFace tf)

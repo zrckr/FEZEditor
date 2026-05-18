@@ -19,8 +19,6 @@ internal interface IChrisEditor
 
     TrixelsMesh Trixels { get; }
 
-    Gizmo Gizmo { get; }
-
     Color PaintColor { get; set; }
 
     ChrisTool CurrentTool { get; set; }

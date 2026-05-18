@@ -21,7 +21,7 @@ internal class PickTool : TextureTool
 
     private int _recentCount;
 
-    private ChrisTool _lastUsedTool;
+    private ChrisTool _lastTextureTool = ChrisTool.Paint;
 
     public PickTool(Game game, IChrisEditor chris) : base(game, chris)
     {
@@ -38,20 +38,19 @@ internal class PickTool : TextureTool
             _commonColors = ComputeCommonColors(textureData);
         }
 
-        if (Chris.CurrentTool != ChrisTool.Pick)
+        if (Chris.CurrentTool != ChrisTool.Pick && Chris.CurrentTool.IsTextureTool())
         {
-            _lastUsedTool = Chris.CurrentTool;
-            return;
-        }
-
-        if (ImGui.IsKeyPressed(ImGuiKey.Escape))
-        {
-            Chris.CurrentTool = _lastUsedTool;
+            _lastTextureTool = Chris.CurrentTool;
         }
     }
 
     public override void DrawOverlay()
     {
+        if (Chris.CurrentTool == ChrisTool.Pick && !ImGui.IsPopupOpen("##PaintPicker"))
+        {
+            Chris.CurrentTool = _lastTextureTool;
+        }
+
         if (!ImGui.BeginPopup("##PaintPicker"))
         {
             return;
@@ -65,6 +64,10 @@ internal class PickTool : TextureTool
             ImGui.EndPopup();
             return;
         }
+
+        ImGui.Text("Select a color from color palette");
+        ImGui.Text("or click on trixel to pick it.");
+        ImGui.Separator();
 
         var paintColor = Chris.PaintColor;
 
@@ -139,10 +142,6 @@ internal class PickTool : TextureTool
         var picked = GetTrixelColor(face);
         Chris.PaintColor = picked;
         PushRecentColor(new Color(picked.R, picked.G, picked.B, byte.MaxValue));
-
-        Chris.CurrentTool = _lastUsedTool.IsTextureTool()
-            ? _lastUsedTool
-            : ChrisTool.Paint;
     }
 
     protected override bool IsToolAllowed(ChrisTool tool)
