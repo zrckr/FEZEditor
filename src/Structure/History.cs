@@ -23,6 +23,8 @@ public class History : IDisposable
 
     private HistoryNode? _current;
 
+    private HistoryNode? _saved;
+
     private Type TrackedType
     {
         get
@@ -40,12 +42,15 @@ public class History : IDisposable
 
     public bool CanRedo => _current?.Child != null;
 
+    public bool HasUnsavedChanges => _current != _saved;
+
     public event Action<Change>? StateChanged;
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         _current = null;
+        _saved = null;
 
         if (Directory.Exists(_sessionDirectory))
         {
@@ -57,6 +62,7 @@ public class History : IDisposable
     {
         _tracked = target;
         ResetRoot();
+        _saved = _current;
     }
 
     public IDisposable BeginScope(string name)
@@ -97,7 +103,13 @@ public class History : IDisposable
     public void Clear()
     {
         ResetRoot();
+        _saved = _current;
         StateChanged?.Invoke(EmptyChange);
+    }
+
+    public void MarkSaved()
+    {
+        _saved = _current;
     }
 
     private HistoryNode CaptureState(string name, HistoryNode? parent)
