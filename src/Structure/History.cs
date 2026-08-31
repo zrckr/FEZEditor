@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FezEditor.Services;
 using FezEditor.Tools;
 
 namespace FezEditor.Structure;
@@ -16,11 +17,13 @@ public class History : IDisposable
 
     private static readonly Change EmptyChange = new(string.Empty, string.Empty);
 
-    private const int MaxHistorySize = byte.MaxValue;
-
     private readonly LinkedList<UndoOperation> _undoStack = new();
 
     private readonly LinkedList<UndoOperation> _redoStack = new();
+
+    private readonly string _sessionDirectory = AppStorageService.CreateHistorySessionDirectory();
+
+    private long _nextSnapshotId;
 
     private object _tracked = null!;
 
@@ -48,6 +51,11 @@ public class History : IDisposable
         GC.SuppressFinalize(this);
         _undoStack.Clear();
         _redoStack.Clear();
+
+        if (Directory.Exists(_sessionDirectory))
+        {
+            Directory.Delete(_sessionDirectory, true);
+        }
     }
 
     public void Track(object target)
@@ -72,13 +80,16 @@ public class History : IDisposable
 
         var before = CaptureState(after.Name);
         _redoStack.AddLast(before);
-        if (_redoStack.Count > MaxHistorySize)
-        {
-            _redoStack.RemoveFirst();
-        }
 
         Restore(after);
-        StateChanged?.Invoke(new Change(before.Json, after.Json));
+        try
+        {
+            StateChanged?.Invoke(new Change(ReadSnapshot(before), ReadSnapshot(after)));
+        }
+        finally
+        {
+            DeleteSnapshot(after);
+        }
     }
 
     public void Redo()
@@ -93,17 +104,22 @@ public class History : IDisposable
 
         var before = CaptureState(after.Name);
         _undoStack.AddLast(before);
-        if (_undoStack.Count > MaxHistorySize)
-        {
-            _undoStack.RemoveFirst();
-        }
 
         Restore(after);
-        StateChanged?.Invoke(new Change(before.Json, after.Json));
+        try
+        {
+            StateChanged?.Invoke(new Change(ReadSnapshot(before), ReadSnapshot(after)));
+        }
+        finally
+        {
+            DeleteSnapshot(after);
+        }
     }
 
     public void Clear()
     {
+        DeleteSnapshots(_undoStack);
+        DeleteSnapshots(_redoStack);
         _undoStack.Clear();
         _redoStack.Clear();
         StateChanged?.Invoke(EmptyChange);
@@ -112,12 +128,14 @@ public class History : IDisposable
     private UndoOperation CaptureState(string name)
     {
         var json = JsonSerializer.Serialize(_tracked, TrackedType, JsonOptions);
-        return new UndoOperation(name, json);
+        var path = Path.Combine(_sessionDirectory, $"{_nextSnapshotId++}.json");
+        File.WriteAllText(path, json);
+        return new UndoOperation(name, path);
     }
 
     private void Restore(UndoOperation op)
     {
-        var restored = JsonSerializer.Deserialize(op.Json, TrackedType, JsonOptions)!;
+        var restored = JsonSerializer.Deserialize(ReadSnapshot(op), TrackedType, JsonOptions)!;
         foreach (var property in TrackedType.GetProperties())
         {
             if (property is { CanRead: true, CanWrite: true } &&
@@ -139,19 +157,42 @@ public class History : IDisposable
 
     private void Push(UndoOperation before, UndoOperation after)
     {
-        if (before.Json.Equals(after.Json))
+        var beforeJson = ReadSnapshot(before);
+        var afterJson = ReadSnapshot(after);
+        DeleteSnapshot(after);
+
+        if (beforeJson.Equals(afterJson))
         {
+            DeleteSnapshot(before);
             return;
         }
 
         _undoStack.AddLast(before);
-        if (_undoStack.Count > MaxHistorySize)
-        {
-            _undoStack.RemoveFirst();
-        }
 
+        DeleteSnapshots(_redoStack);
         _redoStack.Clear();
-        StateChanged?.Invoke(new Change(before.Json, after.Json));
+        StateChanged?.Invoke(new Change(beforeJson, afterJson));
+    }
+
+    private static string ReadSnapshot(UndoOperation op)
+    {
+        return File.ReadAllText(op.Path);
+    }
+
+    private static void DeleteSnapshot(UndoOperation op)
+    {
+        if (File.Exists(op.Path))
+        {
+            File.Delete(op.Path);
+        }
+    }
+
+    private static void DeleteSnapshots(IEnumerable<UndoOperation> operations)
+    {
+        foreach (var operation in operations)
+        {
+            DeleteSnapshot(operation);
+        }
     }
 
     public sealed record Change(string BeforeJson, string AfterJson);
@@ -183,5 +224,5 @@ public class History : IDisposable
         }
     }
 
-    private sealed record UndoOperation(string Name, string Json);
+    private sealed record UndoOperation(string Name, string Path);
 }
