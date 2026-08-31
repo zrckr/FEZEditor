@@ -17,15 +17,11 @@ public class History : IDisposable
 
     private static readonly Change EmptyChange = new(string.Empty, string.Empty);
 
-    private readonly LinkedList<UndoOperation> _undoStack = new();
-
-    private readonly LinkedList<UndoOperation> _redoStack = new();
-
     private readonly string _sessionDirectory = AppStorageService.CreateHistorySessionDirectory();
 
-    private long _nextSnapshotId;
+    private object? _tracked;
 
-    private object _tracked = null!;
+    private HistoryNode? _current;
 
     private Type TrackedType
     {
@@ -40,17 +36,16 @@ public class History : IDisposable
         }
     }
 
-    public bool CanUndo => _undoStack.Count > 0;
+    public bool CanUndo => _current?.Parent != null;
 
-    public bool CanRedo => _redoStack.Count > 0;
+    public bool CanRedo => _current?.Child != null;
 
     public event Action<Change>? StateChanged;
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _undoStack.Clear();
-        _redoStack.Clear();
+        _current = null;
 
         if (Directory.Exists(_sessionDirectory))
         {
@@ -61,6 +56,7 @@ public class History : IDisposable
     public void Track(object target)
     {
         _tracked = target;
+        ResetRoot();
     }
 
     public IDisposable BeginScope(string name)
@@ -75,21 +71,12 @@ public class History : IDisposable
             return;
         }
 
-        var after = _undoStack.Last!.Value;
-        _undoStack.RemoveLast();
-
-        var before = CaptureState(after.Name);
-        _redoStack.AddLast(before);
+        var before = _current!;
+        var after = before.Parent!;
+        _current = after;
 
         Restore(after);
-        try
-        {
-            StateChanged?.Invoke(new Change(ReadSnapshot(before), ReadSnapshot(after)));
-        }
-        finally
-        {
-            DeleteSnapshot(after);
-        }
+        StateChanged?.Invoke(new Change(ReadSnapshot(before), ReadSnapshot(after)));
     }
 
     public void Redo()
@@ -99,43 +86,31 @@ public class History : IDisposable
             return;
         }
 
-        var after = _redoStack.Last!.Value;
-        _redoStack.RemoveLast();
-
-        var before = CaptureState(after.Name);
-        _undoStack.AddLast(before);
+        var before = _current!;
+        var after = before.Child!;
+        _current = after;
 
         Restore(after);
-        try
-        {
-            StateChanged?.Invoke(new Change(ReadSnapshot(before), ReadSnapshot(after)));
-        }
-        finally
-        {
-            DeleteSnapshot(after);
-        }
+        StateChanged?.Invoke(new Change(ReadSnapshot(before), ReadSnapshot(after)));
     }
 
     public void Clear()
     {
-        DeleteSnapshots(_undoStack);
-        DeleteSnapshots(_redoStack);
-        _undoStack.Clear();
-        _redoStack.Clear();
+        ResetRoot();
         StateChanged?.Invoke(EmptyChange);
     }
 
-    private UndoOperation CaptureState(string name)
+    private HistoryNode CaptureState(string name, HistoryNode? parent)
     {
         var json = JsonSerializer.Serialize(_tracked, TrackedType, JsonOptions);
-        var path = Path.Combine(_sessionDirectory, $"{_nextSnapshotId++}.json");
+        var path = Path.Combine(_sessionDirectory, $"[{DateTime.UtcNow.Ticks}] {ToFileName(name)}.json");
         File.WriteAllText(path, json);
-        return new UndoOperation(name, path);
+        return new HistoryNode(path, parent);
     }
 
-    private void Restore(UndoOperation op)
+    private void Restore(HistoryNode node)
     {
-        var restored = JsonSerializer.Deserialize(ReadSnapshot(op), TrackedType, JsonOptions)!;
+        var restored = JsonSerializer.Deserialize(ReadSnapshot(node), TrackedType, JsonOptions)!;
         foreach (var property in TrackedType.GetProperties())
         {
             if (property is { CanRead: true, CanWrite: true } &&
@@ -155,44 +130,60 @@ public class History : IDisposable
         }
     }
 
-    private void Push(UndoOperation before, UndoOperation after)
+    private void Push(HistoryNode before, HistoryNode after)
     {
         var beforeJson = ReadSnapshot(before);
         var afterJson = ReadSnapshot(after);
-        DeleteSnapshot(after);
-
         if (beforeJson.Equals(afterJson))
         {
-            DeleteSnapshot(before);
+            DeleteSnapshot(after);
             return;
         }
 
-        _undoStack.AddLast(before);
-
-        DeleteSnapshots(_redoStack);
-        _redoStack.Clear();
+        DeleteBranch(before.Child);
+        before.Child = after;
+        _current = after;
         StateChanged?.Invoke(new Change(beforeJson, afterJson));
     }
 
-    private static string ReadSnapshot(UndoOperation op)
+    private void ResetRoot()
     {
-        return File.ReadAllText(op.Path);
+        if (Directory.Exists(_sessionDirectory))
+        {
+            Directory.Delete(_sessionDirectory, true);
+        }
+
+        Directory.CreateDirectory(_sessionDirectory);
+        _current = _tracked == null ? null : CaptureState(string.Empty, null);
     }
 
-    private static void DeleteSnapshot(UndoOperation op)
+    private static string ReadSnapshot(HistoryNode node)
     {
-        if (File.Exists(op.Path))
+        return File.ReadAllText(node.Path);
+    }
+
+    private static void DeleteSnapshot(HistoryNode node)
+    {
+        if (File.Exists(node.Path))
         {
-            File.Delete(op.Path);
+            File.Delete(node.Path);
         }
     }
 
-    private static void DeleteSnapshots(IEnumerable<UndoOperation> operations)
+    private static void DeleteBranch(HistoryNode? node)
     {
-        foreach (var operation in operations)
+        while (node != null)
         {
-            DeleteSnapshot(operation);
+            DeleteSnapshot(node);
+            node = node.Child;
         }
+    }
+
+    private static string ToFileName(string name)
+    {
+        return string.IsNullOrWhiteSpace(name)
+            ? "initial"
+            : string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
     }
 
     public sealed record Change(string BeforeJson, string AfterJson);
@@ -201,14 +192,17 @@ public class History : IDisposable
     {
         private readonly History _service;
 
-        private readonly UndoOperation _before;
+        private readonly HistoryNode _before;
+
+        private readonly string _name;
 
         private bool _disposed;
 
         internal Scope(History service, string name)
         {
             _service = service;
-            _before = service.CaptureState(name);
+            _before = service._current ?? throw new InvalidOperationException("Cannot use history before tracking an object!");
+            _name = name;
         }
 
         public void Dispose()
@@ -219,10 +213,17 @@ public class History : IDisposable
             }
 
             _disposed = true;
-            var after = _service.CaptureState(_before.Name);
+            var after = _service.CaptureState(_name, _before);
             _service.Push(_before, after);
         }
     }
 
-    private sealed record UndoOperation(string Name, string Path);
+    private sealed class HistoryNode(string path, HistoryNode? parent)
+    {
+        public string Path { get; } = path;
+
+        public HistoryNode? Parent { get; } = parent;
+
+        public HistoryNode? Child { get; set; }
+    }
 }
