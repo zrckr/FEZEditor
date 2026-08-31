@@ -118,7 +118,9 @@ public partial class EditorService
             {
                 if (_tracking.TryGetValue(editor, out var tracking))
                 {
-                    tracking.State |= EditorState.HasChanges;
+                    tracking.State = editor.History.HasUnsavedChanges
+                        ? tracking.State | EditorState.HasChanges
+                        : tracking.State & ~EditorState.HasChanges;
                     _tracking[editor] = tracking;
                     _resourceService.InvalidateCacheFor(tracking.Path);
                 }
@@ -218,6 +220,7 @@ public partial class EditorService
             !_resourceService.IsReadonlyPath(tracking.Path))
         {
             _resourceService.Save(tracking.Path, _activeEditor!.Asset);
+            _activeEditor.History.MarkSaved();
             _tracking[_activeEditor] = (tracking.Path, EditorState.Default);
             Logger.Information("Saving {0}", _activeEditor);
             UpdateFlags();
@@ -244,6 +247,7 @@ public partial class EditorService
             {
                 var relativePath = _resourceService.GetRelativePath(files[0]);
                 _resourceService.Save(relativePath, _activeEditor!.Asset);
+                _activeEditor.History.MarkSaved();
                 _activeEditor!.Title = relativePath;
                 _tracking[_activeEditor!] = (relativePath, EditorState.Default);
                 Logger.Information("Saved {0} as {1}", _activeEditor!, relativePath);
@@ -259,6 +263,7 @@ public partial class EditorService
             !_resourceService.IsReadonlyPath(tracking.Path))
         {
             _resourceService.Save(tracking.Path, editor.Asset);
+            editor.History.MarkSaved();
             _tracking[editor] = (tracking.Path, EditorState.Default);
             Logger.Information("Saving {0}", editor);
             UpdateFlags();

@@ -1,6 +1,9 @@
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FezEditor.Services;
 using FezEditor.Tools;
 
 namespace FezEditor.Structure;
@@ -16,13 +19,17 @@ public class History : IDisposable
 
     private static readonly Change EmptyChange = new(string.Empty, string.Empty);
 
-    private const int MaxHistorySize = byte.MaxValue;
+    private readonly string _sessionDirectory = AppStorageService.CreateHistorySessionDirectory();
 
-    private readonly LinkedList<UndoOperation> _undoStack = new();
+    private readonly Dictionary<string, int> _chunkReferences = new(StringComparer.Ordinal);
 
-    private readonly LinkedList<UndoOperation> _redoStack = new();
+    private readonly FastCdc _chunker = new();
 
-    private object _tracked = null!;
+    private object? _tracked;
+
+    private HistoryNode? _current;
+
+    private HistoryNode? _saved;
 
     private Type TrackedType
     {
@@ -37,22 +44,31 @@ public class History : IDisposable
         }
     }
 
-    public bool CanUndo => _undoStack.Count > 0;
+    public bool CanUndo => _current?.Parent != null;
 
-    public bool CanRedo => _redoStack.Count > 0;
+    public bool CanRedo => _current?.Child != null;
+
+    public bool HasUnsavedChanges => _current != _saved;
 
     public event Action<Change>? StateChanged;
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _undoStack.Clear();
-        _redoStack.Clear();
+        _current = null;
+        _saved = null;
+
+        if (Directory.Exists(_sessionDirectory))
+        {
+            Directory.Delete(_sessionDirectory, true);
+        }
     }
 
     public void Track(object target)
     {
         _tracked = target;
+        ResetRoot();
+        _saved = _current;
     }
 
     public IDisposable BeginScope(string name)
@@ -67,18 +83,12 @@ public class History : IDisposable
             return;
         }
 
-        var after = _undoStack.Last!.Value;
-        _undoStack.RemoveLast();
-
-        var before = CaptureState(after.Name);
-        _redoStack.AddLast(before);
-        if (_redoStack.Count > MaxHistorySize)
-        {
-            _redoStack.RemoveFirst();
-        }
+        var before = _current!;
+        var after = before.Parent!;
+        _current = after;
 
         Restore(after);
-        StateChanged?.Invoke(new Change(before.Json, after.Json));
+        StateChanged?.Invoke(new Change(ReadJson(before), ReadJson(after)));
     }
 
     public void Redo()
@@ -88,36 +98,61 @@ public class History : IDisposable
             return;
         }
 
-        var after = _redoStack.Last!.Value;
-        _redoStack.RemoveLast();
-
-        var before = CaptureState(after.Name);
-        _undoStack.AddLast(before);
-        if (_undoStack.Count > MaxHistorySize)
-        {
-            _undoStack.RemoveFirst();
-        }
+        var before = _current!;
+        var after = before.Child!;
+        _current = after;
 
         Restore(after);
-        StateChanged?.Invoke(new Change(before.Json, after.Json));
+        StateChanged?.Invoke(new Change(ReadJson(before), ReadJson(after)));
     }
 
     public void Clear()
     {
-        _undoStack.Clear();
-        _redoStack.Clear();
+        ResetRoot();
+        _saved = _current;
         StateChanged?.Invoke(EmptyChange);
     }
 
-    private UndoOperation CaptureState(string name)
+    public void MarkSaved()
     {
-        var json = JsonSerializer.Serialize(_tracked, TrackedType, JsonOptions);
-        return new UndoOperation(name, json);
+        _saved = _current;
     }
 
-    private void Restore(UndoOperation op)
+    private HistoryNode CaptureState(string name, HistoryNode? parent)
     {
-        var restored = JsonSerializer.Deserialize(op.Json, TrackedType, JsonOptions)!;
+        var chunks = new List<string>();
+        var stream = new ChunkingStream(_chunker, bytes =>
+        {
+            var hash = Convert.ToHexString(SHA256.HashData(bytes.Span)).ToLowerInvariant();
+            var path = GetChunkPath(hash);
+
+            if (!File.Exists(path))
+            {
+                File.WriteAllBytes(path, bytes.Span);
+            }
+
+            _chunkReferences.TryGetValue(hash, out var references);
+            _chunkReferences[hash] = references + 1;
+            chunks.Add(hash);
+        });
+
+        try
+        {
+            JsonSerializer.Serialize(stream, _tracked, TrackedType, JsonOptions);
+            stream.Complete();
+            return new HistoryNode(name, new Snapshot(checked((int)stream.Length), chunks), parent);
+        }
+        catch
+        {
+            _chunker.Reset();
+            Release(chunks);
+            throw;
+        }
+    }
+
+    private void Restore(HistoryNode node)
+    {
+        var restored = JsonSerializer.Deserialize(ReadBytes(node), TrackedType, JsonOptions)!;
         foreach (var property in TrackedType.GetProperties())
         {
             if (property is { CanRead: true, CanWrite: true } &&
@@ -137,21 +172,77 @@ public class History : IDisposable
         }
     }
 
-    private void Push(UndoOperation before, UndoOperation after)
+    private void Push(HistoryNode before, HistoryNode after)
     {
-        if (before.Json.Equals(after.Json))
+        if (before.Snapshot.Length == after.Snapshot.Length && before.Snapshot.Chunks.SequenceEqual(after.Snapshot.Chunks))
         {
+            Release(after.Snapshot.Chunks);
             return;
         }
 
-        _undoStack.AddLast(before);
-        if (_undoStack.Count > MaxHistorySize)
+        DeleteBranch(before.Child);
+        before.Child = after;
+        _current = after;
+        StateChanged?.Invoke(new Change(ReadJson(before), ReadJson(after)));
+    }
+
+    private void ResetRoot()
+    {
+        if (Directory.Exists(_sessionDirectory)) Directory.Delete(_sessionDirectory, true);
+        Directory.CreateDirectory(_sessionDirectory);
+        _chunkReferences.Clear();
+        _current = _tracked == null ? null : CaptureState("Initial", null);
+    }
+
+    private void DeleteBranch(HistoryNode? node)
+    {
+        while (node != null)
         {
-            _undoStack.RemoveFirst();
+            Release(node.Snapshot.Chunks);
+            node = node.Child;
+        }
+    }
+
+    private byte[] ReadBytes(HistoryNode node)
+    {
+        var result = new byte[node.Snapshot.Length];
+        var offset = 0;
+
+        foreach (var hash in node.Snapshot.Chunks)
+        {
+            var bytes = File.ReadAllBytes(GetChunkPath(hash));
+            bytes.CopyTo(result, offset);
+            offset += bytes.Length;
         }
 
-        _redoStack.Clear();
-        StateChanged?.Invoke(new Change(before.Json, after.Json));
+        return result;
+    }
+
+    private string ReadJson(HistoryNode node)
+    {
+        return Encoding.UTF8.GetString(ReadBytes(node));
+    }
+
+    private void Release(IEnumerable<string> hashes)
+    {
+        foreach (var hash in hashes)
+        {
+            var references = _chunkReferences[hash] - 1;
+            if (references == 0)
+            {
+                _chunkReferences.Remove(hash);
+                File.Delete(GetChunkPath(hash));
+            }
+            else
+            {
+                _chunkReferences[hash] = references;
+            }
+        }
+    }
+
+    private string GetChunkPath(string hash)
+    {
+        return Path.Combine(_sessionDirectory, hash);
     }
 
     public sealed record Change(string BeforeJson, string AfterJson);
@@ -160,14 +251,18 @@ public class History : IDisposable
     {
         private readonly History _service;
 
-        private readonly UndoOperation _before;
+        private readonly HistoryNode _before;
+
+        private readonly string _name;
 
         private bool _disposed;
 
         internal Scope(History service, string name)
         {
             _service = service;
-            _before = service.CaptureState(name);
+            _before = service._current ??
+                      throw new InvalidOperationException("Cannot use history before tracking an object!");
+            _name = name;
         }
 
         public void Dispose()
@@ -178,10 +273,95 @@ public class History : IDisposable
             }
 
             _disposed = true;
-            var after = _service.CaptureState(_before.Name);
+            var after = _service.CaptureState(_name, _before);
             _service.Push(_before, after);
         }
     }
 
-    private sealed record UndoOperation(string Name, string Json);
+    private sealed class HistoryNode(string name, Snapshot snapshot, HistoryNode? parent)
+    {
+        public string Name { get; } = name;
+
+        public Snapshot Snapshot { get; } = snapshot;
+
+        public HistoryNode? Parent { get; } = parent;
+
+        public HistoryNode? Child { get; set; }
+    }
+
+    private sealed record Snapshot(int Length, IReadOnlyList<string> Chunks);
+
+    private sealed class ChunkingStream(FastCdc chunker, Action<ReadOnlyMemory<byte>> emit) : Stream
+    {
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => !_completed;
+
+        public override long Length => _length;
+
+        private bool _completed;
+
+        private long _length;
+
+        public override long Position
+        {
+            get => _length;
+            set => throw new NotSupportedException();
+        }
+
+        public void Complete()
+        {
+            if (_completed)
+            {
+                return;
+            }
+
+            chunker.Complete(WriteChunk);
+            _completed = true;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            Write(buffer.AsSpan(offset, count));
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            ObjectDisposedException.ThrowIf(_completed, this);
+            chunker.Append(buffer, WriteChunk);
+        }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Write(buffer.Span);
+            return ValueTask.CompletedTask;
+        }
+
+        private void WriteChunk(ReadOnlyMemory<byte> bytes)
+        {
+            _length += bytes.Length;
+            emit(bytes);
+        }
+    }
 }

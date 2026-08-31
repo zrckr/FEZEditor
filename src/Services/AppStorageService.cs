@@ -15,6 +15,8 @@ public class AppStorageService : IDisposable
 
     private static readonly string CacheDir = Path.Combine(BaseDir, "Cache");
 
+    private static readonly string HistoryDir = Path.Combine(BaseDir, "History");
+
     private static readonly ILogger Logger = Log.ForContext<AppStorageService>();
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -72,6 +74,7 @@ public class AppStorageService : IDisposable
     public AppStorageService(FezEditor editor)
     {
         Directory.CreateDirectory(CacheDir);
+        ClearAbandonedHistory();
         Load();
         LoadWindowState();
     }
@@ -190,6 +193,14 @@ public class AppStorageService : IDisposable
         }
     }
 
+    public static string CreateHistorySessionDirectory()
+    {
+        Directory.CreateDirectory(HistoryDir);
+        var path = Path.Combine(HistoryDir, DateTime.UtcNow.Ticks.ToString());
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
     public static bool HasCacheFile(string filename)
     {
         return File.Exists(Path.Combine(CacheDir, filename));
@@ -289,6 +300,21 @@ public class AppStorageService : IDisposable
         catch (Exception e)
         {
             Logger.Error(e, "Unable to save application data");
+        }
+    }
+
+    private static void ClearAbandonedHistory()
+    {
+        if (Directory.Exists(HistoryDir))
+        {
+            try
+            {
+                Directory.Delete(HistoryDir, true);
+            }
+            catch (Exception e)
+            {
+                Logger.Warning(e, "Unable to clear abandoned history data.");
+            }
         }
     }
 
