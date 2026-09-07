@@ -27,9 +27,7 @@ public static class RepackerExtensions
         var format = (SurfaceFormat)texture.Format; // formats used by FEZ do overlap - direct conversion is good enough
         var gd = FezEditor.DeviceManager.GraphicsDevice;
         var tex2D = new Texture2D(gd, texture.Width, texture.Height, false, format);
-        var data = new byte[texture.TextureData.Length];
-        Buffer.BlockCopy(texture.TextureData, 0, data, 0, texture.TextureData.Length);
-        tex2D.SetData(data);
+        tex2D.SetData(texture.TextureData);
         return tex2D;
     }
 
@@ -37,9 +35,7 @@ public static class RepackerExtensions
     {
         var gd = FezEditor.DeviceManager.GraphicsDevice;
         var tex2D = new Texture2D(gd, texture.AtlasWidth, texture.AtlasHeight, false, SurfaceFormat.Color);
-        var data = new byte[texture.TextureData.Length];
-        Buffer.BlockCopy(texture.TextureData, 0, data, 0, texture.TextureData.Length);
-        tex2D.SetData(data);
+        tex2D.SetData(texture.TextureData);
         return tex2D;
     }
 
@@ -58,7 +54,7 @@ public static class RepackerExtensions
             throw new FormatException($"Cannot extract color layer from Texture2D with format {sourceTexture.Format}");
         }
 
-        var rgba = new byte[texture.Width * texture.Height * 4];
+        var rgba = GC.AllocateUninitializedArray<byte>(texture.Width * texture.Height * 4);
         Buffer.BlockCopy(sourceTexture.TextureData, 0, rgba, 0, rgba.Length);
         for (var i = 3; i < rgba.Length; i += 4)
         {
