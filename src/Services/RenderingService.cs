@@ -269,5 +269,5 @@ public partial class RenderingService : IDisposable
         return false;
     }
 
-    private record InstanceMatrices(Matrix World, Matrix View, Matrix Projection, Matrix ViewProjection);
+    private readonly record struct InstanceMatrices(Matrix World, Matrix View, Matrix Projection, Matrix ViewProjection);
 }

@@ -1,4 +1,5 @@
-﻿using FezEditor.Structure;
+﻿using System.Diagnostics;
+using FezEditor.Structure;
 using Microsoft.Xna.Framework;
 
 namespace FezEditor.Services;
@@ -22,6 +23,8 @@ public partial class RenderingService
     private readonly Dictionary<Rid, InstanceData> _instances = new();
 
     private readonly Stack<InstanceData> _transformChain = new();
+
+    private readonly Stack<Rid> _instanceStack = new();
 
     public Rid InstanceCreate(Rid parent)
     {
@@ -160,12 +163,12 @@ public partial class RenderingService
 
     private void MarkWorldMatrixDirty(Rid instanceRid)
     {
-        var stack = new Stack<Rid>();
-        stack.Push(instanceRid);
+        Debug.Assert(_instanceStack.Count == 0);
+        _instanceStack.Push(instanceRid);
 
-        while (stack.Count > 0)
+        while (_instanceStack.Count > 0)
         {
-            var rid = stack.Pop();
+            var rid = _instanceStack.Pop();
             var instance = GetResource(_instances, rid);
             if (instance.WorldMatrix.IsDirty)
             {
@@ -175,7 +178,7 @@ public partial class RenderingService
             instance.WorldMatrix = instance.WorldMatrix.Marked();
             foreach (var childRid in instance.Children)
             {
-                stack.Push(childRid);
+                _instanceStack.Push(childRid);
             }
         }
     }
@@ -231,17 +234,17 @@ public partial class RenderingService
             parent!.Children.Remove(instance);
         }
 
-        var stack = new Stack<Rid>();
-        stack.Push(instance);
+        Debug.Assert(_instanceStack.Count == 0);
+        _instanceStack.Push(instance);
 
-        while (stack.Count > 0)
+        while (_instanceStack.Count > 0)
         {
-            var rid = stack.Pop();
+            var rid = _instanceStack.Pop();
             if (_instances.Remove(rid, out var data))
             {
                 foreach (var childRid in data.Children)
                 {
-                    stack.Push(childRid);
+                    _instanceStack.Push(childRid);
                 }
             }
         }
