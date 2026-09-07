@@ -118,6 +118,69 @@ public class History : IDisposable
         _saved = _current;
     }
 
+    public IEnumerable<Entry> GetEntries()
+    {
+        if (_current == null)
+        {
+            yield break;
+        }
+
+        var root = _current;
+        while (root.Parent != null)
+        {
+            root = root.Parent;
+        }
+
+        var isRedo = false;
+        var index = 0;
+
+        for (var node = root; node != null; node = node.Child, index++)
+        {
+            var state = node == _current
+                ? EntryState.Current
+                : isRedo
+                    ? EntryState.Redo
+                    : EntryState.Undo;
+
+            if (node == _saved)
+            {
+                state |= EntryState.Saved;
+            }
+
+            yield return new Entry(index, node.Name, node.Timestamp, state);
+            isRedo |= node == _current;
+        }
+    }
+
+    public void JumpToEntry(int index)
+    {
+        if (_current == null || index < 0)
+        {
+            return;
+        }
+
+        var target = _current;
+        while (target.Parent != null)
+        {
+            target = target.Parent;
+        }
+
+        for (var i = 0; i < index && target != null; i++)
+        {
+            target = target.Child;
+        }
+
+        if (target == null || target == _current)
+        {
+            return;
+        }
+
+        var before = _current;
+        _current = target;
+        Restore(target);
+        StateChanged?.Invoke(new Change(ReadJson(before), ReadJson(target)));
+    }
+
     private HistoryNode CaptureState(string name, HistoryNode? parent)
     {
         var chunks = new List<string>();
@@ -140,7 +203,7 @@ public class History : IDisposable
         {
             JsonSerializer.Serialize(stream, _tracked, TrackedType, JsonOptions);
             stream.Complete();
-            return new HistoryNode(name, new Snapshot(checked((int)stream.Length), chunks), parent);
+            return new HistoryNode(name, DateTime.UtcNow, new Snapshot(checked((int)stream.Length), chunks), parent);
         }
         catch
         {
@@ -174,7 +237,8 @@ public class History : IDisposable
 
     private void Push(HistoryNode before, HistoryNode after)
     {
-        if (before.Snapshot.Length == after.Snapshot.Length && before.Snapshot.Chunks.SequenceEqual(after.Snapshot.Chunks))
+        if (before.Snapshot.Length == after.Snapshot.Length &&
+            before.Snapshot.Chunks.SequenceEqual(after.Snapshot.Chunks))
         {
             Release(after.Snapshot.Chunks);
             return;
@@ -247,6 +311,17 @@ public class History : IDisposable
 
     public sealed record Change(string BeforeJson, string AfterJson);
 
+    [Flags]
+    public enum EntryState
+    {
+        Undo = 0,
+        Current = 1 << 0,
+        Redo = 1 << 1,
+        Saved = 1 << 2
+    }
+
+    public readonly record struct Entry(int Index, string Name, DateTime Timestamp, EntryState State);
+
     private sealed class Scope : IDisposable
     {
         private readonly History _service;
@@ -278,9 +353,11 @@ public class History : IDisposable
         }
     }
 
-    private sealed class HistoryNode(string name, Snapshot snapshot, HistoryNode? parent)
+    private sealed class HistoryNode(string name, DateTime timestamp, Snapshot snapshot, HistoryNode? parent)
     {
         public string Name { get; } = name;
+
+        public DateTime Timestamp { get; } = timestamp;
 
         public Snapshot Snapshot { get; } = snapshot;
 

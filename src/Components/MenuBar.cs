@@ -19,6 +19,8 @@ public class MenuBar : DrawableGameComponent
 
     private readonly ReferencesWindow _referencesWindow;
 
+    private readonly HistoryWindow _historyWindow;
+
     private readonly EditorService _editorService;
 
     private readonly ResourceService _resourceService;
@@ -41,6 +43,7 @@ public class MenuBar : DrawableGameComponent
     {
         game.AddComponent(_confirmWindow = new ConfirmWindow(game));
         game.AddComponent(_referencesWindow = new ReferencesWindow(game));
+        game.AddComponent(_historyWindow = new HistoryWindow(game));
         _editorService = game.GetService<EditorService>();
         _resourceService = game.GetService<ResourceService>();
         _inputService = game.GetService<InputService>();
@@ -57,6 +60,7 @@ public class MenuBar : DrawableGameComponent
         _resourceService.ModOpenedFirstTime -= OnModOpenedFirstTime;
         _confirmWindow.Dispose();
         _referencesWindow.Dispose();
+        _historyWindow.Dispose();
         _aboutWindow?.Dispose();
     }
 
@@ -209,6 +213,12 @@ public class MenuBar : DrawableGameComponent
 
             if (ImGui.BeginMenu("Editor"))
             {
+                ImGui.SeparatorText("History");
+                if (ImGui.MenuItem("History", null, _historyWindow.IsOpen))
+                {
+                    _historyWindow.Toggle();
+                }
+
                 if (_resourceService.GetModReferencePaths().Count > 0)
                 {
                     ImGui.SeparatorText("Mod");
