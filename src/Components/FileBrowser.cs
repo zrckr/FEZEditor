@@ -625,7 +625,7 @@ public class FileBrowser : DrawableGameComponent
 
     public void RegenerateThumbnails()
     {
-        AppStorageService.ClearCache();
+        AppStorageService.ClearThumbs();
         UpdateNodeTree();
     }
 

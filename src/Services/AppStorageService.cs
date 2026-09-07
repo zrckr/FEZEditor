@@ -13,7 +13,7 @@ public class AppStorageService : IDisposable
 {
     public static readonly string BaseDir = Path.Combine(AppContext.BaseDirectory, "EditorData");
 
-    private static readonly string CacheDir = Path.Combine(BaseDir, "Cache");
+    private static readonly string ThumbsDir = Path.Combine(BaseDir, "Thumbs");
 
     private static readonly string HistoryDir = Path.Combine(BaseDir, "History");
 
@@ -71,9 +71,9 @@ public class AppStorageService : IDisposable
 
     private Settings _data = new();
 
-    public AppStorageService(FezEditor editor)
+    public AppStorageService()
     {
-        Directory.CreateDirectory(CacheDir);
+        Directory.CreateDirectory(ThumbsDir);
         ClearAbandonedHistory();
         Load();
         LoadWindowState();
@@ -82,7 +82,6 @@ public class AppStorageService : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        ThumbnailDatabase.Flush();
         SaveWindowState();
         Save();
     }
@@ -184,10 +183,10 @@ public class AppStorageService : IDisposable
         }
     }
 
-    public static void ClearCache()
+    public static void ClearThumbs()
     {
-        ThumbnailDatabase.Reset();
-        foreach (var file in Directory.GetFiles(CacheDir))
+        Thumbnailer.ResetDirty();
+        foreach (var file in Directory.GetFiles(ThumbsDir))
         {
             File.Delete(file);
         }
@@ -201,74 +200,21 @@ public class AppStorageService : IDisposable
         return path;
     }
 
-    public static bool HasCacheFile(string filename)
+    public static bool HasThumb(string filename)
     {
-        return File.Exists(Path.Combine(CacheDir, filename));
+        return File.Exists(Path.Combine(ThumbsDir, filename));
     }
 
-    public static void SaveToCache(string filename, Stream stream)
+    public static bool SaveThumb(string filename, Stream stream)
     {
+        var path = Path.Combine(ThumbsDir, filename);
+        var temporaryPath = path + $".{Guid.NewGuid():N}.tmp";
         try
         {
-            using var file = new FileStream(Path.Combine(CacheDir, filename), FileMode.Create, FileAccess.Write);
-            stream.Seek(0, SeekOrigin.Begin);
-            stream.CopyTo(file);
-        }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Unable to save cache binary data.");
-        }
-    }
-
-    public static Stream LoadFromCache(string filename)
-    {
-        var memory = new MemoryStream();
-        try
-        {
-            using var stream = new FileStream(Path.Combine(CacheDir, filename), FileMode.Open, FileAccess.Read);
-            stream.Seek(0, SeekOrigin.Begin);
-            stream.CopyTo(memory);
-        }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Unable to read cache binary data.");
-        }
-
-        memory.Seek(0, SeekOrigin.Begin);
-        return memory;
-    }
-
-    public static bool TryLoadCacheJson<T>(string filename, out T? value)
-    {
-        value = default;
-        var path = Path.Combine(CacheDir, filename);
-        if (!File.Exists(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            value = JsonSerializer.Deserialize<T>(file, JsonOptions);
-            return value != null;
-        }
-        catch (Exception e)
-        {
-            Logger.Warning(e, "Unable to read cache database {0}", filename);
-            return false;
-        }
-    }
-
-    public static bool SaveCacheJson<T>(string filename, T value)
-    {
-        var path = Path.Combine(CacheDir, filename);
-        var temporaryPath = path + ".tmp";
-        try
-        {
-            using (var file = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var file = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                JsonSerializer.Serialize(file, value, JsonOptions);
+                stream.Seek(0, SeekOrigin.Begin);
+                stream.CopyTo(file);
             }
 
             File.Move(temporaryPath, path, true);
@@ -276,18 +222,28 @@ public class AppStorageService : IDisposable
         }
         catch (Exception e)
         {
-            Logger.Error(e, "Unable to save cache database {0}", filename);
-            try
-            {
-                File.Delete(temporaryPath);
-            }
-            catch
-            {
-                // Preserve the original persistence error.
-            }
-
+            Logger.Error(e, "Unable to save thumb data.");
+            File.Delete(temporaryPath);
             return false;
         }
+    }
+
+    public static Stream LoadThumb(string filename)
+    {
+        var memory = new MemoryStream();
+        try
+        {
+            using var stream = new FileStream(Path.Combine(ThumbsDir, filename), FileMode.Open, FileAccess.Read);
+            stream.Seek(0, SeekOrigin.Begin);
+            stream.CopyTo(memory);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Unable to read thumb data.");
+        }
+
+        memory.Seek(0, SeekOrigin.Begin);
+        return memory;
     }
 
     private void Save()

@@ -216,11 +216,6 @@ internal class DirResourceProvider : IResourceProvider
         return new DirectoryInfo(dir).EnumerateFiles(prefix + ".*");
     }
 
-    public DateTime GetLastWriteTimeUtc(string path)
-    {
-        return _entries.TryGetValue(path, out var info) ? info.LastWriteTimeUtc : DateTime.MinValue;
-    }
-
     public void Refresh()
     {
         _entries.Clear();

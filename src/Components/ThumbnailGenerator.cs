@@ -1,4 +1,4 @@
-﻿using FezEditor.Services;
+using FezEditor.Services;
 using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.ArtObject;
@@ -16,11 +16,11 @@ public class ThumbnailGenerator : DrawableGameComponent
 {
     private static readonly ILogger Logger = Log.ForContext<ThumbnailGenerator>();
 
+    private static readonly Dictionary<CollisionType, RTexture2D> CollisionTextures = new();
+
     private readonly ResourceService _resources;
 
     private readonly StatusService _statusService;
-
-    private static readonly Dictionary<CollisionType, RTexture2D> CollisionTextures = new();
 
     private CancellationTokenSource? _cts;
 
@@ -103,93 +103,46 @@ public class ThumbnailGenerator : DrawableGameComponent
 
     private void ProcessInternal(CancellationToken ct)
     {
-        var providerRoot = _resources.RootPath;
-        var previousSources = ThumbnailDatabase.GetProviderSources(providerRoot);
-        var sources = new Dictionary<string, ThumbnailDatabase.SourceRecord>(StringComparer.OrdinalIgnoreCase);
         var entries = new Queue<Entry>();
-        var pending = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var npcFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var files = _resources.Files.ToArray();
 
         foreach (var file in files)
         {
             ct.ThrowIfCancellationRequested();
-            var extension = string.Empty;
             try
             {
-                extension = _resources.GetExtension(file);
+                var extension = _resources.GetExtension(file);
                 if (file.StartsWith("Trile Sets/", StringComparison.OrdinalIgnoreCase) ||
                     extension.Equals(".fezts.glb", StringComparison.OrdinalIgnoreCase))
                 {
-                    var lastWrite = _resources.GetLastWriteTimeUtc(file);
-                    var sourceKey = GetSourceKey(file, AssetType.Trile);
-                    List<string> thumbnailPaths;
-                    if (previousSources.TryGetValue(sourceKey, out var previous) &&
-                        previous.LastWrite == lastWrite)
+                    var trileNames = _resources.GetTrileSetList(file);
+                    foreach (var name in trileNames.Values)
                     {
-                        thumbnailPaths = previous.ThumbnailPaths;
+                        EnqueueIfNeeded(entries, new Entry(file, AssetType.Trile, name));
                     }
-                    else
-                    {
-                        var trileNames = _resources.GetTrileSetList(file);
-                        thumbnailPaths = trileNames.Values
-                            .Select(name => new Entry(file, AssetType.Trile, lastWrite, sourceKey, name).CachePath)
-                            .ToList();
-                    }
-
-                    AddSource(previousSources, sources, entries, pending, sourceKey, file,
-                        AssetType.Trile, lastWrite, thumbnailPaths);
                 }
                 else if (file.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase) ||
                          extension.Equals(".fezao.glb", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!extension.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
                     {
-                        AddSingleSource(previousSources, sources, entries, pending, file,
-                            AssetType.ArtObject, _resources.GetLastWriteTimeUtc(file));
+                        EnqueueIfNeeded(entries, new Entry(file, AssetType.ArtObject));
                     }
                 }
                 else if (file.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
                 {
-                    AddSingleSource(previousSources, sources, entries, pending, file,
-                        AssetType.BackgroundPlane, _resources.GetLastWriteTimeUtc(file));
+                    EnqueueIfNeeded(entries, new Entry(file, AssetType.BackgroundPlane));
                 }
-                else if (file.StartsWith("Character Animations/", StringComparison.OrdinalIgnoreCase) &&
-                         !file.Contains("Metadata", StringComparison.OrdinalIgnoreCase))
+                else if (!file.Contains("Metadata", StringComparison.OrdinalIgnoreCase) &&
+                         TryGetNpcFolder(file, out var folder) && npcFolders.Add(folder))
                 {
-                    var remainder = file["Character Animations/".Length..];
-                    var slashIndex = remainder.IndexOf('/');
-                    if (slashIndex >= 0)
-                    {
-                        var folder = $"Character Animations/{remainder[..slashIndex]}";
-                        if (npcFolders.Add(folder))
-                        {
-                            var prefix = folder + "/";
-                            var lastWrite = files
-                                .Where(candidate => candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                                .Select(_resources.GetLastWriteTimeUtc)
-                                .DefaultIfEmpty(DateTime.MinValue)
-                                .Max();
-                            AddSingleSource(previousSources, sources, entries, pending, folder,
-                                AssetType.NonPlayableCharacter, lastWrite);
-                        }
-                    }
+                    EnqueueIfNeeded(entries, new Entry(folder, AssetType.NonPlayableCharacter));
                 }
             }
             catch (Exception ex)
             {
                 Logger.Warning(ex, "Failed to inspect thumbnail source {0}", file);
-                var type = GetAssetType(file, extension);
-                if (type.HasValue)
-                {
-                    var sourceKey = GetSourceKey(file, type.Value);
-                    sources[sourceKey] = new ThumbnailDatabase.SourceRecord
-                    {
-                        LastWrite = _resources.GetLastWriteTimeUtc(file),
-                        Complete = true,
-                        Failed = true
-                    };
-                }
             }
         }
 
@@ -197,8 +150,6 @@ public class ThumbnailGenerator : DrawableGameComponent
         var total = entries.Count;
         if (total == 0)
         {
-            ThumbnailDatabase.SetProviderSources(providerRoot, sources);
-            ThumbnailDatabase.Flush();
             return;
         }
 
@@ -206,31 +157,27 @@ public class ThumbnailGenerator : DrawableGameComponent
         TrileSet? cachedTrileSet = null;
         string? cachedTrileSetPath = null;
 
-        try
+        while (entries.Count > 0)
         {
-            while (entries.Count > 0)
+            ct.ThrowIfCancellationRequested();
+            var entry = entries.Dequeue();
+            try
             {
-                ct.ThrowIfCancellationRequested();
-                var entry = entries.Dequeue();
-                try
+                var cachePath = entry.CachePath;
+                var cacheProbe = new Thumbnailer(cachePath);
+                if (!cacheProbe.NeedsGeneration())
                 {
-                    var lastWrite = entry.LastWrite;
-                    var cachePath = entry.CachePath;
+                    Logger.Debug("Thumbnail for {0} already cached", cachePath);
+                    continue;
+                }
 
-                    var cacheProbe = new Thumbnailer(cachePath, lastWrite);
-                    if (cacheProbe.IsCacheCurrent())
-                    {
-                        Logger.Debug("Thumbnail for {0} already cached", cachePath);
-                        continue;
-                    }
-
-                    Thumbnailer? thumbnailer = null;
-                    switch (entry.Type)
-                    {
+                Thumbnailer? thumbnailer = null;
+                switch (entry.Type)
+                {
                     case AssetType.ArtObject:
                         {
                             var ao = _resources.Load<ArtObject>(entry.Path);
-                            thumbnailer = new Thumbnailer(cachePath, lastWrite, ao);
+                            thumbnailer = new Thumbnailer(cachePath, ao);
                             break;
                         }
 
@@ -251,12 +198,12 @@ public class ThumbnailGenerator : DrawableGameComponent
 
                             if (!trile.Geometry.IsNullOrEmpty())
                             {
-                                thumbnailer = new Thumbnailer(cachePath, lastWrite, trile, cachedTrileSet.TextureAtlas);
+                                thumbnailer = new Thumbnailer(cachePath, trile, cachedTrileSet.TextureAtlas);
                             }
                             else if (trile.Faces.TryGetValue(FaceOrientation.Front, out var collisionType) &&
                                      CollisionTextures.TryGetValue(collisionType, out var collisionTex))
                             {
-                                thumbnailer = new Thumbnailer(cachePath, lastWrite, collisionTex);
+                                thumbnailer = new Thumbnailer(cachePath, collisionTex);
                             }
 
                             break;
@@ -267,11 +214,11 @@ public class ThumbnailGenerator : DrawableGameComponent
                             var asset = _resources.Load<object>(entry.Path);
                             if (asset is RAnimatedTexture anim)
                             {
-                                thumbnailer = new Thumbnailer(cachePath, lastWrite, anim);
+                                thumbnailer = new Thumbnailer(cachePath, anim);
                             }
                             else if (asset is RTexture2D tex)
                             {
-                                thumbnailer = new Thumbnailer(cachePath, lastWrite, tex);
+                                thumbnailer = new Thumbnailer(cachePath, tex);
                             }
 
                             break;
@@ -280,28 +227,10 @@ public class ThumbnailGenerator : DrawableGameComponent
                     case AssetType.NonPlayableCharacter:
                         {
                             var animations = _resources.LoadAnimations(entry.Path);
-
-                            RAnimatedTexture? selected = null;
-                            if (animations.TryGetValue("IdleWink", out var idleWink))
-                            {
-                                selected = idleWink;
-                            }
-                            else if (animations.TryGetValue("Idle", out var idle))
-                            {
-                                selected = idle;
-                            }
-                            else if (animations.TryGetValue("Walk", out var walk))
-                            {
-                                selected = walk;
-                            }
-                            else if (animations.Count > 0)
-                            {
-                                selected = animations.Values.First();
-                            }
-
+                            var selected = SelectNpcAnimation(animations);
                             if (selected != null)
                             {
-                                thumbnailer = new Thumbnailer(cachePath, lastWrite, selected);
+                                thumbnailer = new Thumbnailer(cachePath, selected);
                             }
 
                             break;
@@ -309,134 +238,91 @@ public class ThumbnailGenerator : DrawableGameComponent
 
                     default:
                         throw new InvalidOperationException();
-                    }
-
-                    if (thumbnailer != null)
-                    {
-                        var thumbnail = thumbnailer.Generate();
-                        thumbnailer.Save(thumbnail);
-                    }
-                    else
-                    {
-                        sources[entry.SourceKey].Failed = true;
-                    }
                 }
-                catch (Exception e)
-                {
-                    Logger.Warning(e, "Failed to generate thumbnail for {0}", entry.CachePath);
-                    sources[entry.SourceKey].Failed = true;
-                }
-                finally
-                {
-                    if (--pending[entry.SourceKey] == 0)
-                    {
-                        sources[entry.SourceKey].Complete = true;
-                    }
 
-                    processed++;
-                    ReportProgress(activity, processed, total);
+                if (thumbnailer != null)
+                {
+                    var thumbnail = thumbnailer.Generate();
+                    thumbnailer.Save(thumbnail);
                 }
             }
-        }
-        finally
-        {
-            ThumbnailDatabase.SetProviderSources(providerRoot, sources);
-            ThumbnailDatabase.Flush();
-        }
-    }
-
-    private static void ReportProgress(StatusActivityHandle activity, int processed, int total)
-    {
-        var progress = total == 0 ? 1f : (float)processed / total;
-        activity.Report($"Generating thumbnails ({processed}/{total})", progress);
-    }
-
-    private static void AddSingleSource(
-        Dictionary<string, ThumbnailDatabase.SourceRecord> previousSources,
-        Dictionary<string, ThumbnailDatabase.SourceRecord> sources,
-        Queue<Entry> entries,
-        Dictionary<string, int> pending,
-        string path,
-        AssetType type,
-        DateTime lastWrite)
-    {
-        var sourceKey = GetSourceKey(path, type);
-        var thumbnailPath = new Entry(path, type, lastWrite, sourceKey).CachePath;
-        AddSource(previousSources, sources, entries, pending, sourceKey, path, type, lastWrite, [thumbnailPath]);
-    }
-
-    private static void AddSource(
-        Dictionary<string, ThumbnailDatabase.SourceRecord> previousSources,
-        Dictionary<string, ThumbnailDatabase.SourceRecord> sources,
-        Queue<Entry> entries,
-        Dictionary<string, int> pending,
-        string sourceKey,
-        string path,
-        AssetType type,
-        DateTime lastWrite,
-        List<string> thumbnailPaths)
-    {
-        var record = new ThumbnailDatabase.SourceRecord
-        {
-            LastWrite = lastWrite,
-            ThumbnailPaths = thumbnailPaths,
-            Complete = false
-        };
-        sources[sourceKey] = record;
-
-        var unchanged = previousSources.TryGetValue(sourceKey, out var previous) &&
-                        previous.LastWrite == lastWrite && previous.Complete;
-        if (unchanged && previous!.Failed)
-        {
-            record.Complete = true;
-            record.Failed = true;
-            return;
-        }
-
-        var stalePaths = thumbnailPaths
-            .Where(thumbnailPath => !unchanged || !new Thumbnailer(thumbnailPath, lastWrite).IsCacheCurrent())
-            .ToList();
-
-        if (stalePaths.Count == 0)
-        {
-            record.Complete = true;
-            return;
-        }
-
-        pending[sourceKey] = stalePaths.Count;
-        var basePath = new Entry(path, type, lastWrite, sourceKey).CachePath;
-        foreach (var thumbnailPath in stalePaths)
-        {
-            var trileName = type == AssetType.Trile ? thumbnailPath[(basePath.Length + 1)..] : null;
-            entries.Enqueue(new Entry(path, type, lastWrite, sourceKey, trileName));
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to generate thumbnail for {0}", entry.CachePath);
+            }
+            finally
+            {
+                processed++;
+                activity.Report($"Generating thumbnails ({processed}/{total})", (float)processed / total);
+            }
         }
     }
 
-    private static string GetSourceKey(string path, AssetType type)
+    private static RAnimatedTexture? SelectNpcAnimation(Dictionary<string, RAnimatedTexture> animations)
     {
-        return $"{type}:{path}".Replace('\\', '/').ToLowerInvariant();
+        if (animations.TryGetValue("IdleWink", out var idleWink)) return idleWink;
+        if (animations.TryGetValue("Idle", out var idle)) return idle;
+        if (animations.TryGetValue("Walk", out var walk)) return walk;
+        return animations.Count > 0 ? animations.Values.First() : null;
     }
 
-    private static AssetType? GetAssetType(string path, string extension)
+    private static void EnqueueIfNeeded(Queue<Entry> entries, Entry entry)
     {
-        if (path.StartsWith("Trile Sets/", StringComparison.OrdinalIgnoreCase) ||
-            extension.Equals(".fezts.glb", StringComparison.OrdinalIgnoreCase))
+        if (new Thumbnailer(entry.CachePath).NeedsGeneration())
         {
-            return AssetType.Trile;
+            entries.Enqueue(entry);
+        }
+    }
+
+    private static bool TryGetNpcFolder(string path, out string folder)
+    {
+        const string prefix = "Character Animations/";
+        if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var remainder = path[prefix.Length..];
+            var slashIndex = remainder.IndexOf('/');
+            if (slashIndex >= 0)
+            {
+                folder = prefix + remainder[..slashIndex];
+                return true;
+            }
         }
 
-        if (path.StartsWith("Art Objects/", StringComparison.OrdinalIgnoreCase) ||
-            extension.Equals(".fezao.glb", StringComparison.OrdinalIgnoreCase))
-        {
-            return AssetType.ArtObject;
-        }
+        folder = string.Empty;
+        return false;
+    }
 
-        if (path.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
+    internal static void MarkDirtyForSave(string path, object asset)
+    {
+        switch (asset)
         {
-            return AssetType.BackgroundPlane;
-        }
+            case ArtObject:
+                {
+                    Thumbnailer.MarkDirty(new Entry(path, AssetType.ArtObject).CachePath);
+                    break;
+                }
 
-        return null;
+            case TrileSet trileSet:
+                foreach (var trile in trileSet.Triles.Values)
+                {
+                    Thumbnailer.MarkDirty(new Entry(path, AssetType.Trile, trile.Name).CachePath);
+                }
+
+                break;
+
+            case RTexture2D:
+            case RAnimatedTexture:
+                if (path.StartsWith("Background Planes/", StringComparison.OrdinalIgnoreCase))
+                {
+                    Thumbnailer.MarkDirty(new Entry(path, AssetType.BackgroundPlane).CachePath);
+                }
+                else if (TryGetNpcFolder(path, out var folder))
+                {
+                    Thumbnailer.MarkDirty(new Entry(folder, AssetType.NonPlayableCharacter).CachePath);
+                }
+
+                break;
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -449,12 +335,7 @@ public class ThumbnailGenerator : DrawableGameComponent
         }
     }
 
-    private readonly record struct Entry(
-        string Path,
-        AssetType Type,
-        DateTime LastWrite,
-        string SourceKey,
-        string? TrileName = null)
+    private readonly record struct Entry(string Path, AssetType Type, string? TrileName = null)
     {
         public string CachePath
         {

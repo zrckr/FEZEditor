@@ -51,7 +51,7 @@ public sealed class InstanceThumbnails : IDisposable
             _ => throw new ArgumentOutOfRangeException(nameof(instance), instance, null)
         };
 
-        return Get(assetPath, instance is InstanceId.TrileBatch);
+        return Get(assetPath);
     }
 
     public Texture2D Get(AssetEntry entry)
@@ -65,10 +65,10 @@ public sealed class InstanceThumbnails : IDisposable
             _ => throw new ArgumentOutOfRangeException(nameof(entry), entry, null)
         };
 
-        return Get(assetPath, entry is AssetEntry.Trile);
+        return Get(assetPath);
     }
 
-    private Texture2D Get(string assetPath, bool fromTrileSet)
+    private Texture2D Get(string assetPath)
     {
         var thumbnail = SharedThumbnails.GetValueOrDefault(assetPath);
         if (thumbnail != null)
@@ -76,10 +76,7 @@ public sealed class InstanceThumbnails : IDisposable
             return thumbnail;
         }
 
-        var sourcePath = fromTrileSet ? "Trile Sets/" + _level.TrileSetName : assetPath;
-        var lastWrite = _resources.GetLastWriteTimeUtc(ResolveSourcePath(sourcePath));
-        var cacheProbe = new Thumbnailer(assetPath, lastWrite);
-
+        var cacheProbe = new Thumbnailer(assetPath);
         if (cacheProbe.TryLoad(out var cached) && cached != null)
         {
             thumbnail = RepackerExtensions.ConvertToTexture2D(cached);
@@ -88,26 +85,6 @@ public sealed class InstanceThumbnails : IDisposable
         }
 
         return _placeholder;
-    }
-
-    private string ResolveSourcePath(string canonicalPath)
-    {
-        if (_resources.Exists(canonicalPath))
-        {
-            return canonicalPath;
-        }
-
-        var slash = canonicalPath.IndexOf('/');
-        if (slash >= 0)
-        {
-            var unprefixedPath = canonicalPath[(slash + 1)..];
-            if (_resources.Exists(unprefixedPath))
-            {
-                return unprefixedPath;
-            }
-        }
-
-        return canonicalPath;
     }
 
     public void Dispose()

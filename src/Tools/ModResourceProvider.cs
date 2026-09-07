@@ -177,13 +177,6 @@ internal class ModResourceProvider : IResourceProvider
             : _inner.GetFullPath(resolved);
     }
 
-    public DateTime GetLastWriteTimeUtc(string path)
-    {
-        return TryGetProviderForPath(path, out var rp, out var resolved)
-            ? rp.GetLastWriteTimeUtc(resolved)
-            : DateTime.MinValue;
-    }
-
     public void Save<T>(string path, T asset) where T : class
     {
         if (path.StartsWith(ReferencesVirtualPathPrefix, StringComparison.OrdinalIgnoreCase))

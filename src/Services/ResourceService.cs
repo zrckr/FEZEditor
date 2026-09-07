@@ -198,14 +198,6 @@ public class ResourceService : IDisposable
         }
     }
 
-    public DateTime GetLastWriteTimeUtc(string path)
-    {
-        lock (_providerLock)
-        {
-            return _provider?.GetLastWriteTimeUtc(path) ?? DateTime.MinValue;
-        }
-    }
-
     public string GetRelativePath(string absolutePath)
     {
         var relative = Path.GetRelativePath(RootPath, absolutePath);
@@ -349,6 +341,7 @@ public class ResourceService : IDisposable
             _provider.Refresh();
         }
 
+        ThumbnailGenerator.MarkDirtyForSave(path, asset);
         ProviderChanged?.Invoke();
         Logger.Information("Saved - {0}", path);
     }
