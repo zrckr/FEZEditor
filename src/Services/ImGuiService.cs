@@ -35,7 +35,11 @@ public partial class ImGuiService : IDisposable
 
     private Texture2D _fontTexture = null!;
 
-    private readonly List<nint> _fontDataAllocations = [];
+    private readonly Dictionary<string, LanguageFont> _languageFonts = new();
+
+    private ImFontPtr _defaultFont;
+
+    private readonly List<GCHandle> _fontDataHandles = [];
 
     private readonly List<nint> _fontGlyphRangeAllocations = [];
 
@@ -62,6 +66,8 @@ public partial class ImGuiService : IDisposable
     private float _displayScale;
 
     private float? _pendingDisplayScale;
+
+    private bool _fontAtlasDirty;
 
     public ImGuiService(Game game)
     {
@@ -143,21 +149,31 @@ public partial class ImGuiService : IDisposable
             }
         }
 
-        if (_pendingDisplayScale.HasValue)
+        var scaleChanged = _pendingDisplayScale.HasValue;
+        if (scaleChanged)
         {
-            _displayScale = _pendingDisplayScale.Value;
+            _displayScale = _pendingDisplayScale!.Value;
             _pendingDisplayScale = null;
+            _fontAtlasDirty = true;
+        }
+
+        var io = ImGui.GetIO();
+        if (_fontAtlasDirty)
+        {
+            _fontAtlasDirty = false;
             if (UnbindTexture(_fontTexture))
             {
                 _fontTexture.Dispose();
             }
 
-            ImGui.GetIO().Fonts.Clear();
+            io.Fonts.Clear();
             BuildFontAtlas();
-            ApplyStyleScale();
+            if (scaleChanged)
+            {
+                ApplyStyleScale();
+            }
         }
 
-        var io = ImGui.GetIO();
         var delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
         io.DeltaTime = delta > 0f ? delta : FallbackFrameTime;
 
@@ -387,13 +403,10 @@ public partial class ImGuiService : IDisposable
     private unsafe void BuildFontAtlas()
     {
         var io = ImGui.GetIO();
-        LoadFont("Fonts/ProggyForever", io.Fonts.GetGlyphRangesDefault(), size: 13f);
+        _defaultFont = LoadFont("Fonts/ProggyForever", io.Fonts.GetGlyphRangesDefault(), size: 13f);
         LoadIconsFont("Fonts/Lucide", Lucide.IconMin, Lucide.IconMax, size: 16f, yOffset: 4f);
         LoadIconsFont("Fonts/AtIcons", AtIcons.IconMin, AtIcons.IconMax, size: 13f, yOffset: 0f);
-        ImGuiX.Fonts.NotoSans = LoadFont("Fonts/NotoSans", io.Fonts.GetGlyphRangesDefault(), size: 24f);
-        ImGuiX.Fonts.NotoSansJp = LoadFont("Fonts/NotoSansJP", io.Fonts.GetGlyphRangesJapanese(), size: 24f);
-        ImGuiX.Fonts.NotoSansKr = LoadFont("Fonts/NotoSansKR", io.Fonts.GetGlyphRangesKorean(), size: 24f);
-        ImGuiX.Fonts.NotoSansTc = LoadFont("Fonts/NotoSansTC", io.Fonts.GetGlyphRangesChineseFull(), size: 24f);
+        LoadLanguageFonts(size: 24f);
 
         io.Fonts.GetTexDataAsRGBA32(
             out byte* pixelData,
@@ -401,14 +414,60 @@ public partial class ImGuiService : IDisposable
             out var height,
             out var bytesPerPixel);
 
-        var pixels = new byte[width * height * bytesPerPixel];
-        Marshal.Copy(new IntPtr(pixelData), pixels, 0, pixels.Length);
+        io.Fonts.ClearInputData();
         FreeFontAtlasAllocations();
 
         _fontTexture = new Texture2D(_game.GraphicsDevice, width, height, false, SurfaceFormat.Color);
-        _fontTexture.SetData(pixels);
+        _fontTexture.SetDataPointerEXT(0, null, (nint)pixelData, width * height * bytesPerPixel);
         io.Fonts.SetTexID(BindTexture(_fontTexture));
         io.Fonts.ClearTexData();
+    }
+
+    private void LoadLanguageFonts(float size)
+    {
+        var io = ImGui.GetIO();
+        foreach (var (path, languageFont) in _languageFonts)
+        {
+            languageFont.Ptr = LoadFont(path, languageFont.Language.GetGlyphRange(io.Fonts), size);
+        }
+    }
+
+    public void AcquireLanguageFont(Language language)
+    {
+        var path = language.GetFont();
+        if (_languageFonts.TryGetValue(path, out var font))
+        {
+            font.ReferenceCount++;
+        }
+        else
+        {
+            _languageFonts[path] = new LanguageFont(language);
+            _fontAtlasDirty = true;
+        }
+    }
+
+    public ImFontPtr GetLanguageFont(Language language)
+    {
+        var path = language.GetFont();
+        return _languageFonts.TryGetValue(path, out var font) && font.Ptr.HasValue
+            ? font.Ptr.Value
+            : _defaultFont;
+    }
+
+    public void ReleaseLanguageFont(Language language)
+    {
+        var path = language.GetFont();
+        if (!_languageFonts.TryGetValue(path, out var font))
+        {
+            return;
+        }
+
+        font.ReferenceCount--;
+        if (font.ReferenceCount == 0)
+        {
+            _languageFonts.Remove(path);
+            _fontAtlasDirty = true;
+        }
     }
 
     /// <summary>
@@ -420,12 +479,13 @@ public partial class ImGuiService : IDisposable
         var io = ImGui.GetIO();
         var content = _game.GetService<ContentService>().Global;
         var data = content.LoadBytes(path);
-        var nativeData = CopyToNative(data);
+        var dataHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
         var config = ImGuiNative.ImFontConfig_ImFontConfig();
         config->MergeMode = 0;
         config->FontDataOwnedByAtlas = 0;
-        var font = io.Fonts.AddFontFromMemoryTTF(nativeData, data.Length, size * _displayScale, config, glyphRanges);
-        _fontDataAllocations.Add(nativeData);
+        var font = io.Fonts.AddFontFromMemoryTTF(
+            dataHandle.AddrOfPinnedObject(), data.Length, size * _displayScale, config, glyphRanges);
+        _fontDataHandles.Add(dataHandle);
         ImGuiNative.ImFontConfig_destroy(config);
         return font;
     }
@@ -442,7 +502,7 @@ public partial class ImGuiService : IDisposable
         var io = ImGui.GetIO();
         var content = _game.GetService<ContentService>().Global;
         var data = content.LoadBytes(path);
-        var nativeData = CopyToNative(data);
+        var dataHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
         var config = ImGuiNative.ImFontConfig_ImFontConfig();
         config->MergeMode = 1;
         config->FontDataOwnedByAtlas = 0;
@@ -450,18 +510,12 @@ public partial class ImGuiService : IDisposable
         config->GlyphOffset = new NVector2(0, yOffset);
 
         var rangesPtr = CopyGlyphRanges(min, max);
-        io.Fonts.AddFontFromMemoryTTF(nativeData, data.Length, size * _displayScale, config, rangesPtr);
+        io.Fonts.AddFontFromMemoryTTF(
+            dataHandle.AddrOfPinnedObject(), data.Length, size * _displayScale, config, rangesPtr);
 
-        _fontDataAllocations.Add(nativeData);
+        _fontDataHandles.Add(dataHandle);
         _fontGlyphRangeAllocations.Add(rangesPtr);
         ImGuiNative.ImFontConfig_destroy(config);
-    }
-
-    private static nint CopyToNative(byte[] data)
-    {
-        var ptr = Marshal.AllocHGlobal(data.Length);
-        Marshal.Copy(data, 0, ptr, data.Length);
-        return ptr;
     }
 
     private static unsafe nint CopyGlyphRanges(ushort min, ushort max)
@@ -475,9 +529,9 @@ public partial class ImGuiService : IDisposable
 
     private void FreeFontAtlasAllocations()
     {
-        foreach (var allocation in _fontDataAllocations)
+        foreach (var handle in _fontDataHandles)
         {
-            Marshal.FreeHGlobal(allocation);
+            handle.Free();
         }
 
         foreach (var allocation in _fontGlyphRangeAllocations)
@@ -485,7 +539,7 @@ public partial class ImGuiService : IDisposable
             Marshal.FreeHGlobal(allocation);
         }
 
-        _fontDataAllocations.Clear();
+        _fontDataHandles.Clear();
         _fontGlyphRangeAllocations.Clear();
     }
 
@@ -521,5 +575,14 @@ public partial class ImGuiService : IDisposable
                 new VertexElement(16, VertexElementFormat.Color, VertexElementUsage.Color, 0)
             );
         }
+    }
+
+    private sealed class LanguageFont(Language language)
+    {
+        public Language Language { get; } = language;
+
+        public ImFontPtr? Ptr { get; set; }
+
+        public int ReferenceCount { get; set; } = 1;
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace FezEditor.Structure;
+﻿using ImGuiNET;
+
+namespace FezEditor.Structure;
 
 public enum Language
 {
@@ -28,8 +30,33 @@ public static class LanguageExtensions
         ["zh"] = Language.Chinese
     };
 
-    public static string GetId(this Language language)
+    extension(Language language)
     {
-        return LanguageKeys.FirstOrDefault(kv => kv.Value == language).Key;
+        public string GetId()
+        {
+            return LanguageKeys.FirstOrDefault(kv => kv.Value == language).Key;
+        }
+
+        public string GetFont()
+        {
+            return language switch
+            {
+                Language.Japanese => "Fonts/NotoSansJP",
+                Language.Korean => "Fonts/NotoSansKR",
+                Language.Chinese => "Fonts/NotoSansTC",
+                _ => "Fonts/NotoSans"
+            };
+        }
+
+        public nint GetGlyphRange(ImFontAtlasPtr fonts)
+        {
+            return language switch
+            {
+                Language.Japanese => fonts.GetGlyphRangesJapanese(),
+                Language.Korean => fonts.GetGlyphRangesKorean(),
+                Language.Chinese => fonts.GetGlyphRangesChineseFull(),
+                _ => fonts.GetGlyphRangesDefault()
+            };
+        }
     }
 }

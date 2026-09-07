@@ -1,5 +1,7 @@
 using FezEditor.Components.Zu;
 using FezEditor.Tools;
+using FezEditor.Services;
+using FezEditor.Structure;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -16,7 +18,7 @@ public class ZuEditor : EditorComponent
 
     public IntPtr FontTexturePtr { get; private set; }
 
-    public ImFontPtr CharactersFont { get; private set; }
+    public ImFontPtr CharactersFont => _imgui.GetLanguageFont(_language);
 
     public int SelectedIndex { get; set; } = -1;
 
@@ -28,8 +30,15 @@ public class ZuEditor : EditorComponent
 
     private TempTextureTracker? _atlasTracker;
 
+    private readonly ImGuiService _imgui;
+
+    private readonly Language _language;
+
     public ZuEditor(Game game, string title, FezFont font) : base(game, title)
     {
+        _imgui = game.GetService<ImGuiService>();
+        _language = SelectCharactersLanguage(title);
+        _imgui.AcquireLanguageFont(_language);
         Font = font;
         FontTexture = null!;
         History.Track(font);
@@ -39,7 +48,6 @@ public class ZuEditor : EditorComponent
     {
         FontTexture = RepackerExtensions.ConvertToTexture2D(Font.Texture);
         FontTexturePtr = ImGuiX.Bind(FontTexture);
-        CharactersFont = SelectCharactersFont();
 
         _properties = new FontProperties(this);
         _preview = new FontPreview(Title, this);
@@ -177,24 +185,24 @@ public class ZuEditor : EditorComponent
         FontTexturePtr = ImGuiX.Bind(FontTexture);
     }
 
-    private ImFontPtr SelectCharactersFont()
+    private static Language SelectCharactersLanguage(string title)
     {
-        if (Title.Contains("japanese", StringComparison.OrdinalIgnoreCase))
+        if (title.Contains("japanese", StringComparison.OrdinalIgnoreCase))
         {
-            return ImGuiX.Fonts.NotoSansJp;
+            return Language.Japanese;
         }
 
-        if (Title.Contains("korean", StringComparison.OrdinalIgnoreCase))
+        if (title.Contains("korean", StringComparison.OrdinalIgnoreCase))
         {
-            return ImGuiX.Fonts.NotoSansKr;
+            return Language.Korean;
         }
 
-        if (Title.Contains("chinese", StringComparison.OrdinalIgnoreCase))
+        if (title.Contains("chinese", StringComparison.OrdinalIgnoreCase))
         {
-            return ImGuiX.Fonts.NotoSansTc;
+            return Language.Chinese;
         }
 
-        return ImGuiX.Fonts.NotoSans;
+        return Language.English;
     }
 
     public override void Dispose()
@@ -208,6 +216,7 @@ public class ZuEditor : EditorComponent
         ImGuiX.Unbind(FontTexture);
         FontTexture.Dispose();
         FontTexturePtr = IntPtr.Zero;
+        _imgui.ReleaseLanguageFont(_language);
         base.Dispose();
     }
 

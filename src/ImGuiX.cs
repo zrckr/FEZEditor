@@ -1022,19 +1022,4 @@ public static class ImGuiX
     }
 
     #endregion
-
-    #region Fonts
-
-    public static class Fonts
-    {
-        public static ImFontPtr NotoSans { get; set; } = null!;
-
-        public static ImFontPtr NotoSansJp { get; set; } = null!;
-
-        public static ImFontPtr NotoSansKr { get; set; } = null!;
-
-        public static ImFontPtr NotoSansTc { get; set; } = null!;
-    }
-
-    #endregion
 }

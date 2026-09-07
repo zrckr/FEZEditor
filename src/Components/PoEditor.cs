@@ -1,5 +1,6 @@
 ﻿using FezEditor.Structure;
 using FezEditor.Tools;
+using FezEditor.Services;
 using FEZRepacker.Core.Definitions.Game.Helpers;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
@@ -17,6 +18,8 @@ public class PoEditor : EditorComponent
     private readonly ConfirmWindow _confirm;
 
     private readonly TextStorage _textStorage;
+
+    private readonly ImGuiService _imgui;
 
     private readonly List<string[]> _textTable = new();
 
@@ -37,6 +40,8 @@ public class PoEditor : EditorComponent
     public PoEditor(Game game, string title, TextStorage textStorage) : base(game, title)
     {
         _textStorage = textStorage;
+        _imgui = game.GetService<ImGuiService>();
+        _imgui.AcquireLanguageFont(_selectedLanguage);
         History.Track(_textStorage);
         History.StateChanged += _ => UpdateTableView();
         Game.AddComponent(_edit = new EditWindow(game));
@@ -45,8 +50,10 @@ public class PoEditor : EditorComponent
 
     public override void Dispose()
     {
+        _imgui.ReleaseLanguageFont(_selectedLanguage);
         Game.RemoveComponent(_edit);
         Game.RemoveComponent(_confirm);
+        base.Dispose();
     }
 
     public override void LoadContent()
@@ -86,7 +93,10 @@ public class PoEditor : EditorComponent
         ImGui.SetNextItemWidth(120);
         if (ImGui.Combo("Language", ref language, languages, languages.Length))
         {
-            _selectedLanguage = (Language)language;
+            var selectedLanguage = (Language)language;
+            _imgui.AcquireLanguageFont(selectedLanguage);
+            _imgui.ReleaseLanguageFont(_selectedLanguage);
+            _selectedLanguage = selectedLanguage;
             UpdateTableView();
         }
 
@@ -130,8 +140,7 @@ public class PoEditor : EditorComponent
                 sortSpecs.SpecsDirty = false;
             }
 
-            var languageFont = GetLanguageFont();
-
+            var languageFont = _imgui.GetLanguageFont(_selectedLanguage);
             for (var i = 0; i < _textTable.Count; i++)
             {
                 var row = _textTable[i];
@@ -293,10 +302,9 @@ public class PoEditor : EditorComponent
         }
 
         _edit.Text = $"Editing {ColumnNames[_activeCell.Column]}...";
-        var font = GetLanguageFont();
         _edit.EditValue = () =>
         {
-            ImGui.PushFont(font);
+            ImGui.PushFont(_imgui.GetLanguageFont(_selectedLanguage));
             ImGuiX.InputTextMultiline("##edit", ref _cellText, 2048, new Vector2(-1, 240));
             ImGui.PopFont();
             return true;
@@ -356,17 +364,6 @@ public class PoEditor : EditorComponent
         };
 
         _nextState = State.TableView;
-    }
-
-    private ImFontPtr GetLanguageFont()
-    {
-        return _selectedLanguage switch
-        {
-            Language.Japanese => ImGuiX.Fonts.NotoSansJp,
-            Language.Korean => ImGuiX.Fonts.NotoSansKr,
-            Language.Chinese => ImGuiX.Fonts.NotoSansTc,
-            _ => ImGuiX.Fonts.NotoSans
-        };
     }
 
     private static string NormalizeLineEndings(string text)
