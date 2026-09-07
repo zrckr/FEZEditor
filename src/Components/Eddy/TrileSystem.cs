@@ -3,8 +3,10 @@ using FezEditor.Structure;
 using FezEditor.Tools;
 using FEZRepacker.Core.Definitions.Game.Common;
 using FEZRepacker.Core.Definitions.Game.Level;
+using FEZRepacker.Core.Definitions.Game.TrileSet;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace FezEditor.Components.Eddy;
 
@@ -20,8 +22,13 @@ public class TrileSystem : EddySystem
 
     private IDisposable? _multiPositionScope;
 
+    private Texture2D? _textureAtlas;
+
+    private readonly Dictionary<string, Texture2D> _collisionTextures = new();
+
     public override void Initialize()
     {
+        LoadTextures();
         var ids = Level.Triles.Values
             .Where(ti => ti.TrileId != EddyEditor.InvalidId)
             .SelectMany(ti => Enumerable.Repeat(ti.TrileId, 1)
@@ -124,7 +131,7 @@ public class TrileSystem : EddySystem
         if (!actor.HasComponent<TrilesMesh>())
         {
             var mesh = actor.AddComponent<TrilesMesh>();
-            mesh.Visualize(trile, Eddy.TrileSet.TextureAtlas);
+            mesh.Visualize(trile, _textureAtlas, _collisionTextures);
         }
 
         return actor;
@@ -647,10 +654,37 @@ public class TrileSystem : EddySystem
         return new Color(0, 0, 0, 96);
     }
 
+    private void LoadTextures()
+    {
+        if (Eddy.TrileSet.TextureAtlas != null)
+        {
+            _textureAtlas = RepackerExtensions.ConvertToTexture2D(Eddy.TrileSet.TextureAtlas);
+        }
+
+        foreach (var collision in Enum.GetValues<CollisionType>())
+        {
+            var texture = Content.Load<Texture2D>($"Textures/{collision}");
+            _collisionTextures.Add($"{collision}Texture", texture);
+        }
+    }
+
+    private void UnloadTextures()
+    {
+        foreach (var texture in _collisionTextures.Values)
+        {
+            texture.Dispose();
+        }
+
+        _collisionTextures.Clear();
+        _textureAtlas?.Dispose();
+        _textureAtlas = null;
+    }
+
     public override void Dispose()
     {
         GC.SuppressFinalize(this);
         _positionScope?.Dispose();
         _multiPositionScope?.Dispose();
+        UnloadTextures();
     }
 }

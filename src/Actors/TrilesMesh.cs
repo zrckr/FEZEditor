@@ -48,8 +48,6 @@ public class TrilesMesh : ActorComponent, IPickable
 
     private readonly Rid _displacementMaterial;
 
-    private Texture2D? _texture;
-
     private bool _instancesDirty;
 
     private Vector3 _size;
@@ -74,13 +72,6 @@ public class TrilesMesh : ActorComponent, IPickable
     {
         var effect = content.Load<Effect>("Effects/TrilesMesh");
         _rendering.MaterialAssignEffect(_material, effect);
-
-        foreach (var collision in Enum.GetValues<CollisionType>())
-        {
-            var texture = content.Load<Texture2D>($"Textures/{collision}");
-            _rendering.MaterialShaderSetParam(_material, $"{collision}Texture", texture);
-        }
-
         _rendering.MaterialAssignEffect(_displacementMaterial, _rendering.BasicEffectVertexColor);
         _rendering.MaterialSetCullMode(_displacementMaterial, CullMode.None);
     }
@@ -88,13 +79,14 @@ public class TrilesMesh : ActorComponent, IPickable
     public override void Dispose()
     {
         GC.SuppressFinalize(this);
-        _texture?.Dispose();
         _rendering.FreeRid(_multiMesh);
         _rendering.FreeRid(_mesh);
         _rendering.FreeRid(_material);
+        _rendering.FreeRid(_displacementMesh);
+        _rendering.FreeRid(_displacementMaterial);
     }
 
-    public void Visualize(Trile trile, RTexture2D? textureAtlas)
+    public void Visualize(Trile trile, Texture2D? textureAtlas, IDictionary<string, Texture2D> collisionTextures)
     {
         _size = trile.Size.ToXna();
         _offset = trile.Offset.ToXna();
@@ -110,16 +102,14 @@ public class TrilesMesh : ActorComponent, IPickable
 
         if (HasGeometry)
         {
-            _texture?.Dispose();
-
             if (textureAtlas != null)
             {
-                _texture = RepackerExtensions.ConvertToTexture2D(textureAtlas);
-                _rendering.MaterialAssignBaseTexture(_material, _texture);
+                _rendering.MaterialAssignBaseTexture(_material, textureAtlas);
             }
-            else
+
+            foreach (var (name, texture) in collisionTextures)
             {
-                _texture = null;
+                _rendering.MaterialShaderSetParam(_material, name, texture);
             }
 
             _rendering.MaterialSetDepthBias(_material, 0f, 0f);

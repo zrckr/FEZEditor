@@ -496,6 +496,7 @@ public class EddyEditor : EditorComponent
             system.Input = InputService;
             system.Storage = StorageService;
             system.Hints = _inputHints;
+            system.Content = ContentManager;
             system.Initialize();
             collection.Add(system);
         }
