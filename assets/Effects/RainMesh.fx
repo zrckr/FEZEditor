@@ -4,11 +4,10 @@ struct VS_INPUT
 {
     float4 Position : POSITION0;
     float2 TexCoord : TEXCOORD0;
-    float InstanceIndex : TEXCOORD1;
-    float3 InstancePosition : TEXCOORD2;
-    float4 InstanceQuaternion : TEXCOORD3;
-    float3 InstanceScale : TEXCOORD4;
-    float4 InstanceColor : TEXCOORD5;
+    float3 InstancePosition : TEXCOORD1;
+    float4 InstanceQuaternion : TEXCOORD2;
+    float3 InstanceScale : TEXCOORD3;
+    float4 InstanceColor : TEXCOORD4;
 };
 
 struct VS_OUTPUT

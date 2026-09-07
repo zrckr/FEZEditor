@@ -21,11 +21,10 @@ struct VS_INPUT
     float4 Position : POSITION0;
     float3 Normal : NORMAL0;
     float2 TexCoord : TEXCOORD0;
-    float InstanceIndex : TEXCOORD1;
-    float4 InstancePositionCollision : TEXCOORD2;
-    float4 InstanceQuaternion : TEXCOORD3;
-    float4 InstanceTint : TEXCOORD4;
-    float4 InstanceCollisionTypes : TEXCOORD5;
+    float4 InstancePositionCollision : TEXCOORD1;
+    float4 InstanceQuaternion : TEXCOORD2;
+    float4 InstanceTint : TEXCOORD3;
+    float4 InstanceCollisionTypes : TEXCOORD4;
 };
 
 struct VS_OUTPUT

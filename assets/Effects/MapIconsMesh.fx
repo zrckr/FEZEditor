@@ -7,10 +7,9 @@ struct VS_INPUT
 {
     float4 Position : POSITION0;
     float2 TexCoord : TEXCOORD0;
-    float InstanceIndex : TEXCOORD1;
-    float3 InstancePosition : TEXCOORD2;
-    float3 InstanceScale : TEXCOORD3;
-    float4 InstanceTexCoord : TEXCOORD4;
+    float3 InstancePosition : TEXCOORD1;
+    float3 InstanceScale : TEXCOORD2;
+    float4 InstanceTexCoord : TEXCOORD3;
 };
 
 struct VS_OUTPUT

@@ -21,10 +21,9 @@ struct VS_INPUT
     float4 Position : POSITION0;
     float3 Normal : NORMAL0;
     float2 TexCoord : TEXCOORD0;
-    float InstanceIndex : TEXCOORD1;
-    float4 InstancePosition : TEXCOORD2;
-    float4 InstanceQuaternion : TEXCOORD3;
-    float4 InstanceSizeType : TEXCOORD4;
+    float4 InstancePosition : TEXCOORD1;
+    float4 InstanceQuaternion : TEXCOORD2;
+    float4 InstanceSizeType : TEXCOORD3;
 };
 
 struct VS_OUTPUT

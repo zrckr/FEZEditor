@@ -10,9 +10,11 @@ public partial class RenderingService
     {
         public Rid Mesh;
         public int InstanceCount;
+        public int InstanceCapacity;
         public int VisibleInstances = -1; // -1 = all
         public MultiMeshDataType DataType;
-        public float[] UploadBuffer = Array.Empty<float>(); // pre-allocated, reused every frame
+        public Matrix[] MatrixUploadBuffer = Array.Empty<Matrix>();
+        public Vector4[] VectorUploadBuffer = Array.Empty<Vector4>();
         public bool Dirty = true;
 
         // GPU buffers for hardware instancing.
@@ -48,56 +50,39 @@ public partial class RenderingService
     public void MultiMeshAllocate(Rid multiMesh, int instances, MultiMeshDataType dataType)
     {
         var data = GetResource(_multiMeshes, multiMesh);
-        data.InstanceBuffer?.Dispose();
-        data.InstanceDeclaration?.Dispose();
-        data.TemplateVertexBuffer = null;
-        data.TemplateIndexBuffer = null;
-        data.InstanceBuffer = null;
-        data.InstanceDeclaration = null;
+        EnsureMultiMeshCapacity(data, instances, dataType);
         data.InstanceCount = instances;
-        data.DataType = dataType;
         data.VisibleInstances = instances;
         data.Dirty = true;
-
-        // Pre-allocate upload buffer
-        var stride = dataType.GetStride();
-        var floatsPerInstance = dataType.GetFloatsPerInstance();
-        data.UploadBuffer = new float[instances * floatsPerInstance];
-
-        // Pre-fill instance indices (never change after allocation).
-        for (var i = 0; i < instances; i++)
-        {
-            data.UploadBuffer[i * floatsPerInstance] = i;
-        }
-
-        // Build instance vertex declaration.
-        // Layout: InstanceIndex (TEXCOORD1) + Data0..DataN (TEXCOORD2..TEXCOORD5)
-        var elements = new VertexElement[1 + stride];
-        var offset = 0;
-
-        // InstanceIndex: float -> TEXCOORD1
-        elements[0] = new VertexElement(offset, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 1);
-        offset += sizeof(float);
-
-        // Data0..DataN: Vector4 -> TEXCOORD2..TEXCOORD5
-        for (var i = 0; i < stride; i++)
-        {
-            elements[1 + i] = new VertexElement(offset, VertexElementFormat.Vector4,
-                VertexElementUsage.TextureCoordinate, 2 + i);
-            offset += 16; // sizeof(Vector4)
-        }
-
-        if (instances <= 0)
-        {
-            Logger.Verbose("MultiMesh {0} allocated {1} instance(s), dataType={2}", multiMesh, instances, dataType);
-            return;
-        }
-
-        // Allocate instance buffer.
-        data.InstanceDeclaration = new VertexDeclaration(offset, elements);
-        data.InstanceBuffer =
-            new DynamicVertexBuffer(GraphicsDevice, data.InstanceDeclaration, instances, BufferUsage.WriteOnly);
         Logger.Verbose("MultiMesh {0} allocated {1} instance(s), dataType={2}", multiMesh, instances, dataType);
+    }
+
+    public int MultiMeshSetInstances(Rid multiMesh, IEnumerable<Matrix> instances)
+    {
+        ArgumentNullException.ThrowIfNull(instances);
+        var data = GetResource(_multiMeshes, multiMesh);
+        var count = 0;
+
+        if (instances.TryGetNonEnumeratedCount(out var knownCount))
+        {
+            EnsureMultiMeshCapacity(data, knownCount, MultiMeshDataType.Matrix);
+        }
+
+        foreach (var instance in instances)
+        {
+            if (count == data.InstanceCapacity)
+            {
+                var capacity = Math.Max(4, data.InstanceCapacity * 2);
+                EnsureMultiMeshCapacity(data, capacity, MultiMeshDataType.Matrix);
+            }
+
+            data.MatrixUploadBuffer[count++] = instance;
+        }
+
+        data.InstanceCount = count;
+        data.VisibleInstances = count;
+        data.Dirty = true;
+        return count;
     }
 
     public void MultiMeshDeallocate(Rid multiMesh)
@@ -135,24 +120,7 @@ public partial class RenderingService
                 "MultiMesh was allocated with Vector4 data type, use MultiMeshSetInstanceVector4");
         }
 
-        var offset = (index * mm.DataType.GetFloatsPerInstance()) + 1;
-        var b = mm.UploadBuffer;
-        b[offset] = value.M11;
-        b[offset + 1] = value.M12;
-        b[offset + 2] = value.M13;
-        b[offset + 3] = value.M14;
-        b[offset + 4] = value.M21;
-        b[offset + 5] = value.M22;
-        b[offset + 6] = value.M23;
-        b[offset + 7] = value.M24;
-        b[offset + 8] = value.M31;
-        b[offset + 9] = value.M32;
-        b[offset + 10] = value.M33;
-        b[offset + 11] = value.M34;
-        b[offset + 12] = value.M41;
-        b[offset + 13] = value.M42;
-        b[offset + 14] = value.M43;
-        b[offset + 15] = value.M44;
+        mm.MatrixUploadBuffer[index] = value;
         mm.Dirty = true;
     }
 
@@ -166,12 +134,7 @@ public partial class RenderingService
                 "MultiMesh was allocated with Matrix data type, use MultiMeshSetInstanceMatrix");
         }
 
-        var offset = (index * mm.DataType.GetFloatsPerInstance()) + 1;
-        var b = mm.UploadBuffer;
-        b[offset] = value.X;
-        b[offset + 1] = value.Y;
-        b[offset + 2] = value.Z;
-        b[offset + 3] = value.W;
+        mm.VectorUploadBuffer[index] = value;
         mm.Dirty = true;
     }
 
@@ -222,8 +185,14 @@ public partial class RenderingService
         {
             if (mm.InstanceBuffer != null)
             {
-                var floatsPerInstance = mm.DataType.GetFloatsPerInstance();
-                mm.InstanceBuffer.SetData(mm.UploadBuffer, 0, visible * floatsPerInstance, SetDataOptions.Discard);
+                if (mm.DataType == MultiMeshDataType.Matrix)
+                {
+                    mm.InstanceBuffer.SetData(mm.MatrixUploadBuffer, 0, visible, SetDataOptions.Discard);
+                }
+                else
+                {
+                    mm.InstanceBuffer.SetData(mm.VectorUploadBuffer, 0, visible, SetDataOptions.Discard);
+                }
             }
 
             mm.Dirty = false;
@@ -243,7 +212,7 @@ public partial class RenderingService
         }
 
         ApplyMaterialState(mat);
-        if (mat!.Effect is BasicEffect)
+        if (mat.Effect is BasicEffect)
         {
             UpdateBasicEffect(world, mat, matrices);
         }
@@ -310,5 +279,52 @@ public partial class RenderingService
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"MultiMesh instance index {index} out of range [0, {mm.InstanceCount})");
         }
+    }
+
+    private void EnsureMultiMeshCapacity(MultiMeshData data, int capacity, MultiMeshDataType dataType)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
+
+        var typeChanged = data.InstanceCapacity > 0 && data.DataType != dataType;
+        if (!typeChanged && capacity <= data.InstanceCapacity)
+        {
+            data.DataType = dataType;
+            return;
+        }
+
+        data.InstanceBuffer?.Dispose();
+        data.InstanceDeclaration?.Dispose();
+        data.InstanceBuffer = null;
+        data.InstanceDeclaration = null;
+        data.DataType = dataType;
+        data.InstanceCapacity = capacity;
+
+        if (dataType == MultiMeshDataType.Matrix)
+        {
+            Array.Resize(ref data.MatrixUploadBuffer, capacity);
+            data.VectorUploadBuffer = Array.Empty<Vector4>();
+        }
+        else
+        {
+            Array.Resize(ref data.VectorUploadBuffer, capacity);
+            data.MatrixUploadBuffer = Array.Empty<Matrix>();
+        }
+
+        if (capacity == 0)
+        {
+            return;
+        }
+
+        var stride = dataType.GetStride();
+        var elements = new VertexElement[stride];
+        for (var i = 0; i < stride; i++)
+        {
+            elements[i] = new VertexElement(i * 16, VertexElementFormat.Vector4,
+                VertexElementUsage.TextureCoordinate, 1 + i);
+        }
+
+        data.InstanceDeclaration = new VertexDeclaration(stride * 16, elements);
+        data.InstanceBuffer =
+            new DynamicVertexBuffer(GraphicsDevice, data.InstanceDeclaration, capacity, BufferUsage.WriteOnly);
     }
 }

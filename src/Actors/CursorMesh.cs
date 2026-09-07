@@ -283,8 +283,6 @@ public sealed class CursorMesh : ActorComponent
 
         private PrimitiveType _primitive;
 
-        private int _instanceCount;
-
         private bool _loaded;
 
         public Batch(RenderingService rendering, Rid parent)
@@ -327,20 +325,8 @@ public sealed class CursorMesh : ActorComponent
 
         public void SetInstances(IEnumerable<Matrix> instances)
         {
-            var data = instances as IReadOnlyList<Matrix> ?? instances.ToList();
-            if (_instanceCount != data.Count)
-            {
-                _rendering.MultiMeshAllocate(_multiMesh, data.Count, MultiMeshDataType.Matrix);
-                _instanceCount = data.Count;
-            }
-
-            for (var i = 0; i < data.Count; i++)
-            {
-                _rendering.MultiMeshSetInstanceMatrix(_multiMesh, i, data[i]);
-            }
-
-            _rendering.MultiMeshSetVisibleInstances(_multiMesh, data.Count);
-            _rendering.InstanceSetVisibility(_instance, data.Count > 0);
+            var count = _rendering.MultiMeshSetInstances(_multiMesh, instances);
+            _rendering.InstanceSetVisibility(_instance, count > 0);
         }
 
         public void Clear()

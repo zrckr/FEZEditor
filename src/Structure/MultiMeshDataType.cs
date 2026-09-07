@@ -17,10 +17,4 @@ public static class MultiMeshDataTypeExtensions
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
         };
     }
-
-    public static int GetFloatsPerInstance(this MultiMeshDataType type)
-    {
-        // 1 float (index) + Stride * 4 floats (data) per instance.
-        return 1 + (type.GetStride() * 4);
-    }
 }

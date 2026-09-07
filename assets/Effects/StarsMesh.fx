@@ -11,8 +11,7 @@ struct VS_INPUT
 {
     float4 Position : POSITION0;
     float2 TexCoord : TEXCOORD0;
-    float InstanceIndex : TEXCOORD1;
-    float4 InstancePositionColorIndex : TEXCOORD2;
+    float4 InstancePositionColorIndex : TEXCOORD1;
 };
 
 struct VS_OUTPUT
